@@ -9,7 +9,6 @@ execs=$(patsubst bin/%.cpp, exe/%, $(wildcard bin/*.cpp))
 all: $(execs) libhgcalconverter.so
 
 
-
 exe/%: bin/%.cpp Makefile $(OBJ_FILES)
 	g++ $(CC_FLAGS) $(LD_FLAGS) $(OBJ_FILES) $< -o $@ 
 
