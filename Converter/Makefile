@@ -5,13 +5,13 @@ CC_FLAGS := -fPIC -Wall `root-config --cflags`
 CC_FLAGS += -I./include -O2 
 
 
+execs=$(patsubst bin/%.cpp, exe/%, $(wildcard bin/*.cpp))
+all: $(execs) libhgcalconverter.so
 
-all: $(patsubst bin/%.cpp, %, $(wildcard bin/*.cpp)) libhgcalconverter.so
 
 
-
-%: bin/%.cpp Makefile $(OBJ_FILES)
-	g++ $(CC_FLAGS) $(LD_FLAGS) $(OBJ_FILES) $< -o exe/$@ 
+exe/%: bin/%.cpp Makefile $(OBJ_FILES)
+	g++ $(CC_FLAGS) $(LD_FLAGS) $(OBJ_FILES) $< -o $@ 
 
 libhgcalconverter.so: $(OBJ_FILES)
 	g++ -shared $(LD_FLAGS) -o $@ $^
@@ -22,5 +22,4 @@ obj/%.o: src/%.cpp
 
 clean: 
 	rm -f obj/*.o obj/*.d
-	rm -f exe/*
-	touch bin/*
+	rm -f $(execs)

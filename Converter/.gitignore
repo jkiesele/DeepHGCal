@@ -1,2 +1,4 @@
 *.so
 obj/*.o
+exe/*
+!exe/README
