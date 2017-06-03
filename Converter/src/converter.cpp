@@ -48,6 +48,7 @@ void converter::Loop(){
    fChain->SetBranchStatus("rechit_phi",1);
    fChain->SetBranchStatus("rechit_energy",1);
    fChain->SetBranchStatus("rechit_time",1);
+   fChain->SetBranchStatus("rechit_layer",1);
 
 
 
@@ -113,7 +114,8 @@ void converter::Loop(){
 		  for(size_t i_r=0;i_r<rechit_eta->size();i_r++){
 			  if(s.matches(rechit_eta->at(i_r),rechit_phi->at(i_r), 0.2 )){
 				  recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
-						  rechit_energy->at(i_r),rechit_time->at(i_r));
+						  rechit_energy->at(i_r),rechit_time->at(i_r),
+						  rechit_layer->at(i_r));
 
 			  }
 		  }
