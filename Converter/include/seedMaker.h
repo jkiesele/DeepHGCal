@@ -11,7 +11,7 @@
 
 #include <cmath>
 #include <vector>
-
+#include <limits>
 //helper
 
 class seed{
@@ -19,16 +19,22 @@ public:
 	seed(const float& eta, const float& phi):
 	eta_(eta),phi_(phi){}
 
-	inline bool matches(const float& eta, const float& phi, const float& dR)const{
+	inline float matches(const float& eta, const float& phi, const float& dR)const{
 		float deltaeta=eta_-eta;
 		if(fabs(deltaeta)>dR)
-			return false;
+			return 0;
 		float deltaphi=phi_-phi;
 		if(fabs(deltaphi)>dR)
-			return false;
+			return 0;
 
 		float deltaR2=deltaeta*deltaeta + deltaphi*deltaphi;
-		return deltaR2<dR;
+		if(deltaR2<dR*dR){
+			if(deltaR2)
+				return sqrt(deltaR2);
+			else
+				return std::numeric_limits<float>::min();
+		}
+		return 0;
 
 	}
 

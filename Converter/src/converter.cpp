@@ -92,6 +92,8 @@ void converter::Loop(){
     	  //get truth
     	  bool hastruthmatch=false;
     	  int truthid=0;
+
+    	  //change to look for the best truth match, not only any within the cone
     	  for(size_t i_t=0;i_t<genpart_eta->size();i_t++){
 
     		  //change to best match here
