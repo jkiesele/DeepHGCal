@@ -11,7 +11,7 @@ all: $(patsubst bin/%.cpp, %, $(wildcard bin/*.cpp)) libhgcalconverter.so
 
 
 %: bin/%.cpp Makefile $(OBJ_FILES)
-	g++ $(CC_FLAGS) $(LD_FLAGS) $(OBJ_FILES) $< -o $@ 
+	g++ $(CC_FLAGS) $(LD_FLAGS) $(OBJ_FILES) $< -o exe/$@ 
 
 libhgcalconverter.so: $(OBJ_FILES)
 	g++ -shared $(LD_FLAGS) -o $@ $^
@@ -22,4 +22,5 @@ obj/%.o: src/%.cpp
 
 clean: 
 	rm -f obj/*.o obj/*.d
+	rm -f exe/*
 	touch bin/*
