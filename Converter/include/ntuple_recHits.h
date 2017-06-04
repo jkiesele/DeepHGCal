@@ -41,7 +41,7 @@ private:
 	float rechit_eta_[MAX_RECHITS];
 	float rechit_phi_[MAX_RECHITS];
 	float rechit_time_[MAX_RECHITS];
-	int rechit_layer_[MAX_RECHITS];
+	float rechit_layer_[MAX_RECHITS];
 
 };
 

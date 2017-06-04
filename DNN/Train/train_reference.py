@@ -55,9 +55,9 @@ print ('start')
 
 testrun=False
 
-nepochs=10
-batchsize=20
-startlearnrate=0.0005
+nepochs=50
+batchsize=400
+startlearnrate=0.005
 from DeepJet_callbacks import DeepJet_callbacks
 
 callbacks=DeepJet_callbacks(stop_patience=300, 
@@ -95,16 +95,16 @@ inputs = [Input(shape=shapes[0],name='globals'),
 #model = Dense_model2(inputs,traind.getTruthShape()[0],(traind.getInputShapes()[0],))
 
 from DeepHGCal_models import HGCal_model_reg
-model = HGCal_model_reg(inputs,traind.getTruthShape()[0],shapes,0.1)
+model = HGCal_model_reg(inputs,traind.getTruthShape()[0],shapes,0.4)
 print('compiling')
 
-
+from Losses import loss_NLL
 from keras.optimizers import Adam
 adam = Adam(lr=startlearnrate)
-model.compile(loss=['categorical_crossentropy','mean_absolute_percentage_error'], 
+model.compile(loss=['categorical_crossentropy',loss_NLL], 
               optimizer=adam,
               metrics=['accuracy','accuracy'],
-              loss_weights=[1., 0.05])#strong focus on flavour
+              loss_weights=[1., 0.5])#strong focus on flavour
 
 # This stores the history of the training to e.g. allow to plot the learning curve
 
@@ -154,9 +154,9 @@ plt.savefig(outputDir+'learningcurve.pdf')
 #plt.show()
 
 plt.figure(2)
-plt.plot(callbacks.history.history['acc'])
+plt.plot(callbacks.history.history['ID_pred_acc'])
 #print(callbacks.history.history['val_loss'],history.history['loss'])
-plt.plot(callbacks.history.history['val_acc'])
+plt.plot(callbacks.history.history['val_ID_pred_acc'])
 plt.title('model accuracy')
 plt.ylabel('acc')
 plt.xlabel('epoch')

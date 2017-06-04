@@ -27,6 +27,14 @@ public:
 		event_=event;
 	}
 
+	void setMultiCluster(const float& eta,
+            const float& phi,
+            const float& energy){
+        multicluster_eta_=eta;
+        multicluster_phi_=phi;
+        multicluster_energy_=energy;
+    }
+
 	void setTruthKinematics(const float& eta,
 			const float& phi,
 			const float& energy){
@@ -50,6 +58,12 @@ private:
 	float seed_eta_;
 	float seed_phi_;
 	int   seed_index_;
+
+	//for comparison
+    float multicluster_eta_;
+    float multicluster_phi_;
+    float multicluster_energy_;
+
 
 	//DNN truth branches
 	float true_eta_;

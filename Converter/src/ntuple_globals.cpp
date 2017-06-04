@@ -22,6 +22,10 @@ void ntuple_globals::reset(){
 	seed_phi_=0;
 	seed_index_=0;
 
+    multicluster_eta_=0;
+    multicluster_phi_=0;
+    multicluster_energy_=0;
+
 	true_eta_=0;
 	true_phi_=0;
 	true_energy_=0;
@@ -62,6 +66,11 @@ void ntuple_globals::initDNNBranches(TTree* t){
 	addBranch(t,"seed_eta",   &seed_eta_,   "seed_eta_/f");
 	addBranch(t,"seed_phi",   &seed_phi_,   "seed_phi_/f");
 	addBranch(t,"seed_index", &seed_index_, "seed_index_/i");
+
+
+	addBranch(t,"multicluster_eta",   &multicluster_eta_,   "multicluster_eta_/f");
+	addBranch(t,"multicluster_phi",   &multicluster_phi_,   "multicluster_phi_/f");
+	addBranch(t,"multicluster_energy",   &multicluster_energy_,   "multicluster_energy_/f");
 
 	addBranch(t,"true_eta",   &true_eta_,   "true_eta_/f");
 	addBranch(t,"true_phi",   &true_phi_,   "true_phi_/f");

@@ -25,6 +25,7 @@ class TrainData_reference(TrainData):
         self.registerBranches(['rechit_energy',
                                'rechit_eta',
                                'rechit_phi',
+                               'rechit_layer',
                                'nrechits',
                                'seed_eta',
                                'seed_phi',
@@ -53,7 +54,7 @@ class TrainData_reference(TrainData):
     def readFromRootFile(self,filename,TupleMeanStd, weighter):
         
         #the first part is standard, no changes needed
-        from preprocessing import MeanNormApply, createDensityMap, MeanNormZeroPad, MeanNormZeroPadParticles
+        from preprocessing import MeanNormApply,createDensityLayers, createDensityMap, MeanNormZeroPad, MeanNormZeroPadParticles
         import numpy
         import ROOT
         
@@ -70,12 +71,19 @@ class TrainData_reference(TrainData):
         
         
         #flatten everything out for now
-        x_chmap = createDensityMap(filename,TupleMeanStd,
-                                   'rechit_energy', #use the energy to create the image
-                                   self.nsamples,
-                                   ['rechit_eta','seed_eta',3,0.2], 
-                                   ['rechit_phi','seed_phi',3,0.2],
-                                   'nrechits')    
+        x_chmap = createDensityLayers(filename,
+                                      TupleMeanStd,
+                                      inbranch='rechit_energy', 
+                                      layerbranch='rechit_layer',
+                                      maxlayers=50,
+                                      layeroffset=1,
+                                      nevents=self.nsamples,
+                                      dimension1=['rechit_eta','seed_eta',19,0.2], 
+                                      dimension2=['rechit_phi','seed_phi',19,0.2],
+                                      counterbranch='nrechits')
+        
+        
+        
         
         Tuple = self.readTreeFromRootToTuple(filename)
         
