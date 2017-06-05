@@ -10,7 +10,7 @@
 #include "../include/seedMaker.h"
 #include <stdexcept>
 
-void seedMaker::createSeedsFromSimClusters(const std::vector<float> *etas,
+void seedMaker::createSeedsFromCollection(const std::vector<float> *etas,
 		const std::vector<float> *phis){
 
 	if(etas->size()!=phis->size())

@@ -14,14 +14,14 @@ def HGCal_model_reg(Inputs,nclasses,Inputshape,dropoutRate=0.25):
     
     x=Inputs[1]
     
-    #first shower z direction
-    x=Convolution2D(64,kernel_size=(3,3), activation='relu',kernel_initializer='lecun_uniform')(x)
+   
+    x=Convolution3D(8,kernel_size=(3,3,3), activation='relu',kernel_initializer='lecun_uniform')(x)
     x = Dropout(dropoutRate)(x)
-    x=Convolution2D(64,kernel_size=(3,3), activation='relu',kernel_initializer='lecun_uniform')(x)
+    x=Convolution3D(8,kernel_size=(3,3,3), activation='relu',kernel_initializer='lecun_uniform')(x)
     x = Dropout(dropoutRate)(x)
-    x=Convolution2D(64,kernel_size=(6,6), activation='relu',kernel_initializer='lecun_uniform')(x)
-    x = Dropout(dropoutRate)(x)
-    x=Convolution2D(5,kernel_size=(6,6),strides=(3,3), activation='relu',kernel_initializer='lecun_uniform')(x)
+    #x=Convolution3D(64,kernel_size=(6,6,6), activation='relu',kernel_initializer='lecun_uniform')(x)
+    #x = Dropout(dropoutRate)(x)
+    x=Convolution3D(3,kernel_size=(6,6,6),strides=(3,3,3), activation='relu',kernel_initializer='lecun_uniform')(x)
     x = Dropout(dropoutRate)(x)
 
     x = Flatten()(x)
@@ -43,6 +43,8 @@ def HGCal_model_reg(Inputs,nclasses,Inputshape,dropoutRate=0.25):
     
     predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
     predictE=Dense(2, activation='linear',kernel_initializer='ones',name='E_pred')(x)
+    
+    
    
     predictions = [predictID,predictE]
                    

@@ -49,7 +49,7 @@ class seedMaker{
 public:
 	seedMaker(){}
 
-	void createSeedsFromSimClusters(const std::vector<float> *etas,
+	void createSeedsFromCollection(const std::vector<float> *etas,
 			const std::vector<float> *phis);
 
 	const std::vector<seed>& seeds()const{return seeds_;}

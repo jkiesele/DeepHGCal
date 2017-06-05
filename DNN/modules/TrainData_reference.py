@@ -40,14 +40,14 @@ class TrainData_reference(TrainData):
     
     def reduceTruth(self, tuple_in):
         import numpy
-        self.reducedtruthclasses=['isReal','isFake']
+        self.reducedtruthclasses=['isGamma','isHadron','isFake']
         if tuple_in is not None:
             q = tuple_in['isGamma'].view(numpy.ndarray)
             w = tuple_in['isHadron'].view(numpy.ndarray)
             t = tuple_in['isFake'].view(numpy.ndarray)
-            real=q+w
+            #real=q+w
             
-            return numpy.vstack((real,t)).transpose()  
+            return numpy.vstack((q,w,t)).transpose()  
         
         
     
@@ -75,14 +75,22 @@ class TrainData_reference(TrainData):
                                       TupleMeanStd,
                                       inbranch='rechit_energy', 
                                       layerbranch='rechit_layer',
-                                      maxlayers=50,
+                                      maxlayers=55,
                                       layeroffset=1,
                                       nevents=self.nsamples,
-                                      dimension1=['rechit_eta','seed_eta',19,0.2], 
-                                      dimension2=['rechit_phi','seed_phi',19,0.2],
+                                      dimension1=['rechit_eta','seed_eta',23,0.3], 
+                                      dimension2=['rechit_phi','seed_phi',23,0.3],
                                       counterbranch='nrechits')
         
-        
+        from plotting import plot4d, rotanimate
+        giffile=filename.replace('/','_')
+        for i in range(0,3):
+            ax,_=plot4d(x_chmap[i],giffile+"_"+str(i)+".pdf",'etabin','layer','phibin')
+            rotanimate(ax,giffile+'_'+str(i)+'.gif',delay=5,prefix=giffile)
+        #
+        #
+        #
+        #exit()
         
         
         Tuple = self.readTreeFromRootToTuple(filename)

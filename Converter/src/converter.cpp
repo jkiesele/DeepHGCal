@@ -85,7 +85,7 @@ void converter::Loop(){
 
         //create the seeds per event
         seedMaker seedmaker;
-        seedmaker.createSeedsFromSimClusters(simcluster_eta,simcluster_phi);
+        seedmaker.createSeedsFromCollection(genpart_eta,genpart_phi);
 
         for(size_t i_seed=0;i_seed<seedmaker.seeds().size();i_seed++){
 
@@ -103,7 +103,7 @@ void converter::Loop(){
             for(size_t i_t=0;i_t<genpart_eta->size();i_t++){
 
                 //change to best match here
-                if(s.matches(genpart_eta->at(i_t),genpart_phi->at(i_t), 0.02 )){
+                if(s.matches(genpart_eta->at(i_t),genpart_phi->at(i_t), 0.002 )){
 
                     hastruthmatch=true;
                     globals.setTruthKinematics(genpart_eta->at(i_t),
