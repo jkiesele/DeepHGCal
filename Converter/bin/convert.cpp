@@ -10,15 +10,22 @@
 #include "TString.h"
 
 #include "../include/converter.h"
+#include "TCanvas.h"
+#include <iostream>
 
 int main(int argc, char *argv[]){
 
 	if(argc<3){
-		std::cout << "USAGE:\nconvert <input file path> <output file path>"<<std::endl;
+		std::cout << "USAGE:\nconvert <input file path> <output file path> <optional: test>"<<std::endl;
 	}
 
 	TString infile=argv[1];
 	TString outfile=argv[2];
+
+	TString extra="";
+	if(argc>3){
+	    extra=argv[3];
+	}
 
 	//open infile
 	TFile * f=new TFile(infile,"READ");
@@ -40,6 +47,10 @@ int main(int argc, char *argv[]){
 
 	converter cv(tree);
 	cv.setOutFile(outfile);
+	if(extra.Contains("test")){
+	    cv.setTest(true);
+	    std::cout << "Test mode: only running on 50 events" <<std::endl;
+	}
 
 	try{
 		cv.Loop();
@@ -48,6 +59,9 @@ int main(int argc, char *argv[]){
 		delete f;
 		throw e;
 	}
+
+
+
 	f->Close();
 	delete f;
 	return 0;

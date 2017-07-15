@@ -1,5 +1,8 @@
 from keras import backend as K
 
+global_loss_list={}
+
+
 def loss_NLL(y_true, x):
     """
     This loss is the negative log likelyhood for gaussian pdf.
@@ -9,8 +12,71 @@ def loss_NLL(y_true, x):
     """
     x_pred = x[:,1:]
     x_sig = x[:,:1]
-    return K.mean( 0.5* K.log(K.square(x_sig))  + K.square(x_pred - y_true)/K.square(0*x_sig+1)/2.,    axis=-1)
+    return K.mean( 0.5* K.log(K.square(x_sig))  + K.square(x_pred - y_true)/K.square(x_sig)/2.,    axis=-1)
 
+
+global_loss_list['loss_NLL']=loss_NLL
+
+def loss_NLL_mod(y_true, x):
+    """
+    Modified loss_NLL, such that very large deviations have reduced impact
+    """
+    import numpy
+    from tensorflow import where, greater, abs, zeros_like, exp
+    
+    x_pred = x[:,1:]
+    x_sig = x[:,:1]
+    
+    gaussianCentre=  K.square(x_pred - y_true)/K.square(x_sig)/2 
+    outerpart = K.log(abs(x_pred - y_true)/abs(x_sig)- exp(-1.))
+   
+    res=where(greater(gaussianCentre,4), 0.5* K.log(abs(x_sig))+ outerpart, 0.5* K.log(K.square(x_sig)) +gaussianCentre )
+   
+    #remove non truth-matched
+    #res=where(greater(y_true,0),res,zeros_like(y_true))
+   
+    
+    #penalty for too small sigmas
+    #res=where(greater(x_sig,1),res,res+10000*K.square(x_sig-1) )
+    
+    return K.mean( res,    axis=-1)
+
+global_loss_list['loss_NLL_mod']=loss_NLL_mod
+
+
+def loss_relMeanSquaredError(y_true, x):
+    """
+    testing - name is also wrong depending on commit..
+    """
+    
+    from tensorflow import where, greater, abs, zeros_like, exp
+    
+    x_pred = x[:,1:]
+    x_sig = x[:,:1]
+    
+    res=0.5* K.square(x_sig)  + K.square(x_pred - y_true)/K.square(0*y_true+60)
+    #res=where(greater(y_true,0.0001),res,zeros_like(y_true))
+    
+    return K.mean(res ,    axis=-1)
+
+
+global_loss_list['loss_relMeanSquaredError']=loss_relMeanSquaredError
+
+def accuracy_None(y_true, x):
+    return 0
+
+def accuracy_SigPred(y_true, x):
+    """
+    testing - name is also wrong depending on commit..
+    """
+    
+    from tensorflow import where, greater, abs, zeros_like, exp
+    
+    x_pred = x[:,1:]
+    x_sig = x[:,:1]
+    
+    
+    return K.mean(x_sig/y_true ,    axis=-1)
 
 # The below is to use multiple gaussians for regression
 

@@ -20,7 +20,9 @@
 
 class converter: public HGCalSel{
 public:
-	converter(TTree* t):HGCalSel(t){}
+	converter(TTree* t):HGCalSel(t),testmode_(false){}
+
+	void setTest(bool test){testmode_=test;}
 
 	void setOutFile(const TString& outname){
 		outfilename_=outname;
@@ -30,7 +32,7 @@ public:
 
 private:
 	TString outfilename_;
-
+	bool testmode_;
 };
 
 

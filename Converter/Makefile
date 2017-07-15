@@ -22,3 +22,4 @@ obj/%.o: src/%.cpp
 clean: 
 	rm -f obj/*.o obj/*.d
 	rm -f $(execs)
+	rm -f libhgcalconverter.so

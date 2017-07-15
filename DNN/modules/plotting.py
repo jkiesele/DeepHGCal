@@ -101,7 +101,7 @@ def rotanimate(ax, output, **kwargs):
             - delay : delay between frames in milliseconds
             - repeat : True or False (.gif only)
     """
-    angles = np.linspace(1,48,31)[:-1]
+    angles = np.linspace(-48,48,31)[:-1]
     anglesflip=angles[::-1]
     angles=np.append(angles,anglesflip)
          
@@ -122,30 +122,44 @@ def rotanimate(ax, output, **kwargs):
      
      
 
-def plot4d(inputarray,outname,xlabel='',ylabel='',zlabel=''):
+def plot4d(inputarray,outname,xlabel='',ylabel='',zlabel='',project=1):
     
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
     import numpy as np
+    from pylab import cm
     
     fig = plt.figure(figsize=(8, 6), dpi=300)
     ax = fig.add_subplot(111, projection='3d')
     
-    z,x,y,_ = inputarray.nonzero()
+    
+    
+    x,y,z,_ = inputarray.nonzero()
     c=inputarray.flatten()
     c=c[c!=0]
+    
+    #c=c/c.max()
+    #c*=100
     s=c/c.min()
     from math import log10
     s=s+0.01
     for i in range(len(s)):
         s[i]=log10(s[i])
+        
+    #colmap = cm.ScalarMappable(cmap=cm.hsv)
+    #colmap.set_array(c)
     
     #s=s+1
-    ax.scatter(x, y, z, c=c, cmap=plt.hot(),s=s)
+    ax.scatter(x, z, y, c=cm.hot(c),s=s)
     
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_zlabel(zlabel)
+    
+    #fig.axes.get_xaxis().set_visible(False)
+    #fig.axes.get_yaxis().set_visible(False)
+    #fig.axes.get_zaxis().set_visible(False)
+    
     fig.savefig(outname)
     return ax,plt
     #plt.show()

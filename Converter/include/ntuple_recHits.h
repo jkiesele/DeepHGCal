@@ -10,7 +10,7 @@
 
 #include "ntuple_content.h"
 
-#define MAX_RECHITS 2000
+#define MAX_RECHITS 20000
 
 class ntuple_recHits : public ntuple_content{
 public:
@@ -27,7 +27,9 @@ public:
 			const float& phi,
 			const float& energy,
 			const float& time,
-			const int& layer);
+			const int& layer,
+            const float& seedeta,
+            const float& seedphi);
 
 
 private:
@@ -42,6 +44,8 @@ private:
 	float rechit_phi_[MAX_RECHITS];
 	float rechit_time_[MAX_RECHITS];
 	float rechit_layer_[MAX_RECHITS];
+
+    float rechit_seeddr_[MAX_RECHITS];
 
 };
 

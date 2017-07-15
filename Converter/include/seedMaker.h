@@ -12,6 +12,7 @@
 #include <cmath>
 #include <vector>
 #include <limits>
+#include "helpers.h"
 //helper
 
 class seed{
@@ -23,7 +24,7 @@ public:
 		float deltaeta=eta_-eta;
 		if(fabs(deltaeta)>dR)
 			return 0;
-		float deltaphi=phi_-phi;
+		float deltaphi=helpers::deltaPhi(phi_,phi);
 		if(fabs(deltaphi)>dR)
 			return 0;
 
@@ -47,10 +48,16 @@ private:
 
 class seedMaker{
 public:
-	seedMaker(){}
+	seedMaker():mineta(1.2),maxeta(3.){}
 
 	void createSeedsFromCollection(const std::vector<float> *etas,
-			const std::vector<float> *phis);
+			const std::vector<float> *phis,
+	        const std::vector<float> * select=0,
+	        const float selectcut=0);
+
+    void createSeedsFromCollection(const std::vector<float> *etas,
+            const std::vector<float> *phis,
+            const std::vector<bool> * select);
 
 	const std::vector<seed>& seeds()const{return seeds_;}
 
@@ -59,6 +66,8 @@ public:
 	}
 private:
 	std::vector<seed> seeds_;
+
+	const float mineta,maxeta;
 
 };
 

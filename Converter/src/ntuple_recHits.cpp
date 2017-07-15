@@ -25,6 +25,7 @@ void ntuple_recHits::initDNNBranches(TTree* t){
 	addBranch(t,add+"rechit_energy",&rechit_energy_,"rechit_energy_[n_rechits_]/f");
 	addBranch(t,add+"rechit_time"  ,&rechit_time_,  "rechit_time_[n_rechits_]/f");
 	addBranch(t,add+"rechit_layer"  ,&rechit_layer_,  "rechit_layer_[n_rechits_]/f");
+    addBranch(t,add+"rechit_seeddr"  ,&rechit_seeddr_,  "rechit_seeddr_[n_rechits_]/f");
 
 
 }
@@ -34,7 +35,9 @@ void ntuple_recHits::addRecHit(const float& eta,
 			const float& phi,
 			const float& energy,
 			const float& time,
-			const int& layer){
+			const int& layer,
+			const float& seedeta,
+			const float& seedphi){
 
 		if(n_rechits_>=MAX_RECHITS){
 			std::cout << "WARNING: MAX NUMBER OF REC HITS REACHED" << std::endl;
@@ -45,6 +48,9 @@ void ntuple_recHits::addRecHit(const float& eta,
 		rechit_energy_[n_rechits_]=energy;
 		rechit_time_[n_rechits_]=time;
 		rechit_layer_[n_rechits_]=layer;
+
+		rechit_seeddr_[n_rechits_]=std::sqrt((eta-seedeta)*(eta-seedeta)+(phi-seedphi)*(phi-seedphi));
+
 		nrechits_++;
 		n_rechits_++;
 
