@@ -9,6 +9,7 @@
 #define INCLUDE_NTUPLE_GLOBALS_H_
 
 #include "ntuple_content.h"
+#include <vector>
 
 class ntuple_globals : public ntuple_content{
 public:
@@ -39,6 +40,7 @@ public:
 
         totav+=dr;
         true_averagedr_=totav/true_ncloseparticles_;
+        true_closeparticledr_.push_back(dr);
     }
 
 
@@ -90,6 +92,7 @@ private:
     //global info branches
     int event_;
 
+
     //DNN reco branches
     float seed_eta_;
     float seed_phi_;
@@ -112,6 +115,8 @@ private:
     float true_ncloseparticles_;
     float true_drclosestparticle_;
     float true_averagedr_;
+
+    std::vector<float> true_closeparticledr_;
 
     //DNN truth branches
     float true_eta_;

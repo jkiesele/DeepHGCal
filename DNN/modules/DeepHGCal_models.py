@@ -14,32 +14,25 @@ def HGCal_model_reg(Inputs,nclasses,Inputshape,dropoutRate=0.25):
     
     x=Inputs[1]
     globals=Inputs[0]
-    x=BatchNormalization()(x)
-   
-    #x=Convolution3D(16,kernel_size=(5,5,1), activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    #x=Convolution3D(16,kernel_size=(5,5,1), activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    
-    #x=Convolution3D(16,kernel_size=(1,1,10), activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    #x=Convolution3D(16,kernel_size=(1,1,10),strides=(1,1,2), activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x) #aounrd 15 15 19
+    x=BatchNormalization(momentum=0.3,name='input_batchnorm',center=False)(x)
+    globals=BatchNormalization(momentum=0.3,name='globalinput_batchnorm')(globals)
     
     
-    #x=Convolution3D(16,kernel_size=(3,3,5),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    x=Convolution3D(16,kernel_size=(3,3,8),strides=(1,1,2),padding='same', activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization()(x)
+    x=Convolution3D(24,kernel_size=(3,3,8),strides=(1,1,2),padding='same', 
+                    activation='relu',kernel_initializer='lecun_uniform',use_bias=False,name='conv3D_0')(x)
+    x=BatchNormalization(momentum=0.3,name='conv_batchnorm0')(x)
     x = Dropout(dropoutRate)(x)
-    x=Convolution3D(16,kernel_size=(9,9,9),strides=(4,4,4),padding='same', activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization()(x)
+    x=Convolution3D(16,kernel_size=(7,7,7),strides=(4,4,4),padding='same',use_bias=False, 
+                    activation='relu',kernel_initializer='lecun_uniform',name='conv3D_1')(x)
+    x=BatchNormalization(momentum=0.3,name='conv_batchnorm1')(x)
     x = Dropout(dropoutRate)(x)
-    x=Convolution3D(4,kernel_size=(3,3,3),padding='same', activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization()(x)
+    x=Convolution3D(8,kernel_size=(3,3,3),padding='same', 
+                    activation='relu',kernel_initializer='lecun_uniform',use_bias=False,name='conv3D_2')(x)
+    x=BatchNormalization(momentum=0.3,name='conv_batchnorm2')(x)
     x = Dropout(dropoutRate)(x)
-    x=Convolution3D(4,kernel_size=(1,1,1),padding='same', activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization()(x)
+    x=Convolution3D(4,kernel_size=(1,1,1),padding='same', 
+                    activation='relu',kernel_initializer='lecun_uniform',use_bias=False,name='conv3D_3')(x)
+    x=BatchNormalization(momentum=0.3,name='conv_batchnorm3')(x)
     x = Dropout(dropoutRate)(x)
     
     
@@ -81,36 +74,26 @@ def HGCal_model_reg(Inputs,nclasses,Inputshape,dropoutRate=0.25):
     merged=Concatenate()( [globals,x])
     
     x = Dense(128, activation='relu',kernel_initializer='lecun_uniform')(merged)
-    x=BatchNormalization()(x)
+    x=BatchNormalization(momentum=0.3,name='dense_batchnorm0')(x)
     x = Dropout(dropoutRate)(x)
     x = Dense(128, activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization()(x)
+    #x=BatchNormalization(momentum=0.3,name='dense_batchnorm1')(x)
     x = Dropout(dropoutRate)(x)
     x = Dense(64, activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization()(x)
+    x=BatchNormalization(momentum=0.3,name='dense_batchnorm2')(x)
     x = Dropout(dropoutRate)(x)
     x = Dense(64, activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization()(x)
-    x = Dropout(dropoutRate)(x)
+    #x=BatchNormalization(momentum=0.3,name='dense_batchnorm3')(x)
+    #x = Dropout(dropoutRate)(x)
     
     
     
     predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
-    predictE=Dense(1, activation='linear',kernel_initializer='lecun_uniform',name='E_pred_E')(x)
+    predictE=Dense(1, activation='linear',kernel_initializer='zeros',name='E_pred_E')(x)
     predictS=Dense(1, activation='linear',kernel_initializer='ones',name='E_pred_S')(x)
     EandS=Concatenate(name='E_pred')( [predictS,predictE] )
     
-    #checkpoint = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(checkpoint)
-    #x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    #x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    #x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    #x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
-    #x=Add()([checkpoint,x])
+    
     
    
     predictions = [predictID,EandS]

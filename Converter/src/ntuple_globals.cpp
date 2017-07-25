@@ -36,6 +36,7 @@ void ntuple_globals::reset(){
     true_ncloseparticles_=0;
     true_drclosestparticle_=-1;
     true_averagedr_=0;
+    true_closeparticledr_.clear();
 
 	true_eta_=0;
 	true_phi_=0;
@@ -131,6 +132,7 @@ void ntuple_globals::initDNNBranches(TTree* t){
     addBranch(t,"true_ncloseparticles",   &true_ncloseparticles_,   "true_ncloseparticles_");
     addBranch(t,"true_drclosestparticle",   &true_drclosestparticle_,   "true_drclosestparticle_/f");
     addBranch(t,"true_averagedr",   &true_averagedr_,   "true_averagedr_/f");
+    addBranch(t,"true_closeparticledr",   &true_closeparticledr_);
 
 
 	addBranch(t,"true_eta",   &true_eta_,   "true_eta_/f");

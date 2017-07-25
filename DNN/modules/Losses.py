@@ -54,13 +54,16 @@ def loss_relMeanSquaredError(y_true, x):
     x_pred = x[:,1:]
     x_sig = x[:,:1]
     
-    res=0.5* K.square(x_sig)  + K.square(x_pred - y_true)/K.square(0*y_true+60)
+    res=0.5* K.square(x_sig)  + K.square((x_pred - y_true)/(y_true+1))
     #res=where(greater(y_true,0.0001),res,zeros_like(y_true))
     
     return K.mean(res ,    axis=-1)
 
 
 global_loss_list['loss_relMeanSquaredError']=loss_relMeanSquaredError
+
+
+
 
 def accuracy_None(y_true, x):
     return 0

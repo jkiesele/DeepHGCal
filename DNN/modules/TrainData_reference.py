@@ -112,8 +112,8 @@ class TrainData_reference(TrainData):
         #flatten everything out for now
         x_chmap = createDensityLayers(filename,
                                       TupleMeanStd,
-                                      inbranches=['rechit_energy','rechit_layer','rechit_seeddr','rechit_time'], 
-                                      modes=['sum','single','average','average'],
+                                      inbranches=['rechit_energy','rechit_layer','rechit_seeddr'], 
+                                      modes=['sum','single','average'],
                                       layerbranch='rechit_layer',
                                       maxlayers=55,
                                       layeroffset=1,
