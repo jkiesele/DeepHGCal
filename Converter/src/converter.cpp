@@ -9,8 +9,9 @@
 #include "../include/ntuple_globals.h"
 #include "../include/ntuple_recHits.h"
 #include "../include/seedMaker.h"
-#include "TCanvas.h"
+#include "../include/Transformer.h"
 
+#include "TCanvas.h"
 #include "TFile.h"
 
 void converter::Loop(){
@@ -54,6 +55,8 @@ void converter::Loop(){
 
     fChain->SetBranchStatus("rechit_eta",1);
     fChain->SetBranchStatus("rechit_phi",1);
+    fChain->SetBranchStatus("rechit_x",1);
+    fChain->SetBranchStatus("rechit_y",1);
     fChain->SetBranchStatus("rechit_energy",1);
     fChain->SetBranchStatus("rechit_time",1);
     fChain->SetBranchStatus("rechit_layer",1);
@@ -148,10 +151,13 @@ void converter::Loop(){
             }
 
             //match the recHits
+            Transformer transformer(rechit_x, rechit_y);
             float totalrechitenergy=0;
             for(size_t i_r=0;i_r<rechit_eta->size();i_r++){
                 if(s.matches(rechit_eta->at(i_r),rechit_phi->at(i_r), DRaroundSeed )){
+                	vector<float> trans = transformer.transform(rechit_x->at(i_r), rechit_y->at(i_r));
                     recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
+                    		trans[0], trans[1],
                             rechit_energy->at(i_r),rechit_time->at(i_r),
                             rechit_layer->at(i_r),
                             s.eta(),s.phi());

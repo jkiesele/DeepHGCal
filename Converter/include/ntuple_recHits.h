@@ -25,6 +25,8 @@ public:
 
 	void addRecHit(const float& eta,
 			const float& phi,
+			const float& a,
+			const float& b,
 			const float& energy,
 			const float& time,
 			const int& layer,
@@ -42,6 +44,8 @@ private:
 	float rechit_energy_[MAX_RECHITS];
 	float rechit_eta_[MAX_RECHITS];
 	float rechit_phi_[MAX_RECHITS];
+	float rechit_a_[MAX_RECHITS];
+	float rechit_b_[MAX_RECHITS];
 	float rechit_time_[MAX_RECHITS];
 	float rechit_layer_[MAX_RECHITS];
 

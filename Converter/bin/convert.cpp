@@ -13,7 +13,13 @@
 #include "TCanvas.h"
 #include <iostream>
 
+using namespace std;
+
 int main(int argc, char *argv[]){
+
+	char buff[255];//automatically cleaned when it exits scope
+	string curdir(getcwd(buff,255));
+	cout << curdir << endl;
 
 	if(argc<3){
 		std::cout << "USAGE:\nconvert <input file path> <output file path> <optional: test>"<<std::endl;
@@ -64,6 +70,8 @@ int main(int argc, char *argv[]){
 
 	f->Close();
 	delete f;
+
+	cout << "end conversion" << endl;
 	return 0;
 }
 
