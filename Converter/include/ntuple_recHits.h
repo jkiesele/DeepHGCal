@@ -27,6 +27,7 @@ public:
 			const float& phi,
 			const float& a,
 			const float& b,
+			const float& pt,
 			const float& energy,
 			const float& time,
 			const int& layer,
@@ -46,6 +47,7 @@ private:
 	float rechit_phi_[MAX_RECHITS];
 	float rechit_a_[MAX_RECHITS];
 	float rechit_b_[MAX_RECHITS];
+	float rechit_pt_[MAX_RECHITS];
 	float rechit_time_[MAX_RECHITS];
 	float rechit_layer_[MAX_RECHITS];
 
