@@ -14,6 +14,14 @@
 #include "TCanvas.h"
 #include "TFile.h"
 
+
+#include <map>
+
+#define LAYER_NUM 52
+#define COORDINATE_A 0
+#define COORDINATE_B 1
+
+
 void converter::Loop(){
 
 
@@ -81,6 +89,9 @@ void converter::Loop(){
     recHits.initBranches(outtree);
 
     Long64_t nentries = fChain->GetEntries();
+
+    Transformer transformer(rechit_x, rechit_y, rechit_layer, this);
+
 
     Long64_t nbytes = 0, nb = 0;
     for (Long64_t jentry=0; jentry<nentries;jentry++) {
@@ -152,15 +163,18 @@ void converter::Loop(){
             }
 
             //match the recHits
-            Transformer transformer(rechit_x, rechit_y);
             float totalrechitenergy=0;
             for(size_t i_r=0;i_r<rechit_eta->size();i_r++){
                 if(s.matches(rechit_eta->at(i_r),rechit_phi->at(i_r), DRaroundSeed )){
-                	vector<float> trans = transformer.transform(rechit_x->at(i_r), rechit_y->at(i_r));
-                    recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
-                    		trans[0], trans[1], rechit_pt->at(i_r),
-                            rechit_energy->at(i_r),rechit_time->at(i_r),
-                            rechit_layer->at(i_r),
+
+                	vector<float> trans = transformer.transform(rechit_x->at(i_r), rechit_y->at(i_r),
+                												rechit_layer->at(i_r));
+
+                	recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
+                    		trans[COORDINATE_A], trans[COORDINATE_B],
+							rechit_x->at(i_r),rechit_y->at(i_r),
+							rechit_pt->at(i_r), rechit_energy->at(i_r),
+							rechit_time->at(i_r), rechit_layer->at(i_r),
                             s.eta(),s.phi());
                     totalrechitenergy+=rechit_energy->at(i_r);
 
@@ -199,3 +213,5 @@ void converter::Loop(){
     outfile->Close();
     delete outfile;
 }
+
+
