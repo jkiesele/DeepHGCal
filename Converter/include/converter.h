@@ -18,6 +18,10 @@
 #include "HGCalSel.h"
 #include "TTree.h"
 
+#include <vector>
+
+using namespace std;
+
 class converter: public HGCalSel{
 public:
 	converter(TTree* t):HGCalSel(t),testmode_(false){}
@@ -33,6 +37,7 @@ public:
 private:
 	TString outfilename_;
 	bool testmode_;
+
 };
 
 
