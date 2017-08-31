@@ -122,7 +122,7 @@ def rotanimate(ax, output, **kwargs):
      
      
 
-def plot4d(inputarray,outname,xlabel='',ylabel='',zlabel='',project=1):
+def plot4d(inputarray,outname='',xlabel='',ylabel='',zlabel='',project=1):
     
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
@@ -146,6 +146,13 @@ def plot4d(inputarray,outname,xlabel='',ylabel='',zlabel='',project=1):
     for i in range(len(s)):
         s[i]=log10(s[i])
         
+    
+    #sarr=c>0.06914700
+    #sarr2=c<0.06914702
+    #sarr=sarr&sarr2
+    #s[sarr]=100
+    #print(c)
+        
     #colmap = cm.ScalarMappable(cmap=cm.hsv)
     #colmap.set_array(c)
     
@@ -156,11 +163,12 @@ def plot4d(inputarray,outname,xlabel='',ylabel='',zlabel='',project=1):
     ax.set_ylabel(ylabel)
     ax.set_zlabel(zlabel)
     
+    
     #fig.axes.get_xaxis().set_visible(False)
     #fig.axes.get_yaxis().set_visible(False)
     #fig.axes.get_zaxis().set_visible(False)
-    
-    fig.savefig(outname)
-    return ax,plt
+    if len(outname):
+        fig.savefig(outname)
+    return ax,plt,x,y,z,c
     #plt.show()
     #plt.close()

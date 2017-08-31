@@ -60,6 +60,8 @@ void converter::Loop(){
     fChain->SetBranchStatus("genpart_energy",1);
     fChain->SetBranchStatus("genpart_pid",1);
     fChain->SetBranchStatus("genpart_reachedEE",1);
+    fChain->SetBranchStatus("genpart_pt",1);
+
 
     fChain->SetBranchStatus("rechit_eta",1);
     fChain->SetBranchStatus("rechit_phi",1);
@@ -106,11 +108,12 @@ void converter::Loop(){
         seedmaker.createSeedsFromCollection(genpart_eta,genpart_phi,genpart_reachedEE);
 
         for(size_t i_seed=0;i_seed<seedmaker.seeds().size();i_seed++){
+            bool write=true;
 
             globals.reset();
             recHits.reset();
 
-            float DRaroundSeed=0.35;
+            float DRaroundSeed=0.25;
 
             const seed& s=seedmaker.seeds().at(i_seed);
             globals.setSeedInfo(s.eta(),s.phi(),i_seed,jentry);
@@ -130,7 +133,7 @@ void converter::Loop(){
                     if(lasttruedr>dr){
                         hastruthmatch=true;
                         globals.setTruthKinematics(genpart_eta->at(i_t),
-                                genpart_phi->at(i_t),genpart_energy->at(i_t));
+                                genpart_phi->at(i_t),genpart_energy->at(i_t),genpart_pt->at(i_t));
 
                         truthid=genpart_pid->at(i_t);
                         lasttruedr=dr;
@@ -143,6 +146,7 @@ void converter::Loop(){
             }
 
             globals.setTruthID(truthid,hastruthmatch);
+            if(globals.trueEnergy()<energylowercut_) continue;
 
             for(size_t i_m=0;i_m<multiclus_eta->size();i_m++){
                 if(s.matches(multiclus_eta->at(i_m), multiclus_phi->at(i_m),0.05)){
@@ -163,6 +167,7 @@ void converter::Loop(){
             }
 
             //match the recHits
+
             float totalrechitenergy=0;
             for(size_t i_r=0;i_r<rechit_eta->size();i_r++){
                 if(s.matches(rechit_eta->at(i_r),rechit_phi->at(i_r), DRaroundSeed )){
@@ -170,7 +175,7 @@ void converter::Loop(){
                 	vector<float> trans = transformer.transform(rechit_x->at(i_r), rechit_y->at(i_r),
                 												rechit_layer->at(i_r));
 
-                	recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
+                	write &= recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
                     		trans[COORDINATE_A], trans[COORDINATE_B],
 							rechit_x->at(i_r),rechit_y->at(i_r),
 							rechit_pt->at(i_r), rechit_energy->at(i_r),
@@ -183,7 +188,8 @@ void converter::Loop(){
             globals.setTotalRecHitEnergy(totalrechitenergy);
             globals.computeTrueFraction();
 
-            outtree->Fill();
+            if(write)
+                outtree->Fill();
         }
 
 

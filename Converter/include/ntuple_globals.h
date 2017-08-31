@@ -60,10 +60,12 @@ public:
 
     void setTruthKinematics(const float& eta,
             const float& phi,
-            const float& energy){
+            const float& energy,
+            const float& pt=0){
         true_eta_=eta;
         true_phi_=phi;
         true_energy_=energy;
+        true_pt_=pt;
     }
 
     void setSimCluster(const float& eta,
@@ -83,6 +85,7 @@ public:
 
     void setTruthID(const int& pdgid,const bool& matched);
 
+    const float& trueEnergy()const{return true_energy_;}
 
     //void setTruthVertex(); ///..later
 
@@ -120,6 +123,7 @@ private:
 
     //DNN truth branches
     float true_eta_;
+    float true_pt_;
     float true_phi_;
     float true_energy_;
 

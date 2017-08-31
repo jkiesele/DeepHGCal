@@ -3,6 +3,9 @@ from keras import backend as K
 global_loss_list={}
 
 
+
+
+
 def loss_NLL(y_true, x):
     """
     This loss is the negative log likelyhood for gaussian pdf.
@@ -54,7 +57,8 @@ def loss_relMeanSquaredError(y_true, x):
     x_pred = x[:,1:]
     x_sig = x[:,:1]
     
-    res=0.5* K.square(x_sig)  + K.square((x_pred - y_true)/(y_true+1))
+    
+    res=(0.00001* K.square(x_sig - x_pred - y_true) + K.square((x_pred - y_true) ) / K.square(y_true+2))
     #res=where(greater(y_true,0.0001),res,zeros_like(y_true))
     
     return K.mean(res ,    axis=-1)
@@ -63,6 +67,84 @@ def loss_relMeanSquaredError(y_true, x):
 global_loss_list['loss_relMeanSquaredError']=loss_relMeanSquaredError
 
 
+def loss_relMeanSquaredErrorScaled(y_true, x):
+    """
+    testing - name is also wrong depending on commit..
+    """
+    
+    from tensorflow import where, greater, abs, zeros_like, exp
+    
+    x_sig = x[:,:1]
+    x_pred = x[:,1:]
+    scaledtruth=y_true/500 - 1
+    
+    res=(0.00001* K.square(x_sig - x_pred) + K.square((x_pred - scaledtruth) ) / K.square(scaledtruth+ 1.01))
+    #res=where(greater(y_true,0.0001),res,zeros_like(y_true))
+    
+    return K.mean(res ,    axis=-1)
+
+
+global_loss_list['loss_relMeanSquaredErrorScaled']=loss_relMeanSquaredErrorScaled
+
+
+def loss_meanSquaredError(y_true, x):
+    """
+    testing - name is also wrong depending on commit..
+    """
+    
+    from tensorflow import where, greater, abs, zeros_like, exp
+    
+    x_pred = x[:,1:]
+    x_sig = x[:,:1]
+    
+    
+    res=0.0000001* K.square(x_sig - x_pred - y_true) + K.square((x_pred - y_true) ) 
+    #res=where(greater(y_true,0.0001),res,zeros_like(y_true))
+    
+    return K.mean(res ,    axis=-1)
+
+
+global_loss_list['loss_meanSquaredError']=loss_meanSquaredError
+
+
+
+def loss_logcoshScaled(y_true, x):
+    """
+    testing - name is also wrong depending on commit..
+    """
+    
+    from tensorflow import where, greater, abs, zeros_like, exp
+    
+    x_pred = x[:,1:]
+    x_sig = x[:,:1]
+    def cosh(x):
+        return (K.exp(x) + K.exp(-x)) / 2
+    
+    return K.mean(0.001*K.square(x_sig))   + K.mean(K.log(cosh(x_pred - y_true/500+1)), axis=-1)
+    
+
+
+global_loss_list['loss_logcoshScaled']=loss_logcoshScaled
+
+
+def loss_meanSquaredErrorScaled(y_true, x):
+    """
+    testing - name is also wrong depending on commit..
+    """
+    
+    from tensorflow import where, greater, abs, zeros_like, exp
+    
+    x_pred = x[:,1:]
+    x_sig = x[:,:1]
+    scaledtruth=y_true/500 -1
+    
+    res=0.0000001* K.square(x_sig) + K.square((x_pred - scaledtruth) ) 
+    #res=where(greater(y_true,0.0001),res,zeros_like(y_true))
+    
+    return K.mean(res ,    axis=-1)
+
+
+global_loss_list['loss_meanSquaredErrorScaled']=loss_meanSquaredErrorScaled
 
 
 def accuracy_None(y_true, x):

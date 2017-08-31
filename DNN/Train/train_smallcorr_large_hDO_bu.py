@@ -24,6 +24,10 @@ def bestModel(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6):
     x=Inputs[1]
     globals=Inputs[0]
     x=BatchNormalization(momentum=momentum)(x)
+    #one preconditioning step
+    x=Convolution3D(16,kernel_size=(1,1,1),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
+    
+    
     x=Convolution3D(16,kernel_size=(3,3,3),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
     x=BatchNormalization(momentum=momentum)(x)
     x = GaussianDropout(dropoutRate)(x)
@@ -38,7 +42,7 @@ def bestModel(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6):
     x = GaussianDropout(dropoutRate)(x)
     
     x = Flatten()(x)
-    merged=Concatenate()( [globals,x]) #add the inputs again in case some don't like the multiplications
+    merged=Concatenate()( [globals,x])
     
     
     x = Dense(300, activation='relu',kernel_initializer='lecun_uniform')(merged)
@@ -334,21 +338,23 @@ train=training_base(testrun=False)
 
 train.train_data.maxFilesOpen=10
 
-train.setModel(bestModel,dropoutRate=0.15)
+if not train.modelSet():
 
-train.compileModel(learningrate=0.0125,
+    train.setModel(bestModel,dropoutRate=0.05,momentum=0.9)
+
+    train.compileModel(learningrate=0.0125,
                    loss=['categorical_crossentropy','mean_squared_error'],
                    metrics=['accuracy'],
                    loss_weights=[.05, 1.])
 
 print(train.keras_model.summary())
 
-model,history = train.trainModel(nepochs=150, 
+model,history = train.trainModel(nepochs=100, 
                                  batchsize=665, 
                                  stop_patience=300, 
-                                 lr_factor=0.8, 
+                                 lr_factor=0.5, 
                                  lr_patience=-6, 
                                  lr_epsilon=0.0001, 
-                                 lr_cooldown=10, 
+                                 lr_cooldown=8, 
                                  lr_minimum=0.000001, 
                                  maxqsize=200)

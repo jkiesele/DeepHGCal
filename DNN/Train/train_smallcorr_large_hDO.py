@@ -23,39 +23,53 @@ def bestModel(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6):
 
     x=Inputs[1]
     globals=Inputs[0]
+    totalrecenergy=Inputs[2]
+    #x = GaussianDropout(dropoutRate)(x)
+    #pre processing step
+    #x=BatchNormalization(momentum=momentum)(x)
+    #x=Convolution3D(16,kernel_size=(1,1,1),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform',name='conv_pre0')(x)
+    x=Convolution3D(16,kernel_size=(1,1,1),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform',name='conv_pre1')(x)
+    x=Convolution3D(4, kernel_size=(1,1,1),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform',name='conv_pre2')(x)
     x=BatchNormalization(momentum=momentum)(x)
-    x=Convolution3D(16,kernel_size=(3,3,3),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
+    
+    
+    #x=Convolution3D(16,kernel_size=(3,3,3),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform',name='conv_0')(x)
+    #x=BatchNormalization(momentum=momentum)(x)
+    #x = GaussianDropout(dropoutRate)(x)
+    x=Convolution3D(8,kernel_size=(3,3,6),strides=(1,1,2), padding='same',activation='relu',kernel_initializer='lecun_uniform',name='conv_1')(x)
     x=BatchNormalization(momentum=momentum)(x)
     x = GaussianDropout(dropoutRate)(x)
-    x=Convolution3D(16,kernel_size=(3,3,6),strides=(1,1,2), activation='relu',kernel_initializer='lecun_uniform')(x)
+    x=Convolution3D(12,kernel_size=(8,8,12),strides=(5,5,7), padding='same', activation='relu',kernel_initializer='lecun_uniform',name='conv_2')(x)
     x=BatchNormalization(momentum=momentum)(x)
     x = GaussianDropout(dropoutRate)(x)
-    x=Convolution3D(32,kernel_size=(8,8,12),strides=(2,2,2), activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization(momentum=momentum)(x)
-    x = GaussianDropout(dropoutRate)(x)
-    x=Convolution3D(3,kernel_size=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
+    #8
+    x=Convolution3D(4,kernel_size=(1,1,1), activation='relu',kernel_initializer='lecun_uniform',name='conv_3')(x)
     x=BatchNormalization(momentum=momentum)(x)
     x = GaussianDropout(dropoutRate)(x)
     
     x = Flatten()(x)
-    merged=Concatenate()( [globals,x]) #add the inputs again in case some don't like the multiplications
     
+    #totalrecenergy=Dense(1, activation='relu',kernel_initializer='ones')(totalrecenergy)
     
-    x = Dense(300, activation='relu',kernel_initializer='lecun_uniform')(merged)
+    merged=Concatenate()( [globals,x,totalrecenergy]) #add the inputs again in case some don't like the multiplications
+    
+    #400
+    x = Dense(200, activation='relu',kernel_initializer='lecun_uniform',name='first_dense')(merged)
     x=BatchNormalization(momentum=momentum)(x)
     x = Dropout(dropoutRate)(x)
-    x = Dense(200, activation='relu',kernel_initializer='lecun_uniform')(merged)
-    x=BatchNormalization(momentum=momentum)(x)
-    x = Dropout(dropoutRate)(x)
-    x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(merged)
-    x=BatchNormalization(momentum=momentum)(x)
-    x = Dropout(dropoutRate)(x)
-    x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(merged)
-    x=BatchNormalization(momentum=momentum)(x)
-    x = Dropout(dropoutRate)(x)
+    x = Dense(200, activation='relu',kernel_initializer='lecun_uniform')(x)
+    #x=BatchNormalization(momentum=momentum)(x)
+    #x = GaussianDropout(dropoutRate)(x)
+    #x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(x)
+    #x=BatchNormalization(momentum=momentum)(x)
+    #x = GaussianDropout(dropoutRate)(x)
+    #x = Dense(100, activation='relu',kernel_initializer='lecun_uniform')(x)
+    #x=BatchNormalization(momentum=momentum)(x)
+    #x = Dropout(dropoutRate)(x)
     
     predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
-    predictE=Dense(1, activation='linear',kernel_initializer='zeros',name='E_pred_E')(x)
+    predictE=Dense(1, activation='linear',kernel_initializer='lecun_uniform',name='pred_E')(x)
+    #predictE = Add(name='pred_E')([,predictE])
     
     predictions = [predictID,predictE]
                    
@@ -334,21 +348,25 @@ train=training_base(testrun=False)
 
 train.train_data.maxFilesOpen=10
 
-train.setModel(bestModel,dropoutRate=0.15)
+if not train.modelSet():
 
-train.compileModel(learningrate=0.0125,
+    train.setModel(bestModel,dropoutRate=0.07,momentum=0.6)
+
+    train.compileModel(learningrate=0.0001,
                    loss=['categorical_crossentropy','mean_squared_error'],
                    metrics=['accuracy'],
-                   loss_weights=[.05, 1.])
+                   loss_weights=[.1, 1.])
 
 print(train.keras_model.summary())
 
-model,history = train.trainModel(nepochs=150, 
-                                 batchsize=665, 
+#exit()
+
+model,history = train.trainModel(nepochs=200, 
+                                 batchsize=2000, 
                                  stop_patience=300, 
-                                 lr_factor=0.8, 
+                                 lr_factor=0.7, 
                                  lr_patience=-6, 
                                  lr_epsilon=0.0001, 
-                                 lr_cooldown=10, 
+                                 lr_cooldown=15, 
                                  lr_minimum=0.000001, 
-                                 maxqsize=200)
+                                 maxqsize=100)

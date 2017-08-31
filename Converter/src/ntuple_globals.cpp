@@ -40,6 +40,7 @@ void ntuple_globals::reset(){
 
 	true_eta_=0;
 	true_phi_=0;
+	true_pt_=0;
 	true_energy_=0;
 	true_pid_=0;
 
@@ -137,6 +138,7 @@ void ntuple_globals::initDNNBranches(TTree* t){
 
 	addBranch(t,"true_eta",   &true_eta_,   "true_eta_/f");
 	addBranch(t,"true_phi",   &true_phi_,   "true_phi_/f");
+    addBranch(t,"true_pt",   &true_pt_,   "true_pt_/f");
 	addBranch(t,"true_energy",&true_energy_,"true_energy_/f");
 	addBranch(t,"true_pid",&true_pid_,"true_pid_/i");
 

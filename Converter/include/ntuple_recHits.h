@@ -23,7 +23,7 @@ public:
 		n_rechits_=0;
 	}
 
-	void addRecHit(const float& eta,
+	bool addRecHit(const float& eta,
 			const float& phi,
 			const float& a,
 			const float& b,
