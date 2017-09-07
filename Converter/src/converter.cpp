@@ -14,7 +14,7 @@
 #include "TCanvas.h"
 #include "TFile.h"
 
-
+#include <iostream>
 #include <map>
 
 #define LAYER_NUM 52
@@ -65,11 +65,11 @@ void converter::Loop(){
     fChain->SetBranchStatus("rechit_phi",1);
     fChain->SetBranchStatus("rechit_x",1);
     fChain->SetBranchStatus("rechit_y",1);
+    fChain->SetBranchStatus("rechit_z",1);
     fChain->SetBranchStatus("rechit_pt",1);
     fChain->SetBranchStatus("rechit_energy",1);
     fChain->SetBranchStatus("rechit_time",1);
     fChain->SetBranchStatus("rechit_layer",1);
-
 
 
 
@@ -90,11 +90,15 @@ void converter::Loop(){
 
     Long64_t nentries = fChain->GetEntries();
 
-    Transformer transformer(rechit_x, rechit_y, rechit_layer, this);
+    Transformer transformer(rechit_x, rechit_y, rechit_z, this);
 
-
+    int count = 0;
     Long64_t nbytes = 0, nb = 0;
-    for (Long64_t jentry=0; jentry<nentries;jentry++) {
+    for (Long64_t jentry=0; jentry < nentries && jentry < 20 ;jentry++) {
+
+    	cout << jentry << endl;
+
+
         Long64_t ientry = LoadTree(jentry);
         if (ientry < 0) break;
         nb = fChain->GetEntry(jentry);   nbytes += nb;
@@ -167,12 +171,13 @@ void converter::Loop(){
             for(size_t i_r=0;i_r<rechit_eta->size();i_r++){
                 if(s.matches(rechit_eta->at(i_r),rechit_phi->at(i_r), DRaroundSeed )){
 
-                	vector<float> trans = transformer.transform(rechit_x->at(i_r), rechit_y->at(i_r),
+                	vector<float> trans = transformer.rel_transform(rechit_x->at(i_r), rechit_y->at(i_r), rechit_z->at(i_r),
                 												rechit_layer->at(i_r));
+                	count ++;
 
                 	recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
                     		trans[COORDINATE_A], trans[COORDINATE_B],
-							rechit_x->at(i_r),rechit_y->at(i_r),
+							rechit_x->at(i_r), rechit_y->at(i_r), rechit_z->at(i_r),
 							rechit_pt->at(i_r), rechit_energy->at(i_r),
 							rechit_time->at(i_r), rechit_layer->at(i_r),
                             s.eta(),s.phi());
@@ -185,12 +190,7 @@ void converter::Loop(){
 
             outtree->Fill();
         }
-
-
-        /// do the selection and filling
-
-
-
+        cout <<"hits count" << count<< endl;
     }
 
     TCanvas canvas;
