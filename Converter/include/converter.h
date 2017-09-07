@@ -34,8 +34,10 @@ public:
 
 	void Loop();//overwrite standard Selector Loop
 
-private:
 	TString outfilename_;
+
+private:
+
 	bool testmode_;
 
 };
