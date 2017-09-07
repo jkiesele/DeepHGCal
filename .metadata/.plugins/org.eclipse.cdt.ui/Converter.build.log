@@ -1,6 +1,0 @@
-12:10:06 **** Clean-only build of configuration Default for project Converter ****
-make clean 
-make: *** No rule to make target 'clean'.  Stop.
-
-12:10:06 Build Finished (took 75ms)
-
