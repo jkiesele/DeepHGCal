@@ -24,7 +24,9 @@ using namespace std;
 
 class converter: public HGCalSel{
 public:
-	converter(TTree* t):HGCalSel(t),testmode_(false){}
+	converter(TTree* t):HGCalSel(t),testmode_(false),energylowercut_(0){}
+
+	void setEnergyThreshold(float thr){energylowercut_=thr;}
 
 	void setTest(bool test){testmode_=test;}
 
@@ -39,7 +41,7 @@ public:
 private:
 
 	bool testmode_;
-
+	float energylowercut_;
 };
 
 

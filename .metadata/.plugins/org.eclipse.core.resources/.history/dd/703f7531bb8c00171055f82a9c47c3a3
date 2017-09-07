@@ -1,0 +1,39 @@
+/*
+ * Transform.h
+ *
+ *  Created on: 6 Aug 2017
+ *      Author: user
+ */
+
+#ifndef INCLUDE_TRANSFORMER_H_
+#define INCLUDE_TRANSFORMER_H_
+
+
+#include "../include/converter.h"
+#include <vector>
+
+
+using namespace std;
+
+class Transformer {
+public:
+	Transformer(vector<float> *rechit_x, vector<float> *rechit_y, vector<float> *rechit_z, converter* c);
+
+	vector<float> transform(float x, float y, float z,int layer) const;
+
+	void set_seed_origin(float eta, float phi) const;
+
+	~Transformer() {}
+
+private:
+	vector<float> _origin_x;
+	vector<float> _origin_y;
+	vector<float> _DX_per_layer;
+	vector<float> _DY_per_layer;
+
+	vector<float> find_dx(vector<float>* rechit, converter* c, string name="");
+	vector<float> get_layer_origins(vector<float> *rechit, converter* c, string name="");
+	map<int, vector<float>> get_hits_by_layer(vector<float> *rechit, converter* c);
+};
+
+#endif /* INCLUDE_TRANSFORMER_H_ */

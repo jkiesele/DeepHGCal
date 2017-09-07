@@ -8,6 +8,7 @@ from keras.layers.normalization import BatchNormalization
 from keras.layers.merge import Concatenate, Add
 
 
+<<<<<<< HEAD
 def HGCal_model_reg(Inputs, nclasses, Inputshape, dropoutRate=0.25):
     """
     very simple to test with
@@ -25,6 +26,27 @@ def HGCal_model_reg(Inputs, nclasses, Inputshape, dropoutRate=0.25):
     x = Convolution3D(16, kernel_size=(7, 7, 7), strides=(4, 4, 4), padding='same', use_bias=False,
                       activation='relu', kernel_initializer='lecun_uniform', name='conv3D_1')(x)
     x = BatchNormalization(momentum=0.3, name='conv_batchnorm1')(x)
+=======
+def HGCal_model_reg(Inputs,nclasses,nregs,dropoutRate=0.25,noUncertainty=True):
+    """
+    very simple to test with
+    """
+    
+    x=Inputs[1]
+    globals=Inputs[0]
+    # not needed, inputs happen to be in right range
+    #x=BatchNormalization(momentum=0.3,name='input_batchnorm',center=False)(x)
+    globals=BatchNormalization(momentum=0.3,name='globalinput_batchnorm')(globals)
+    
+    
+    x=Convolution3D(32,kernel_size=(3,3,8),strides=(1,1,2),padding='same', 
+                    activation='relu',kernel_initializer='lecun_uniform',use_bias=False,name='conv3D_0')(x)
+    x=BatchNormalization(momentum=0.3,name='conv_batchnorm0')(x)
+    x = Dropout(dropoutRate)(x)
+    x=Convolution3D(16,kernel_size=(7,7,7),strides=(3,3,3),padding='same',use_bias=False, 
+                    activation='relu',kernel_initializer='lecun_uniform',name='conv3D_1')(x)
+    x=BatchNormalization(momentum=0.3,name='conv_batchnorm1')(x)
+>>>>>>> refs/remotes/origin/master
     x = Dropout(dropoutRate)(x)
     x = Convolution3D(8, kernel_size=(3, 3, 3), padding='same',
                       activation='relu', kernel_initializer='lecun_uniform', use_bias=False, name='conv3D_2')(x)
@@ -79,6 +101,7 @@ def HGCal_model_reg(Inputs, nclasses, Inputshape, dropoutRate=0.25):
     x = Dense(64, activation='relu', kernel_initializer='lecun_uniform')(x)
     x = BatchNormalization(momentum=0.3, name='dense_batchnorm2')(x)
     x = Dropout(dropoutRate)(x)
+<<<<<<< HEAD
     x = Dense(64, activation='relu', kernel_initializer='lecun_uniform')(x)
     # x=BatchNormalization(momentum=0.3,name='dense_batchnorm3')(x)
     # x = Dropout(dropoutRate)(x)
@@ -92,5 +115,26 @@ def HGCal_model_reg(Inputs, nclasses, Inputshape, dropoutRate=0.25):
 
     predictions = [predictID, EandS]
 
+=======
+    x = Dense(64, activation='relu',kernel_initializer='lecun_uniform')(x)
+    #x=BatchNormalization(momentum=0.3,name='dense_batchnorm3')(x)
+    #x = Dropout(dropoutRate)(x)
+    
+    
+    
+    predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
+    predictE=Dense(1, activation='linear',kernel_initializer='zeros',name='E_pred_E')(x)
+    if noUncertainty:
+        EandS=predictE
+    else:
+        predictS=Dense(1, activation='linear',kernel_initializer='ones',name='E_pred_S')(x)
+        EandS=Concatenate(name='E_pred')( [predictS,predictE] )
+    
+    
+    
+   
+    predictions = [predictID,EandS]
+                   
+>>>>>>> refs/remotes/origin/master
     model = Model(inputs=Inputs, outputs=predictions)
     return model

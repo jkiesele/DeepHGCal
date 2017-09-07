@@ -27,6 +27,7 @@ int main(int argc, char *argv[]){
 
 	TString infile=argv[1];
 	TString outfile=argv[2];
+	cout << "out file: " << outfile << endl;
 
 	TString extra="";
 	if(argc>3){
