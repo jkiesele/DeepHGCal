@@ -26,12 +26,7 @@ void ntuple_recHits::initDNNBranches(TTree* t){
 	addBranch(t,add+"rechit_b",   &rechit_b_,   "rechit_b_[n_rechits_]/f");
 	addBranch(t,add+"rechit_x",   &rechit_x_,   "rechit_x_[n_rechits_]/f");
 	addBranch(t,add+"rechit_y",   &rechit_y_,   "rechit_y_[n_rechits_]/f");
-<<<<<<< HEAD
 	addBranch(t,add+"rechit_z",   &rechit_z_,   "rechit_z_[n_rechits_]/f");
-	addBranch(t,add+"rechit_pt",   &rechit_pt_,   "rechit_pt_[n_rechits_]/f");
-=======
-	//addBranch(t,add+"rechit_pt",   &rechit_pt_,   "rechit_pt_[n_rechits_]/f");
->>>>>>> refs/remotes/origin/master
 	addBranch(t,add+"rechit_energy",&rechit_energy_,"rechit_energy_[n_rechits_]/f");
 	addBranch(t,add+"rechit_time"  ,&rechit_time_,  "rechit_time_[n_rechits_]/f");
 	addBranch(t,add+"rechit_layer"  ,&rechit_layer_,  "rechit_layer_[n_rechits_]/f");

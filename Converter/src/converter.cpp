@@ -10,6 +10,7 @@
 #include "../include/ntuple_recHits.h"
 #include "../include/seedMaker.h"
 #include "../include/Transformer.h"
+#include "../include/truthCreator.h"
 
 #include "TCanvas.h"
 #include "TFile.h"
@@ -57,6 +58,8 @@ void converter::Loop(){
 
     fChain->SetBranchStatus("genpart_eta",1);
     fChain->SetBranchStatus("genpart_phi",1);
+    fChain->SetBranchStatus("genpart_ovz",1);
+    fChain->SetBranchStatus("genpart_dvz",1);
     fChain->SetBranchStatus("genpart_energy",1);
     fChain->SetBranchStatus("genpart_pid",1);
     fChain->SetBranchStatus("genpart_reachedEE",1);
@@ -92,13 +95,11 @@ void converter::Loop(){
 
     Long64_t nentries = fChain->GetEntries();
 
-    Transformer transformer(rechit_x, rechit_y, rechit_z, this);
+   // Transformer transformer(rechit_x, rechit_y, rechit_z, this);
 
     int count = 0;
     Long64_t nbytes = 0, nb = 0;
-    for (Long64_t jentry=0; jentry < nentries && jentry < 20 ;jentry++) {
-
-    	cout << jentry << endl;
+    for (Long64_t jentry=0; jentry < nentries;jentry++) {
 
 
         Long64_t ientry = LoadTree(jentry);
@@ -107,9 +108,14 @@ void converter::Loop(){
 
         if(testmode_&&jentry>50) break;
 
+        truthCreator truthcreator;
+        std::vector<truthTarget> truth=truthcreator.createTruthTargets(genpart_eta,genpart_phi,genpart_energy,genpart_pt,
+                genpart_ovz,genpart_dvz,
+                genpart_pid);
         //create the seeds per event
         seedMaker seedmaker;
-        seedmaker.createSeedsFromCollection(genpart_eta,genpart_phi,genpart_reachedEE);
+        // seedmaker.createSeedsFromCollection(genpart_eta,genpart_phi,genpart_reachedEE);
+        seedmaker.createSeedsFromTruthTarget(truth);
 
         for(size_t i_seed=0;i_seed<seedmaker.seeds().size();i_seed++){
             bool write=true;
@@ -127,26 +133,23 @@ void converter::Loop(){
             int truthid=0;
 
             //change to look for the best truth match, not only any within the cone
-            float lasttruedr=10;
 
-            for(size_t i_t=0;i_t<genpart_eta->size();i_t++){
+            for(size_t i_t=0;i_t<truth.size();i_t++){
 
                 //use best match here!
-                float dr=s.matches(genpart_eta->at(i_t),genpart_phi->at(i_t), 10000 );
+                float dr=s.matches(truth.at(i_t).eta(),truth.at(i_t).phi(), 10000 );
                 if(dr && dr<DRaroundSeed){
-                    if(lasttruedr>dr){
+                    if(s.truthIndex()==(int)i_t){
                         hastruthmatch=true;
-                        globals.setTruthKinematics(genpart_eta->at(i_t),
-                                genpart_phi->at(i_t),genpart_energy->at(i_t),genpart_pt->at(i_t));
+                        globals.setTruthKinematics(truth.at(i_t).eta(),truth.at(i_t).phi(),
+                                                         truth.at(i_t).energy(),truth.at(i_t).pt());
+                        truthid=truth.at(i_t).pdgId();
 
-                        truthid=genpart_pid->at(i_t);
-                        lasttruedr=dr;
                     }
-                    //break;
+                    else{
+                        globals.setCloseParticles(truth.at(i_t).eta(),truth.at(i_t).phi(),DRaroundSeed);
+                    }
                 }
-            }
-            for(size_t i_t=0;i_t<genpart_eta->size();i_t++){
-                globals.setCloseParticles(genpart_eta->at(i_t),genpart_phi->at(i_t),DRaroundSeed);
             }
 
             globals.setTruthID(truthid,hastruthmatch);
@@ -176,17 +179,18 @@ void converter::Loop(){
             for(size_t i_r=0;i_r<rechit_eta->size();i_r++){
                 if(s.matches(rechit_eta->at(i_r),rechit_phi->at(i_r), DRaroundSeed )){
 
-                	vector<float> trans = transformer.rel_transform(rechit_x->at(i_r), rechit_y->at(i_r), rechit_z->at(i_r),
-                												rechit_layer->at(i_r));
                 	count ++;
 
-                	write &= recHits.addRecHit(rechit_eta->at(i_r),rechit_phi->at(i_r),
-                    		trans[COORDINATE_A], trans[COORDINATE_B],
-							rechit_x->at(i_r), rechit_y->at(i_r), rechit_z->at(i_r),
-							rechit_pt->at(i_r), rechit_energy->at(i_r),
-							rechit_time->at(i_r), rechit_layer->at(i_r),
-                            s.eta(),s.phi());
-                    totalrechitenergy+=rechit_energy->at(i_r);
+                	write &= recHits.addRecHit(
+                	        rechit_eta->at(i_r),rechit_phi->at(i_r),
+                	        0,0,
+                	        rechit_x->at(i_r),rechit_y->at(i_r),
+                	        rechit_z->at(i_r),
+                	        rechit_pt->at(i_r), rechit_energy->at(i_r),
+                	        rechit_time->at(i_r), rechit_layer->at(i_r),
+                	        s.eta(),s.phi());
+
+                	totalrechitenergy+=rechit_energy->at(i_r);
 
                 }
             }
@@ -195,8 +199,8 @@ void converter::Loop(){
 
             if(write)
                 outtree->Fill();
+
         }
-        cout <<"hits count" << count<< endl;
     }
 
     TCanvas canvas;

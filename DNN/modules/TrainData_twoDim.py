@@ -170,10 +170,10 @@ class TrainData_twoDim(TrainData):
         # no need for changes above
         ####################
         # reduce to two dimension
-        # x_global[shower][eta][phi][layer]['colours']
+        # x_chmap[shower][eta][phi][layer]['colours']
         #
         # -> collapse to 
-        # x_global[shower][eta][phi][colours]
+        # x_chmap[shower][eta][phi][colours]
         #
         #
         #
@@ -216,13 +216,4 @@ class TrainData_twoDim(TrainData):
         self.x=[x_global,x_chmap,totalrecenergy]
         self.y=[idtruthtuple,energytruth]
         
-        
-        
-        
-class TrainData_very_small_corr_hiE(TrainData_very_small_corr):
-    def __init__(self):
-        TrainData_very_small_corr.__init__(self)
-        import numpy
-        self.weight_binX = numpy.array([60,80,100,120,140,160,200,240,300,400],dtype=float) 
-        
-        
+       
