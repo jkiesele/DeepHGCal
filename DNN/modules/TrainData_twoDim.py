@@ -167,6 +167,20 @@ class TrainData_twoDim(TrainData):
             x_chmap=x_chmapbase 
         
         
+        # no need for changes above
+        ####################
+        # reduce to two dimension
+        # x_global[shower][eta][phi][layer]['colours']
+        #
+        # -> collapse to 
+        # x_global[shower][eta][phi][colours]
+        #
+        #
+        #
+        #
+        ####################
+        # no need for changes in the following
+        
         before=len(x_global)
         
         if self.remove:
