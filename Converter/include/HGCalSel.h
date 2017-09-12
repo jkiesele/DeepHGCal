@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////
 // This class has been automatically generated on
-// Sat Jun  3 14:00:13 2017 by ROOT version 6.06/02
+// Thu Sep  7 17:22:11 2017 by ROOT version 6.04/03
 // from TTree hgc/hgc
-// found on file: partGun_PDGid211_x120_E35.0To35.0_NTUP_1.root
+// found on file: /afs/cern.ch/user/j/jkiesele/eos_hgcal/FlatRandomPtGunProducer_jkiesele_PDGid11_id13_id211_id22_x8_Pt2.0To100_eta_2.3to2.5_timing_20170907/NTUP/partGun_PDGid11_x960_Pt2.0To100.0_NTUP_92.root
 //////////////////////////////////////////////////////////
 
 #ifndef HGCalSel_h
@@ -36,10 +36,18 @@ public :
    std::vector<float>   *genpart_dvx;
    std::vector<float>   *genpart_dvy;
    std::vector<float>   *genpart_dvz;
+   std::vector<float>   *genpart_ovx;
+   std::vector<float>   *genpart_ovy;
+   std::vector<float>   *genpart_ovz;
+   std::vector<int>     *genpart_mother;
+   std::vector<float>   *genpart_exphi;
+   std::vector<float>   *genpart_exeta;
+   std::vector<float>   *genpart_exx;
+   std::vector<float>   *genpart_exy;
    std::vector<float>   *genpart_fbrem;
    std::vector<int>     *genpart_pid;
    std::vector<int>     *genpart_gen;
-   std::vector<bool>    *genpart_reachedEE;
+   std::vector<int>     *genpart_reachedEE;
    std::vector<bool>    *genpart_fromBeamPipe;
    std::vector<std::vector<float> > *genpart_posx;
    std::vector<std::vector<float> > *genpart_posy;
@@ -82,6 +90,9 @@ public :
    std::vector<float>   *multiclus_slopeY;
    std::vector<std::vector<unsigned int> > *multiclus_cluster2d;
    std::vector<int>     *multiclus_cl2dSeed;
+   std::vector<int>     *multiclus_firstLay;
+   std::vector<int>     *multiclus_lastLay;
+   std::vector<int>     *multiclus_NLay;
    std::vector<float>   *simcluster_eta;
    std::vector<float>   *simcluster_phi;
    std::vector<float>   *simcluster_pt;
@@ -96,6 +107,9 @@ public :
    std::vector<float>   *pfcluster_phi;
    std::vector<float>   *pfcluster_pt;
    std::vector<float>   *pfcluster_energy;
+   std::vector<float>   *pfcluster_correctedEnergy;
+   std::vector<std::vector<unsigned int> > *pfcluster_hits;
+   std::vector<std::vector<float> > *pfcluster_fractions;
    std::vector<float>   *calopart_eta;
    std::vector<float>   *calopart_phi;
    std::vector<float>   *calopart_pt;
@@ -125,6 +139,14 @@ public :
    TBranch        *b_genpart_dvx;   //!
    TBranch        *b_genpart_dvy;   //!
    TBranch        *b_genpart_dvz;   //!
+   TBranch        *b_genpart_ovx;   //!
+   TBranch        *b_genpart_ovy;   //!
+   TBranch        *b_genpart_ovz;   //!
+   TBranch        *b_genpart_mother;   //!
+   TBranch        *b_genpart_exphi;   //!
+   TBranch        *b_genpart_exeta;   //!
+   TBranch        *b_genpart_exx;   //!
+   TBranch        *b_genpart_exy;   //!
    TBranch        *b_genpart_fbrem;   //!
    TBranch        *b_genpart_pid;   //!
    TBranch        *b_genpart_gen;   //!
@@ -171,6 +193,9 @@ public :
    TBranch        *b_multiclus_slopeY;   //!
    TBranch        *b_multiclus_cluster2d;   //!
    TBranch        *b_multiclus_cl2dSeed;   //!
+   TBranch        *b_multiclus_firstLay;   //!
+   TBranch        *b_multiclus_lastLay;   //!
+   TBranch        *b_multiclus_NLay;   //!
    TBranch        *b_simcluster_eta;   //!
    TBranch        *b_simcluster_phi;   //!
    TBranch        *b_simcluster_pt;   //!
@@ -185,6 +210,9 @@ public :
    TBranch        *b_pfcluster_phi;   //!
    TBranch        *b_pfcluster_pt;   //!
    TBranch        *b_pfcluster_energy;   //!
+   TBranch        *b_pfcluster_correctedEnergy;   //!
+   TBranch        *b_pfcluster_hits;   //!
+   TBranch        *b_pfcluster_fractions;   //!
    TBranch        *b_calopart_eta;   //!
    TBranch        *b_calopart_phi;   //!
    TBranch        *b_calopart_pt;   //!
@@ -219,11 +247,11 @@ HGCalSel::HGCalSel(TTree *tree) : fChain(0)
 // if parameter tree is not specified (or zero), connect the file
 // used to generate this class and read the Tree.
    if (tree == 0) {
-      TFile *f = (TFile*)gROOT->GetListOfFiles()->FindObject("partGun_PDGid211_x120_E35.0To35.0_NTUP_1.root");
+      TFile *f = (TFile*)gROOT->GetListOfFiles()->FindObject("/afs/cern.ch/user/j/jkiesele/eos_hgcal/FlatRandomPtGunProducer_jkiesele_PDGid11_id13_id211_id22_x8_Pt2.0To100_eta_2.3to2.5_timing_20170907/NTUP/partGun_PDGid11_x960_Pt2.0To100.0_NTUP_92.root");
       if (!f || !f->IsOpen()) {
-         f = new TFile("partGun_PDGid211_x120_E35.0To35.0_NTUP_1.root");
+         f = new TFile("/afs/cern.ch/user/j/jkiesele/eos_hgcal/FlatRandomPtGunProducer_jkiesele_PDGid11_id13_id211_id22_x8_Pt2.0To100_eta_2.3to2.5_timing_20170907/NTUP/partGun_PDGid11_x960_Pt2.0To100.0_NTUP_92.root");
       }
-      TDirectory * dir = (TDirectory*)f->Get("partGun_PDGid211_x120_E35.0To35.0_NTUP_1.root:/ana");
+      TDirectory * dir = (TDirectory*)f->Get("/afs/cern.ch/user/j/jkiesele/eos_hgcal/FlatRandomPtGunProducer_jkiesele_PDGid11_id13_id211_id22_x8_Pt2.0To100_eta_2.3to2.5_timing_20170907/NTUP/partGun_PDGid11_x960_Pt2.0To100.0_NTUP_92.root:/ana");
       dir->GetObject("hgc",tree);
 
    }
@@ -273,6 +301,14 @@ void HGCalSel::Init(TTree *tree)
    genpart_dvx = 0;
    genpart_dvy = 0;
    genpart_dvz = 0;
+   genpart_ovx = 0;
+   genpart_ovy = 0;
+   genpart_ovz = 0;
+   genpart_mother = 0;
+   genpart_exphi = 0;
+   genpart_exeta = 0;
+   genpart_exx = 0;
+   genpart_exy = 0;
    genpart_fbrem = 0;
    genpart_pid = 0;
    genpart_gen = 0;
@@ -319,6 +355,9 @@ void HGCalSel::Init(TTree *tree)
    multiclus_slopeY = 0;
    multiclus_cluster2d = 0;
    multiclus_cl2dSeed = 0;
+   multiclus_firstLay = 0;
+   multiclus_lastLay = 0;
+   multiclus_NLay = 0;
    simcluster_eta = 0;
    simcluster_phi = 0;
    simcluster_pt = 0;
@@ -333,6 +372,9 @@ void HGCalSel::Init(TTree *tree)
    pfcluster_phi = 0;
    pfcluster_pt = 0;
    pfcluster_energy = 0;
+   pfcluster_correctedEnergy = 0;
+   pfcluster_hits = 0;
+   pfcluster_fractions = 0;
    calopart_eta = 0;
    calopart_phi = 0;
    calopart_pt = 0;
@@ -366,6 +408,14 @@ void HGCalSel::Init(TTree *tree)
    fChain->SetBranchAddress("genpart_dvx", &genpart_dvx, &b_genpart_dvx);
    fChain->SetBranchAddress("genpart_dvy", &genpart_dvy, &b_genpart_dvy);
    fChain->SetBranchAddress("genpart_dvz", &genpart_dvz, &b_genpart_dvz);
+   fChain->SetBranchAddress("genpart_ovx", &genpart_ovx, &b_genpart_ovx);
+   fChain->SetBranchAddress("genpart_ovy", &genpart_ovy, &b_genpart_ovy);
+   fChain->SetBranchAddress("genpart_ovz", &genpart_ovz, &b_genpart_ovz);
+   fChain->SetBranchAddress("genpart_mother", &genpart_mother, &b_genpart_mother);
+   fChain->SetBranchAddress("genpart_exphi", &genpart_exphi, &b_genpart_exphi);
+   fChain->SetBranchAddress("genpart_exeta", &genpart_exeta, &b_genpart_exeta);
+   fChain->SetBranchAddress("genpart_exx", &genpart_exx, &b_genpart_exx);
+   fChain->SetBranchAddress("genpart_exy", &genpart_exy, &b_genpart_exy);
    fChain->SetBranchAddress("genpart_fbrem", &genpart_fbrem, &b_genpart_fbrem);
    fChain->SetBranchAddress("genpart_pid", &genpart_pid, &b_genpart_pid);
    fChain->SetBranchAddress("genpart_gen", &genpart_gen, &b_genpart_gen);
@@ -412,6 +462,9 @@ void HGCalSel::Init(TTree *tree)
    fChain->SetBranchAddress("multiclus_slopeY", &multiclus_slopeY, &b_multiclus_slopeY);
    fChain->SetBranchAddress("multiclus_cluster2d", &multiclus_cluster2d, &b_multiclus_cluster2d);
    fChain->SetBranchAddress("multiclus_cl2dSeed", &multiclus_cl2dSeed, &b_multiclus_cl2dSeed);
+   fChain->SetBranchAddress("multiclus_firstLay", &multiclus_firstLay, &b_multiclus_firstLay);
+   fChain->SetBranchAddress("multiclus_lastLay", &multiclus_lastLay, &b_multiclus_lastLay);
+   fChain->SetBranchAddress("multiclus_NLay", &multiclus_NLay, &b_multiclus_NLay);
    fChain->SetBranchAddress("simcluster_eta", &simcluster_eta, &b_simcluster_eta);
    fChain->SetBranchAddress("simcluster_phi", &simcluster_phi, &b_simcluster_phi);
    fChain->SetBranchAddress("simcluster_pt", &simcluster_pt, &b_simcluster_pt);
@@ -426,6 +479,9 @@ void HGCalSel::Init(TTree *tree)
    fChain->SetBranchAddress("pfcluster_phi", &pfcluster_phi, &b_pfcluster_phi);
    fChain->SetBranchAddress("pfcluster_pt", &pfcluster_pt, &b_pfcluster_pt);
    fChain->SetBranchAddress("pfcluster_energy", &pfcluster_energy, &b_pfcluster_energy);
+   fChain->SetBranchAddress("pfcluster_correctedEnergy", &pfcluster_correctedEnergy, &b_pfcluster_correctedEnergy);
+   fChain->SetBranchAddress("pfcluster_hits", &pfcluster_hits, &b_pfcluster_hits);
+   fChain->SetBranchAddress("pfcluster_fractions", &pfcluster_fractions, &b_pfcluster_fractions);
    fChain->SetBranchAddress("calopart_eta", &calopart_eta, &b_calopart_eta);
    fChain->SetBranchAddress("calopart_phi", &calopart_phi, &b_calopart_phi);
    fChain->SetBranchAddress("calopart_pt", &calopart_pt, &b_calopart_pt);

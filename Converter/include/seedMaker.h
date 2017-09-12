@@ -13,12 +13,14 @@
 #include <vector>
 #include <limits>
 #include "helpers.h"
+#include <string>
+#include "truthCreator.h"
 //helper
 
 class seed{
 public:
 	seed(const float& eta, const float& phi):
-	eta_(eta),phi_(phi){}
+	eta_(eta),phi_(phi),truthidx_(-1){}
 
 	inline float matches(const float& eta, const float& phi, const float& dR)const{
 		float deltaeta=eta_-eta;
@@ -42,8 +44,13 @@ public:
 	const float& eta()const{return eta_;}
 	const float& phi()const{return phi_;}
 
+	//only for seeds from truth. Gives index of truth particle in event
+	const int truthIndex()const{return truthidx_;}
+	void setTruthIndex(int idx){truthidx_=idx;}
+
 private:
 	float eta_,phi_;
+	int truthidx_;
 };
 
 class seedMaker{
@@ -55,9 +62,18 @@ public:
 	        const std::vector<float> * select=0,
 	        const float selectcut=0);
 
+    void createMaxSeedsFromGenCollection(
+            const std::vector<float> *etas,
+            const std::vector<float> *phis,
+            size_t max=1e6,
+            const std::vector<int>*pidsel=0,
+            int abspid=0);
+
     void createSeedsFromCollection(const std::vector<float> *etas,
             const std::vector<float> *phis,
             const std::vector<bool> * select);
+
+    void createSeedsFromTruthTarget(const std::vector<truthTarget>&);
 
 	const std::vector<seed>& seeds()const{return seeds_;}
 

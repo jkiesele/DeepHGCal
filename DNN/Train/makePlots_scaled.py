@@ -15,7 +15,7 @@ outdir=args.inputDir+'/'
 
 #some ROCs
 truthclasses=['isGamma',
-              #'isElectron',
+              'isElectron',
               'isMuon',
               #'isTau',
               #'isPionZero',

@@ -10,7 +10,7 @@ echo ${1}
 
 for f in ${1}/*.root
 do
-./exe/convert $f /eos/cms/store/cmst3/group/dehep/DeepJet/Jan_test_highE/t_$COUNTER.root &
+./exe/convert $f /eos/cms/store/cmst3/group/hgcal/CMG_studies/Production/FlatRandomPtGunProducer_jkiesele_PDGid11_id13_id211_id22_x8_Pt2.0To100_eta_2.3to2.5_timing_20170907/DeepData/t_$COUNTER.root &
 echo t_$COUNTER.root
 COUNTER=$((COUNTER + 1))
 OTHERCOUNTER=$((OTHERCOUNTER + 1))

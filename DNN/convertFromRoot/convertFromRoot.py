@@ -47,13 +47,18 @@ def main(argv=None):
     from TrainData_small import TrainData_small
     from TrainData_small_corr import TrainData_small_corr
     from TrainData_very_small_corr import TrainData_very_small_corr,TrainData_very_small_corr_hiE
-  
+    from TrainData_very_small_corr_phonly import TrainData_very_small_corr_phonly
+    
+    from TrainData_twoDim import TrainData_twoDim
+    
     class_options = [
         TrainData_reference,
         TrainData_fraction,
         TrainData_small,
         TrainData_small_corr,
-        TrainData_very_small_corr,TrainData_very_small_corr_hiE
+        TrainData_very_small_corr,TrainData_very_small_corr_hiE,
+        TrainData_very_small_corr_phonly,
+        TrainData_twoDim
         ]
     class_options = dict((str(i).split("'")[1].split('.')[-1], i) for i in class_options)
 

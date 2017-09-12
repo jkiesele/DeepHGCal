@@ -25,22 +25,24 @@ def bestModel(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6):
     globals=Inputs[0]
     totalrecenergy=Inputs[2]
     
+    x=Convolution3D(4,kernel_size=(1,1,1),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
     x=BatchNormalization(momentum=momentum)(x)
-    x=Convolution3D(16,kernel_size=(3,3,3),strides=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
-    x=BatchNormalization(momentum=momentum)(x)
-    x = GaussianDropout(dropoutRate)(x)
-    x=Convolution3D(16,kernel_size=(3,3,6),strides=(1,1,2), activation='relu',kernel_initializer='lecun_uniform')(x)
+    x=Convolution3D(16,kernel_size=(3,3,3),strides=(1,1,1), padding='same', activation='relu',kernel_initializer='lecun_uniform')(x)
     x=BatchNormalization(momentum=momentum)(x)
     x = GaussianDropout(dropoutRate)(x)
-    x=Convolution3D(8,kernel_size=(8,8,12),strides=(2,2,2), activation='relu',kernel_initializer='lecun_uniform')(x)
+    x=Convolution3D(16,kernel_size=(3,3,6),strides=(1,1,2), padding='same',activation='relu',kernel_initializer='lecun_uniform')(x)
+    x=BatchNormalization(momentum=momentum)(x)
+    x = GaussianDropout(dropoutRate)(x)
+    x=Convolution3D(8,kernel_size=(8,8,12),strides=(2,2,4),activation='relu',kernel_initializer='lecun_uniform')(x)
     x=BatchNormalization(momentum=momentum)(x)
     x = GaussianDropout(dropoutRate)(x)
     x=Convolution3D(5,kernel_size=(1,1,1), activation='relu',kernel_initializer='lecun_uniform')(x)
     x=BatchNormalization(momentum=momentum)(x)
     x = GaussianDropout(dropoutRate)(x)
     
+    totalrecenergy=Dense(1,kernel_initializer='zeros',trainable=False)(totalrecenergy)
     x = Flatten()(x)
-    merged=Concatenate()( [globals,x]) #add the inputs again in case some don't like the multiplications
+    merged=Concatenate()( [globals,x,totalrecenergy]) #add the inputs again in case some don't like the multiplications
     
     
     x = Dense(300, activation='relu',kernel_initializer='lecun_uniform')(merged)
@@ -57,8 +59,7 @@ def bestModel(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6):
     #x = Dropout(dropoutRate)(x)
     
     predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
-    predictE=Dense(1, activation='linear',kernel_initializer='zeros',name='pred_E_corr')(x)
-    predictE = Add(name='pred_E')([totalrecenergy,predictE])
+    predictE=Dense(1, activation='linear',kernel_initializer='zeros',name='pred_E')(x)
     
     predictions = [predictID,predictE]
                    
@@ -335,7 +336,7 @@ from DeepHGCal_models import HGCal_model_reg
 #also dows all the parsing
 train=training_base(testrun=False)
 
-train.train_data.maxFilesOpen=10
+
 
 if not train.modelSet():
 
@@ -347,11 +348,11 @@ if not train.modelSet():
                    loss_weights=[.05, 1.])
 
 print(train.keras_model.summary())
-
-model,history = train.trainModel(nepochs=100, 
+#exit()
+model,history = train.trainModel(nepochs=110, 
                                  batchsize=665, 
                                  stop_patience=300, 
-                                 lr_factor=0.9, 
+                                 lr_factor=0.5, 
                                  lr_patience=-6, 
                                  lr_epsilon=0.0001, 
                                  lr_cooldown=8, 

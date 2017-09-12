@@ -24,18 +24,24 @@ def rotate3Dimages_Right(a):
     return np.flip(np.swapaxes(a,1,2),2)
 
 
-def augmentRotationalSymmetry6(a):
-    mapmirrlr=mirror3Dimages_leftRight(a)
-    mapmirrtb=mirror3Dimages_topBottom(a)
-    maprot1=rotate3Dimages_Right(a)
-    maprot2=rotate3Dimages_Right(maprot1)
-    maprot3=rotate3Dimages_Right(maprot2)
+def augmentRotationalSymmetry8(a):
     
-    return np.concatenate((a,mapmirrlr,mapmirrtb,maprot1,maprot2,maprot3))
+    b=rotate3Dimages_Right(a)
+    c=rotate3Dimages_Right(b)
+    d=rotate3Dimages_Right(c)
+    ma=mirror3Dimages_leftRight(a)
+    mb=mirror3Dimages_leftRight(b)
+    mc=mirror3Dimages_leftRight(c)
+    md=mirror3Dimages_leftRight(d)
+    
+    
+    return np.concatenate((a,b,c,d,ma,mb,mc,md))
 
-def duplicate6(a):
-    return np.concatenate((a,a,a,a,a,a))
+def duplicate8(a):
+    return np.concatenate((a,a,a,a,a,a,a,a))
 
-def evaluate6(func,arg):
-    return np.concatenate((func(arg),func(arg),func(arg),func(arg),func(arg),func(arg)))
+def evaluate8(func,arg):
+    return np.concatenate((func(arg),func(arg),func(arg),func(arg),func(arg),func(arg),func(arg),func(arg)))
+    
+    
     

@@ -1,7 +1,7 @@
 
 from TrainData import TrainData,fileTimeOut
 
-class TrainData_very_small_corr(TrainData):
+class TrainData_very_small_corr_phonly(TrainData):
     
     def __init__(self):
         '''
@@ -13,25 +13,16 @@ class TrainData_very_small_corr(TrainData):
         #define truth:
         self.undefTruth=['']
     
-        self.truthclasses=['isGamma',
-                            'isElectron',
-                            'isMuon',
-                            'isTau',
-                            'isPionZero',
-                            'isPionCharged',
-                            'isProton',
-                            'isKaonCharged',
-                            'isEta',
-                            'isOther',
-                            'isFake']
+        self.truthclasses=['isGamma']
        
         
         self.weightbranchX='true_energy'
         self.weightbranchY='true_eta'
         
         self.referenceclass='flatten'
-        self.weight_binX = numpy.array([0,40,
-                                        80,120,160,200,240,300,400],dtype=float) 
+        self.weight_binX = numpy.array(#[0,1,2,3,4,5,7.5,10,20,30,40,
+                                        #50,60,80,100,120,
+                                        [140,160,200,240,300,400],dtype=float) 
         #allow for falling spectrum after 400
         
         self.weight_binY = numpy.array([-10.,10.], dtype=float )
@@ -63,32 +54,12 @@ class TrainData_very_small_corr(TrainData):
     
     def reduceTruth(self, tuple_in):
         import numpy
-        self.reducedtruthclasses=['isGamma',
-                                  'isElectron',
-                                  'isMuon',
-                                  #'isTau',
-                                  #'isPionZero',
-                                  'isPionCharged',
-                                  #'isProton',
-                                  #'isKaonCharged',
-                                  'isOther'
-                                  ]
+        self.reducedtruthclasses=['isGamma']
         if tuple_in is not None:
             g = tuple_in['isGamma'].view(numpy.ndarray)
-            e = tuple_in['isElectron'].view(numpy.ndarray)
-            mu = tuple_in['isMuon'].view(numpy.ndarray)
-            pc= tuple_in['isPionCharged'].view(numpy.ndarray)
-            
-            tau= tuple_in['isTau'].view(numpy.ndarray)
-            p0= tuple_in['isPionZero'].view(numpy.ndarray)
-            pt= tuple_in['isProton'].view(numpy.ndarray)
-            kc= tuple_in['isKaonCharged'].view(numpy.ndarray)
-            
-            oth= tuple_in['isOther'].view(numpy.ndarray)
-            alloth=oth+tau+p0+pt+kc
             #real=q+w
             
-            return numpy.vstack((g,e,mu,pc,alloth)).transpose()  
+            return g#numpy.vstack((g)).transpose()  
         
         #remove isMuon  isTau  isFake
         
@@ -116,7 +87,7 @@ class TrainData_very_small_corr(TrainData):
         #flatten everything out for now
         x_chmapbase = createDensityLayers(filename,
                                       TupleMeanStd,
-                                      inbranches=['rechit_energy','rechit_layer','rechit_time'], 
+                                      inbranches=['rechit_energy','rechit_layer','rechit_seeddr'], 
                                       modes=['sum','single','average'],
                                       layerbranch='rechit_layer',
                                       maxlayers=55,
@@ -125,7 +96,7 @@ class TrainData_very_small_corr(TrainData):
                                       dimension1=['rechit_eta','seed_eta',13,0.2], 
                                       dimension2=['rechit_phi','seed_phi',13,0.2],
                                       counterbranch='nrechits',
-                                      scales=[1,50,1])
+                                      scales=[1,50,0.2])
         
         
         #training data
@@ -155,14 +126,10 @@ class TrainData_very_small_corr(TrainData):
             totalrecenergy=duplicate8(totalrecenergy)
             energytruth   =duplicate8(energytruth)
             idtruthtuple  =duplicate8(idtruthtuple)
-            notremoves   -=duplicate8(Tuple['isFake'])
-            notremoves   -=duplicate8(Tuple['isEta'])
             
             #notremoves -= energytruth<50
             
         else:
-            notremoves-=Tuple['isFake']
-            notremoves-=Tuple['isEta']
             x_global=x_globalbase
             x_chmap=x_chmapbase 
         
@@ -203,12 +170,5 @@ class TrainData_very_small_corr(TrainData):
         self.y=[idtruthtuple,energytruth]
         
         
-        
-        
-class TrainData_very_small_corr_hiE(TrainData_very_small_corr):
-    def __init__(self):
-        TrainData_very_small_corr.__init__(self)
-        import numpy
-        self.weight_binX = numpy.array([60,80,100,120,140,160,200,240,300,400],dtype=float) 
         
         

@@ -1,7 +1,7 @@
 
 from TrainData import TrainData,fileTimeOut
 
-class TrainData_very_small_corr(TrainData):
+class TrainData_twoDim(TrainData):
     
     def __init__(self):
         '''
