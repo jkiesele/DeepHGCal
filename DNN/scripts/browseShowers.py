@@ -16,6 +16,14 @@ td=TrainData()
 td.readIn(args.inputFile)
 x_chmap=td.x[1]
 del td
+
+
+
+if len(x_chmap.shape) < 5:
+	x_chmap = x_chmap.reshape((x_chmap.shape[0],x_chmap.shape[1],x_chmap.shape[2],1,x_chmap.shape[3]))  
+
+
+
 nentries=x_chmap.shape[0]
 ncolors=x_chmap[0].shape[3]
 

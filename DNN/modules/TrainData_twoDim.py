@@ -94,7 +94,7 @@ class TrainData_twoDim(TrainData):
         
     
     def readFromRootFile(self,filename,TupleMeanStd, weighter):
-        
+	 
         #the first part is standard, no changes needed
         from preprocessing import MeanNormApply,createDensityLayers, createDensityMap, MeanNormZeroPad, MeanNormZeroPadParticles
         import numpy
@@ -104,14 +104,15 @@ class TrainData_twoDim(TrainData):
         rfile = ROOT.TFile(filename)
         tree = rfile.Get("deepntuplizer/tree")
         self.nsamples=tree.GetEntries()
-        
+
+	print("1")
         
         
         x_globalbase = MeanNormZeroPad(filename,TupleMeanStd,
                                    [self.branches[0]],
                                    [self.branchcutoffs[0]],self.nsamples)
         
-        
+	print("2")
         
         #flatten everything out for now
         x_chmapbase = createDensityLayers(filename,
@@ -129,7 +130,7 @@ class TrainData_twoDim(TrainData):
         
         
         #training data
-        
+	print("3")
         Tuple = self.readTreeFromRootToTuple(filename)  
         
         idtruthtuple =  self.reduceTruth(Tuple[self.truthclasses])
@@ -157,8 +158,17 @@ class TrainData_twoDim(TrainData):
             idtruthtuple  =duplicate8(idtruthtuple)
             notremoves   -=duplicate8(Tuple['isFake'])
             notremoves   -=duplicate8(Tuple['isEta'])
-            
-            #notremoves -= energytruth<50
+            notremoves   -=duplicate8(Tuple['isElectron'])
+            notremoves   -=duplicate8(Tuple['isMuon'])
+            notremoves   -=duplicate8(Tuple['isTau'])
+            notremoves   -=duplicate8(Tuple['isPionZero'])
+            notremoves   -=duplicate8(Tuple['isPionCharged'])
+            notremoves   -=duplicate8(Tuple['isProton'])
+            notremoves   -=duplicate8(Tuple['isKaonCharged'])
+            notremoves   -=duplicate8(Tuple['isOther'])
+           
+
+           #notremoves -= energytruth<50
             
         else:
             notremoves-=Tuple['isFake']
@@ -166,7 +176,7 @@ class TrainData_twoDim(TrainData):
             x_global=x_globalbase
             x_chmap=x_chmapbase 
         
-        
+	print("4")
         # no need for changes above
         ####################
         # reduce to two dimension
@@ -180,6 +190,8 @@ class TrainData_twoDim(TrainData):
         #
         ####################
         # no need for changes in the following
+
+	x_chmap = numpy.squeeze(x_chmap[:,:,:, 15:16, :])
         
         before=len(x_global)
         
@@ -190,6 +202,7 @@ class TrainData_twoDim(TrainData):
             idtruthtuple=idtruthtuple[notremoves>0]
             energytruth=energytruth[notremoves>0]
             totalrecenergy=totalrecenergy[notremoves>0]
+	print("5")
         
         print('reduced to '+str(len(x_global))+' of '+ str(before))
         self.nsamples=len(x_global)
@@ -215,5 +228,5 @@ class TrainData_twoDim(TrainData):
         self.w=[weights,weights]
         self.x=[x_global,x_chmap,totalrecenergy]
         self.y=[idtruthtuple,energytruth]
-        
+	
        
