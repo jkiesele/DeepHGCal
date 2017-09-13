@@ -106,7 +106,7 @@ void converter::Loop(){
         if (ientry < 0) break;
         nb = fChain->GetEntry(jentry);   nbytes += nb;
 
-        if(testmode_&&jentry>50) break;
+        if(testmode_&&jentry>2) break;
 
         truthCreator truthcreator;
         std::vector<truthTarget> truth=truthcreator.createTruthTargets(genpart_eta,genpart_phi,genpart_energy,genpart_pt,

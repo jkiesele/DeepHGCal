@@ -86,6 +86,26 @@ makePlots_async(infile, #input file or file list
                 ) #override max value of y-axis range
 
 
+#makePlots_async(intextfile, name_list, variables, cuts, colours,
+#                     outpdffile, xaxis='',yaxis='',
+#                     normalized=False,profiles=False,
+#                     minimum=-1e100,maximum=1e100,widthprofile=False,
+#                     treename="deepntuplizer/tree"): 
+
+for t in truthclasses:
+    makePlots_async(infile, #input file or file list
+                ['E < 150 GeV',
+                 'E = [150,300] GeV',
+                 'E > 300 GeV',], #legend names [as list]
+                'reg_E*100/true_energy-1', #variable to plot --> yaxis:xaxis
+                [t+'&& true_energy<150',
+                 t+'&& true_energy>150 && true_energy<300',
+                 t+'&& true_energy>300'], #list of cuts to apply
+                'auto', #list of color and style, e.g. ['red,dashed', ...]
+                outdir+'/resolution_'+ t+'.pdf', #output file (pdf)
+                'response', #xaxisname
+                'A.U.', #yaxisname
+                normalized=True) #override max value of y-axis range
 
 legs=[]
 all=''

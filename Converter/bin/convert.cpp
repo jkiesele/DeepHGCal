@@ -56,7 +56,7 @@ int main(int argc, char *argv[]){
 	cv.setOutFile(outfile);
 	if(extra.Contains("test")){
 	    cv.setTest(true);
-	    std::cout << "Test mode: only running on 50 events" <<std::endl;
+	    std::cout << "Test mode: only running on 1 event" <<std::endl;
 	}
 
 	try{
