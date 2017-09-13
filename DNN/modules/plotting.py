@@ -113,13 +113,9 @@ def rotanimate(ax, output, **kwargs):
     for f in files:
         os.remove(f)
 
-<<<<<<< HEAD
 
 def plot4d(inputarray, outname, xlabel='', ylabel='', zlabel='', project=1):
-=======
-def plot4d(inputarray,outname='',xlabel='',ylabel='',zlabel='',project=1):
-    
->>>>>>> refs/remotes/origin/master
+
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
     import numpy as np
@@ -138,28 +134,7 @@ def plot4d(inputarray,outname='',xlabel='',ylabel='',zlabel='',project=1):
     from math import log10
     s = s + 0.01
     for i in range(len(s)):
-<<<<<<< HEAD
-        s[i] = log10(s[i])
 
-    # colmap = cm.ScalarMappable(cmap=cm.hsv)
-    # colmap.set_array(c)
-
-    # s=s+1
-    ax.scatter(x, z, y, c=cm.hot(c), s=s)
-
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_zlabel(zlabel)
-
-    # fig.axes.get_xaxis().set_visible(False)
-    # fig.axes.get_yaxis().set_visible(False)
-    # fig.axes.get_zaxis().set_visible(False)
-
-    fig.savefig(outname)
-    return ax, plt
-    # plt.show()
-    # plt.close()
-=======
         s[i]=log10(s[i])
         
     
@@ -188,4 +163,3 @@ def plot4d(inputarray,outname='',xlabel='',ylabel='',zlabel='',project=1):
     return ax,plt,x,y,z,c
     #plt.show()
     #plt.close()
->>>>>>> refs/remotes/origin/master
