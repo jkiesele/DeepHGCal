@@ -30,7 +30,7 @@ energyrange="true_energy >0&&true_energy <500"
 cuts=[]#[energyrange]
 for i in range(len(truthclasses)):
     cuts.append(energyrange+'&&'+truthclasses[i])
-
+# 1
 makePlots_async(infile, #input file or file list
                 ['INVISIBLE'], #legend names [as list]
                 'reg_E*100/true_energy-1', #variable to plot --> yaxis:xaxis
@@ -44,7 +44,7 @@ makePlots_async(infile, #input file or file list
                 0.1, #override min value of y-axis range
                 2.) #override max value of y-axis range
 
-
+# 2
 makePlots_async(infile, #input file or file list
                 truthclasses, #legend names [as list]
                 'reg_E*100/true_energy:true_energy', #variable to plot --> yaxis:xaxis
@@ -57,8 +57,7 @@ makePlots_async(infile, #input file or file list
                 True, #make a profile plot
                 0.1, #override min value of y-axis range
                 2.) #override max value of y-axis range
-
-
+# 3
 makePlots_async(infile, #input file or file list
                 truthclasses, #legend names [as list]
                 '(reg_E*100-true_energy):true_energy', #variable to plot --> yaxis:xaxis
@@ -72,7 +71,7 @@ makePlots_async(infile, #input file or file list
                 -100, #override min value of y-axis range
                 100) #override max value of y-axis range
 
-
+# 4
 makePlots_async(infile, #input file or file list
                 truthclasses, #legend names [as list]
                 'reg_E*100', #variable to plot --> yaxis:xaxis
@@ -90,14 +89,14 @@ makePlots_async(infile, #input file or file list
 #                     outpdffile, xaxis='',yaxis='',
 #                     normalized=False,profiles=False,
 #                     minimum=-1e100,maximum=1e100,widthprofile=False,
-#                     treename="deepntuplizer/tree"): 
+#                     treename="deepntuplizer/tree"):
 
 for t in truthclasses:
     makePlots_async(infile, #input file or file list
                 ['E < 150 GeV',
                  'E = [150,300] GeV',
                  'E > 300 GeV',], #legend names [as list]
-                'reg_E*100/true_energy-1', #variable to plot --> yaxis:xaxis
+                'reg_E*100/true_energy', #variable to plot --> yaxis:xaxis
                 [t+'&& true_energy<150',
                  t+'&& true_energy>150 && true_energy<300',
                  t+'&& true_energy>300'], #list of cuts to apply
@@ -106,7 +105,7 @@ for t in truthclasses:
                 'response', #xaxisname
                 'A.U.', #yaxisname
                 normalized=True) #override max value of y-axis range
-
+# 'reg_E*100/true_energy-1'
 legs=[]
 all=''
 probs=[]
@@ -121,62 +120,62 @@ for t in truthclasses:
         veto+= t2 + '+'
     veto=veto[0:-1]
     vetos.append(veto)
-    
+
 all=all[0:-1]
 
 
-
+# 5
 ##exit()
 #for c in truthclasses:
-makeROCs_async(intextfile=infile, 
-                   name_list=legs, 
-                   probabilities_list=probs, 
-                   truths_list=truthclasses, 
-                   vetos_list=vetos, 
-                   colors_list='auto,dashed', 
-                   outpdffile=outdir+'ROC_against_all.pdf', 
+makeROCs_async(intextfile=infile,
+                   name_list=legs,
+                   probabilities_list=probs,
+                   truths_list=truthclasses,
+                   vetos_list=vetos,
+                   colors_list='auto,dashed',
+                   outpdffile=outdir+'ROC_against_all.pdf',
                    cuts='true_energy>5')
-                   #, cmsstyle, 
-                   #firstcomment, 
-                   #secondcomment, 
-                   #invalidlist, 
-                   #extralegend, 
+                   #, cmsstyle,
+                   #firstcomment,
+                   #secondcomment,
+                   #invalidlist,
+                   #extralegend,
                    #logY)
-                   
-makeROCs_async(intextfile=infile, 
-                   name_list=['Gamma','Electrons'], 
-                   probabilities_list=['prob_isGamma','prob_isElectron'], 
-                   truths_list=['isGamma','isElectron'], 
-                   vetos_list=2*['isPionCharged+isProton+isKaonCharged+isOther'], 
-                   colors_list='auto,dashed', 
-                   outpdffile=outdir+'ROC_egamma_hadr.pdf', 
+# 6
+makeROCs_async(intextfile=infile,
+                   name_list=['Gamma','Electrons'],
+                   probabilities_list=['prob_isGamma','prob_isElectron'],
+                   truths_list=['isGamma','isElectron'],
+                   vetos_list=2*['isPionCharged+isProton+isKaonCharged+isOther'],
+                   colors_list='auto,dashed',
+                   outpdffile=outdir+'ROC_egamma_hadr.pdf',
                    cuts='true_energy>0')
-
-makeROCs_async(intextfile=infile, 
-                   name_list=          ['0-5 GeV','5-20 GeV','20-100 GeV','>100 GeV'], 
-                   probabilities_list= 'prob_isMuon', 
-                   truths_list=        'isMuon', 
-                   vetos_list=         'isGamma+isElectron+isPionCharged+isProton+isKaonCharged+isOther', 
-                   colors_list='auto,dashed', 
-                   outpdffile=outdir+'ROC_muon_all.pdf', 
+# 7
+makeROCs_async(intextfile=infile,
+                   name_list=          ['0-5 GeV','5-20 GeV','20-100 GeV','>100 GeV'],
+                   probabilities_list= 'prob_isMuon',
+                   truths_list=        'isMuon',
+                   vetos_list=         'isGamma+isElectron+isPionCharged+isProton+isKaonCharged+isOther',
+                   colors_list='auto,dashed',
+                   outpdffile=outdir+'ROC_muon_all.pdf',
                    cuts=['true_energy>0&&true_energy<5',
                          'true_energy>5&&true_energy<20',
                          'true_energy>20&&true_energy<100',
                          'true_energy>100'
                          ])
 
-
-makeROCs_async(intextfile=infile, 
-                   name_list=['Gamma','Electrons'], 
-                   probabilities_list=['prob_isGamma','prob_isElectron'], 
-                   truths_list=['isGamma','isElectron'], 
-                   vetos_list=2*['isPionCharged+isProton+isKaonCharged+isOther'], 
-                   colors_list='auto,dashed', 
-                   outpdffile=outdir+'ROC_egamma_hadr.pdf', 
+# 8
+makeROCs_async(intextfile=infile,
+                   name_list=['Gamma','Electrons'],
+                   probabilities_list=['prob_isGamma','prob_isElectron'],
+                   truths_list=['isGamma','isElectron'],
+                   vetos_list=2*['isPionCharged+isProton+isKaonCharged+isOther'],
+                   colors_list='auto,dashed',
+                   outpdffile=outdir+'ROC_egamma_hadr.pdf',
                    cuts='true_energy>5')
-                  
-exit()
 
+exit()
+# 9
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma','multicluster: hadron',
                  'DNN: hadron','multicluster: gamma'],    #legend names (needs to be list)
@@ -196,7 +195,7 @@ makePlots_async(infile,      #input file or file list
                 True)       #normalise
 
 
-
+# 10
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma','multicluster: hadron',
                  'DNN: hadron','multicluster: gamma'],    #legend names (needs to be list)
@@ -214,7 +213,7 @@ makePlots_async(infile,      #input file or file list
                 '(E_{reco}-E_{true})/E_{true}',     #xaxisname
                 'A.U.',     #yaxisname
                 True)       #normalise
-
+# 11
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma','multicluster: hadron',
                  'DNN: hadron','multicluster: gamma'],    #legend names (needs to be list)
@@ -232,7 +231,7 @@ makePlots_async(infile,      #input file or file list
                 '(E_{reco}-E_{true})/E_{true}',     #xaxisname
                 'A.U.',     #yaxisname
                 True)       #normalise
-
+# 12
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma','multicluster: hadron',
                  'DNN: hadron','multicluster: gamma'],    #legend names (needs to be list)
@@ -251,7 +250,7 @@ makePlots_async(infile,      #input file or file list
                 'A.U.',     #yaxisname
                 True)       #normalise
 
-
+# 13
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma','multicluster: hadron',
                  'DNN: hadron','multicluster: gamma'],    #legend names (needs to be list)
@@ -268,9 +267,9 @@ makePlots_async(infile,      #input file or file list
                 outdir+'/resolution_np6_e5.pdf',  #output file (pdf)
                 '(E_{reco}-E_{true})/E_{true}',     #xaxisname
                 'A.U.',     #yaxisname
-                True)       #normalise 
+                True)       #normalise
 
-
+# 14
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma','multicluster: hadron',
                  'DNN: hadron','multicluster: gamma'],    #legend names (needs to be list)
@@ -287,8 +286,8 @@ makePlots_async(infile,      #input file or file list
                 outdir+'/resolution_np6_e20.pdf',  #output file (pdf)
                 '(E_{reco}-E_{true})/E_{true}',     #xaxisname
                 'A.U.',     #yaxisname
-                True)       #normalise 
-
+                True)       #normalise
+# 15
 makePlots_async(infile,      #input file or file list
                 ['DNN: #pi^{#pm}','multicluster: #pi^{#pm}',
                  ],    #legend names (needs to be list)
@@ -297,7 +296,7 @@ makePlots_async(infile,      #input file or file list
                 [
                  'isPionCharged&& true_energy > 100 ',
                  'isPionCharged&&   true_energy > 100 ',
-                 
+
                   ],#cut to apply
                 ['green','red'],     #line color and style (e.g. 'red,dashed')
                 outdir+'/resolution_true_E100.pdf',  #output file (pdf)
@@ -306,7 +305,7 @@ makePlots_async(infile,      #input file or file list
                 True)       #normalise
 
 
-
+# 16
 makePlots_async(infile,      #input file or file list
                 ['DNN: #pi^{#pm}','simcluster: #pi^{#pm}',
                  ],    #legend names (needs to be list)
@@ -315,14 +314,14 @@ makePlots_async(infile,      #input file or file list
                 [
                  'isPionCharged&& true_energy > 100 ',
                  'isPionCharged&&   true_energy > 100 ',
-                 
+
                   ],#cut to apply
                 ['green','red'],     #line color and style (e.g. 'red,dashed')
                 outdir+'/resolutionsimcl_true_E100.pdf',  #output file (pdf)
                 '(E_{reco}-E_{true})/E_{true}',     #xaxisname
                 'A.U.',     #yaxisname
                 True)       #normalise
-
+# 17
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma','DNN: electron',
                  'DNN: hadron'],    #legend names (needs to be list)
@@ -332,14 +331,14 @@ makePlots_async(infile,      #input file or file list
                 ['isGamma &&  true_energy > 0 ' ,
                   'isElectron &&  true_energy > 0 ',
                  ' !isGamma && !isOther && true_energy > 0 ',
-                 
+
                   ],#cut to apply
                 ['green','green,dashed','red'],     #line color and style (e.g. 'red,dashed')
                 outdir+'/pull.pdf',  #output file (pdf)
                 '(E_{reco}-E_{true})/#sigma_{rec}',     #xaxisname
                 'A.U.',     #yaxisname
-                True) 
-
+                True)
+# 18
 makePlots_async(infile, #input file or file list
                 ['inclusive','Photon','PionCharged'], #legend names [as list]
                 'reg_uncPt/true_energy:true_energy', #variable to plot --> yaxis:xaxis
@@ -355,7 +354,7 @@ makePlots_async(infile, #input file or file list
                 0., #override min value of y-axis range
                 0.5) #override max value of y-axis range
 
-
+# 19
 makePlots_async(infile, #input file or file list
                 ['inclusive','Photon','PionCharged'], #legend names [as list]
                 'reg_sigmaE/true_energy:true_energy', #variable to plot --> yaxis:xaxis
@@ -370,42 +369,43 @@ makePlots_async(infile, #input file or file list
                 True, #make a profile plot
                 0.2, #override min value of y-axis range
                 1.8) #override max value of y-axis range
-
+# 20
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma',
                  'DNN: hadron'],    #legend names (needs to be list)
                 [
                  'reg_uncPt',
-                 
+
                  'reg_uncPt'],    #variable to plot
                 ['isGamma && prob_isGamma>0.9' ,
-                 
+
                  'isPionCharged && prob_isPionCharged>0.9',
-                 
+
                   ],#cut to apply
                 ['green','red'],     #line color and style (e.g. 'red,dashed')
                 outdir+'/sigma_reco_highpur.pdf',  #output file (pdf)
                 '(E_{reco}-E_{true})/E_{true}',     #xaxisname
                 'A.U.',     #yaxisname
-                True) 
+                True)
+# 21
 makePlots_async(infile,      #input file or file list
                 ['DNN: gamma',
                  'DNN: hadron'],    #legend names (needs to be list)
                 [
                  'reg_sigmaE',
-                 
+
                  'reg_sigmaE'],    #variable to plot
                 ['isGamma ' ,
-                 
+
                  'isPionCharged',
-                 
+
                   ],#cut to apply
                 ['green','red'],     #line color and style (e.g. 'red,dashed')
                 outdir+'/regEnergy.pdf',  #output file (pdf)
                 'E_{reco}',     #xaxisname
                 'A.U.',     #yaxisname
-                True) 
-
+                True)
+# 22
 makePlots_async(infile,      #input file or file list
                 ['#gamma',
                  '#pi^{#pm}','#pi^{0}'],    #legend names (needs to be list)
@@ -414,26 +414,26 @@ makePlots_async(infile,      #input file or file list
                  'true_energy',
                  'true_energy'],    #variable to plot
                 ['isGamma ' ,
-                 
+
                  'isPionCharged','isPionZero'
-                 
+
                   ],#cut to apply
                 ['green','red','blue'],     #line color and style (e.g. 'red,dashed')
                 outdir+'/trueEnergy.pdf',  #output file (pdf)
                 'E_{true}',     #xaxisname
                 'events',     #yaxisname
-                False) 
-
+                False)
+# 23
 makePlots_async(infile,      #input file or file list
                 ['DNN: pion charged'],    #legend names (needs to be list)
                 ['(reg_sigmaE-true_energy)/true_energy'
                  ],    #variable to plot
                 ['isPionCharged',
-                 
+
                   ],#cut to apply
                 ['green'],     #line color and style (e.g. 'red,dashed')
                 outdir+'/test4.pdf',  #output file (pdf)
                 'E:(E_{reco}-E_{true})/E_{true}',     #xaxisname
                 'A.U.',     #yaxisname
-                True) 
+                True)
 

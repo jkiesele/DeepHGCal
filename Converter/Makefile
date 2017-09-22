@@ -1,7 +1,7 @@
 CPP_FILES := $(wildcard src/*.cpp)
 OBJ_FILES := $(addprefix obj/,$(notdir $(CPP_FILES:.cpp=.o)))
 LD_FLAGS := `root-config --cflags --glibs` 
-CC_FLAGS := -fPIC -Wall `root-config --cflags`
+CC_FLAGS := -fPIC -Wall -std=c++11 `root-config --cflags`
 CC_FLAGS += -I./include -O2 
 
 

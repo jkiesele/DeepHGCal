@@ -58,7 +58,6 @@ private:
 	float rechit_layer_[MAX_RECHITS];
 
     float rechit_seeddr_[MAX_RECHITS];
-
 };
 
 
