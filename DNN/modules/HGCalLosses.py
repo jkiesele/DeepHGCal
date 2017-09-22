@@ -50,37 +50,41 @@ def loss_NLL_mod(y_true, x):
 global_loss_list['loss_NLL_mod'] = loss_NLL_mod
 
 
-def loss_relMeanSquaredError(y_true, x):
+def loss_relMeanSquaredError(y_true, x_pred):
     """
     testing - name is also wrong depending on commit..
     """
 
     from tensorflow import where, greater, abs, zeros_like, exp
-<<<<<<< HEAD:DNN/modules/Losses.py
-=======
-    
-    x_pred = x[:,1:]
-    x_sig = x[:,:1]
-    
-    
-    res=(0.00001* K.square(x_sig - x_pred - y_true) + K.square((x_pred - y_true) ) / K.square(y_true+2))
-    #res=where(greater(y_true,0.0001),res,zeros_like(y_true))
-    
-    return K.mean(res ,    axis=-1)
->>>>>>> refs/remotes/origin/master:DNN/modules/HGCalLosses.py
 
-    x_pred = x[:, 1:]
-    x_sig = x[:, :1]
 
-    res = 0.5 * K.square(x_sig) + K.square((x_pred - y_true) / (y_true + 1))
+
+    res = K.square((x_pred - y_true) / (y_true + .01))
     # res=where(greater(y_true,0.0001),res,zeros_like(y_true))
 
     return K.mean(res, axis=-1)
 
 
-<<<<<<< HEAD:DNN/modules/Losses.py
 global_loss_list['loss_relMeanSquaredError'] = loss_relMeanSquaredError
-=======
+
+
+def loss_relAndAbsMeanSquaredError(y_true, x_pred):
+    """
+    testing - name is also wrong depending on commit..
+    """
+
+    from tensorflow import where, greater, abs, zeros_like, exp
+
+
+
+    res = K.square(x_pred - y_true) + K.square((x_pred - y_true) / (y_true + .01))
+    # res=where(greater(y_true,0.0001),res,zeros_like(y_true))
+
+    return K.mean(res, axis=-1)
+
+
+global_loss_list['loss_relAndAbsMeanSquaredError'] = loss_relAndAbsMeanSquaredError
+
 def loss_relMeanSquaredErrorScaled(y_true, x):
     """
     testing - name is also wrong depending on commit..
@@ -159,7 +163,6 @@ def loss_meanSquaredErrorScaled(y_true, x):
 
 
 global_loss_list['loss_meanSquaredErrorScaled']=loss_meanSquaredErrorScaled
->>>>>>> refs/remotes/origin/master:DNN/modules/HGCalLosses.py
 
 
 def accuracy_None(y_true, x):

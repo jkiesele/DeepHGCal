@@ -51,8 +51,8 @@ makePlots_async(infile, #input file or file list
                 cuts, #list of cuts to apply
                 'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
                 outdir+'/resolution_ClassProfile.pdf', #output file (pdf)
-                'true energy [GeV]', #xaxisname
-                'response', #yaxisname
+                'E_{true} [GeV]', #xaxisname
+                'E_{pred}/E_{true}', #yaxisname
                 False, #normalize
                 True, #make a profile plot
                 0.1, #override min value of y-axis range
@@ -64,8 +64,8 @@ makePlots_async(infile, #input file or file list
                 cuts, #list of cuts to apply
                 'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
                 outdir+'/abserror_ClassProfile.pdf', #output file (pdf)
-                'true energy [GeV]', #xaxisname
-                'response', #yaxisname
+                'E_{true} [GeV]', #xaxisname
+                'E_{pred} - E_{true}', #yaxisname
                 False, #normalize
                 True, #make a profile plot
                 -100, #override min value of y-axis range
@@ -79,7 +79,7 @@ makePlots_async(infile, #input file or file list
                 'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
                 outdir+'/pred_ClassProfile.pdf', #output file (pdf)
                 'pred energy [GeV]', #xaxisname
-                'response', #yaxisname
+                'E_{pred}', #yaxisname
                 True, #normalize
                 False, #make a profile plot
                 ) #override max value of y-axis range
@@ -93,19 +93,79 @@ makePlots_async(infile, #input file or file list
 
 for t in truthclasses:
     makePlots_async(infile, #input file or file list
+<<<<<<< HEAD
                 ['E < 150 GeV',
                  'E = [150,300] GeV',
                  'E > 300 GeV',], #legend names [as list]
                 'reg_E*100/true_energy', #variable to plot --> yaxis:xaxis
                 [t+'&& true_energy<150',
+=======
+                ['MCl: E < 150 GeV',
+                 'MCl: E = [150,300] GeV',
+                 'MCl: E > 300 GeV',
+                 'DNN: E < 150 GeV',
+                 'DNN: E = [150,300] GeV',
+                 'DNN: E > 300 GeV',], #legend names [as list]
+                
+                3*['multicluster_energy/true_energy-1']+
+                3*['reg_E*100/true_energy-1'], #variable to plot --> yaxis:xaxis
+                2*[t+'&& true_energy<150',
+>>>>>>> 36a988d32cdb638dcc104c8945abe661d94c71e9
                  t+'&& true_energy>150 && true_energy<300',
                  t+'&& true_energy>300'], #list of cuts to apply
-                'auto', #list of color and style, e.g. ['red,dashed', ...]
+                ['red',
+                 'darkblue',
+                 'darkgreen',
+                 'dashed,red',
+                 'dashed,darkblue',
+                 'dashed,darkgreen',], #list of color and style, e.g. ['red,dashed', ...]
                 outdir+'/resolution_'+ t+'.pdf', #output file (pdf)
-                'response', #xaxisname
+                'E_{pred}/E_{true}-1', #xaxisname
                 'A.U.', #yaxisname
                 normalized=True) #override max value of y-axis range
+<<<<<<< HEAD
 # 'reg_E*100/true_energy-1'
+=======
+    
+    #true_drclosestparticle
+    
+    
+    makePlots_async(infile, #input file or file list
+                ['DNN: DR > 0.25',
+                 'DNN: DR = [0.12,0.25]',
+                 'DNN: DR < 0.12',], #legend names [as list]
+                
+                3*['reg_E*100/true_energy-1'], #variable to plot --> yaxis:xaxis
+                 [t+'&&                            abs(reg_E*100/true_energy-1)<0.6&& true_drclosestparticle<0',
+                 t+'  &&true_drclosestparticle>0&& abs(reg_E*100/true_energy-1)<0.6&& true_drclosestparticle>0.12 && true_drclosestparticle<0.25',
+                 t+'  &&true_drclosestparticle>0&& abs(reg_E*100/true_energy-1)<0.6&& true_drclosestparticle<0.12'], #list of cuts to apply
+                ['red',
+                 'darkblue',
+                 'darkgreen'], #list of color and style, e.g. ['red,dashed', ...]
+                outdir+'/overlap_singleDNN_'+ t+'.pdf', #output file (pdf)
+                'E_{pred}/E_{true}-1', #xaxisname
+                'A.U.', #yaxisname
+                normalized=True) #override max value of y-axis range
+    
+    makePlots_async(infile, #input file or file list
+                ['MCl: DR = [0.10,0.25]',
+                 'MCl: DR = [0.03,0.10]',
+                 'MCl: DR < 0.03',], #legend names [as list]
+                
+                3*['multicluster_energy/true_energy-1'], #variable to plot --> yaxis:xaxis
+                 [t+'&&                            abs(multicluster_energy/true_energy-1)<1&& true_drclosestparticle<0',
+                 t+'  &&true_drclosestparticle>0&& abs(multicluster_energy/true_energy-1)<1&& true_drclosestparticle>0.12 && true_drclosestparticle<0.25',
+                 t+'  &&true_drclosestparticle>0&& abs(multicluster_energy/true_energy-1)<1&& true_drclosestparticle<0.12'], #list of cuts to apply
+                ['red',
+                 'darkblue',
+                 'darkgreen'], #list of color and style, e.g. ['red,dashed', ...]
+                outdir+'/overlap_singleMCl_'+ t+'.pdf', #output file (pdf)
+                'E_{pred}/E_{true}-1', #xaxisname
+                'A.U.', #yaxisname
+                normalized=True) #override max value of y-axis range
+    
+
+>>>>>>> 36a988d32cdb638dcc104c8945abe661d94c71e9
 legs=[]
 all=''
 probs=[]
