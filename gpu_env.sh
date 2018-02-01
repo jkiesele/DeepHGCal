@@ -1,7 +1,7 @@
 
 
 export DEEPHGCAL=`pwd`
-export DEEPJETCORE=../DeepJetCore
+export DEEPJETCORE=`pwd`/../DeepJetCore
 
 cd $DEEPJETCORE
 source gpu_env.sh

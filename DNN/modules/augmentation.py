@@ -40,8 +40,19 @@ def augmentRotationalSymmetry8(a):
 def duplicate8(a):
     return np.concatenate((a,a,a,a,a,a,a,a))
 
+def duplicateImage(a):
+    return np.concatenate((a,a))
+
 def evaluate8(func,arg):
     return np.concatenate((func(arg),func(arg),func(arg),func(arg),func(arg),func(arg),func(arg),func(arg)))
+    
+
+def evaluateTwice(func,arg):
+    return np.concatenate((func(arg),func(arg)))
+    
+def mirrorInPhi(a):
+    return np.concatenate((a,mirror3Dimages_leftRight(a)))
+    
     
     
     

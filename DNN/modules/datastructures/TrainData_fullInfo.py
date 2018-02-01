@@ -96,7 +96,7 @@ class TrainData_fullInfo(TrainDataDeepHGCal):
     def readFromRootFile(self,filename,TupleMeanStd, weighter):
         
         #the first part is standard, no changes needed
-        from preprocessing import MeanNormZeroPad
+        from DeepJetCore.preprocessing import MeanNormZeroPad
         from converters import createRecHitMap
         import numpy
         import ROOT
@@ -200,101 +200,4 @@ class TrainData_fullInfo(TrainDataDeepHGCal):
         self.y=[idtruthtuple,energytruth]
         
         
-        
-class TrainData_fullInfo_noremove(TrainData_fullInfo):
-    
-    def __init__(self):   
-        TrainData_fullInfo.__init__(self)
-        self.weight_binX = numpy.array([0,4000],dtype=float) 
-             
-
-
-class TrainData_fullInfo_noremove_large(TrainData_fullInfo_noremove):
-    
-    def __init__(self):
-        '''
-        
-        '''
-        
-        TrainData_fullInfo_noremove.__init__(self)
-        
-    def readFromRootFile(self,filename,TupleMeanStd, weighter):
-        
-        #the first part is standard, no changes needed
-        from preprocessing import MeanNormZeroPad
-        from converters import createRecHitMap
-        import numpy
-        import ROOT
-        
-        fileTimeOut(filename,120) #give eos 2 minutes to recover
-        rfile = ROOT.TFile(filename)
-        tree = rfile.Get("deepntuplizer/tree")
-        self.nsamples=tree.GetEntries()
-        
-        
-        
-        x_globalbase = MeanNormZeroPad(filename,TupleMeanStd,
-                                   [self.branches[0]],
-                                   [self.branchcutoffs[0]],self.nsamples)
-        
-        
-        x_chmapbase=createRecHitMap(filename,self.nsamples,
-                                    nbins=21,
-                                    width=0.16,
-                                    maxlayers=52,
-                                    maxhitsperpixel=6)
-        
-        
-        Tuple = self.readTreeFromRootToTuple(filename)  
-        
-        idtruthtuple =  self.reduceTruth(Tuple[self.truthclasses])
-        energytruth  =  numpy.array(Tuple[self.regtruth])
-        #simple by-hand scaling to around 0 with a width of max about 1
-        energytruth = energytruth/100.
-        
-        totalrecenergy=numpy.array(Tuple['totalrechit_energy'])/100.
-        
-        weights=numpy.zeros(len(idtruthtuple))
-        
-        notremoves=numpy.zeros(totalrecenergy.shape[0])
-        notremoves+=1
-        if self.remove:
-            from augmentation import mirrorInPhi,duplicateImage,evaluateTwice
-            
-            x_global=duplicateImage(x_globalbase)
-            x_chmap= mirrorInPhi(x_chmapbase)
-            
-            notremoves=evaluateTwice(weighter.createNotRemoveIndices,Tuple)
-            
-            weights=duplicateImage(weighter.getJetWeights(Tuple))
-            totalrecenergy=duplicateImage(totalrecenergy)
-            energytruth   =duplicateImage(energytruth)
-            idtruthtuple  =duplicateImage(idtruthtuple)
-            notremoves   -=duplicateImage(Tuple['isFake'])
-            notremoves   -=duplicateImage(Tuple['isEta'])
-            
-            #notremoves -= energytruth<50
-            
-        else:
-            notremoves-=Tuple['isFake']
-            notremoves-=Tuple['isEta']
-            x_global=x_globalbase
-            x_chmap=x_chmapbase 
-        
-        
-        before=len(x_global)
-        
-        if self.remove:
-            weights=weights[notremoves>0]
-            x_global=x_global[notremoves>0]
-            x_chmap=x_chmap[notremoves>0]
-            idtruthtuple=idtruthtuple[notremoves>0]
-            energytruth=energytruth[notremoves>0]
-            totalrecenergy=totalrecenergy[notremoves>0]
-        
-        print('reduced to '+str(len(x_global))+' of '+ str(before))
-        self.nsamples=len(x_global)
-        
-        self.w=[weights,weights]
-        self.x=[x_global,x_chmap,totalrecenergy]
-        self.y=[idtruthtuple,energytruth]
+     

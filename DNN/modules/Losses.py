@@ -3,8 +3,28 @@ from keras import backend as K
 global_loss_list = {}
 
 
+def mean_squared_mixed_logarithmic_error(y_true, y_pred):
+    from tensorflow import where, greater
+    
+    scaler = 0.05
+    
+    first_log = K.log(K.clip(y_pred, K.epsilon(), None) + 1.)
+    second_log = K.log(K.clip(y_true, K.epsilon(), None) + 1.)
+    return K.mean(K.square(first_log - second_log)+
+                  scaler* K.square(y_pred - y_true), axis=-1)
 
+global_loss_list['mean_squared_mixed_logarithmic_error'] = mean_squared_mixed_logarithmic_error
 
+def mean_squared_logarithmic_error(y_true, y_pred):
+    from tensorflow import where, greater
+    
+    scaler=0.1
+    
+    first_log = K.log(K.clip(scaler*y_pred, K.epsilon(), None) + 1.)
+    second_log = K.log(K.clip(scaler*y_true, K.epsilon(), None) + 1.)
+    return K.mean(K.square(first_log - second_log), axis=-1)
+
+global_loss_list['mean_squared_logarithmic_error'] = mean_squared_logarithmic_error
 
 def loss_NLL(y_true, x):
     """
@@ -50,22 +70,18 @@ def loss_NLL_mod(y_true, x):
 global_loss_list['loss_NLL_mod'] = loss_NLL_mod
 
 
-def loss_relMeanSquaredError(y_true, x_pred):
+def loss_modRelMeanSquaredError(y_true, x_pred):
     """
     testing - name is also wrong depending on commit..
     """
 
-    from tensorflow import where, greater, abs, zeros_like, exp
-
-
-
-    res = K.square((x_pred - y_true) / (y_true + .01))
+    res = K.square((x_pred - y_true)) / (y_true + .05)
     # res=where(greater(y_true,0.0001),res,zeros_like(y_true))
 
     return K.mean(res, axis=-1)
 
 
-global_loss_list['loss_relMeanSquaredError'] = loss_relMeanSquaredError
+global_loss_list['loss_modRelMeanSquaredError'] = loss_modRelMeanSquaredError
 
 
 def loss_relAndAbsMeanSquaredError(y_true, x_pred):
@@ -77,7 +93,7 @@ def loss_relAndAbsMeanSquaredError(y_true, x_pred):
 
 
 
-    res = K.square(x_pred - y_true) + K.square((x_pred - y_true) / (y_true + .01))
+    res = K.square(x_pred - y_true) + 10*K.square((x_pred - y_true) / (y_true + .03))
     # res=where(greater(y_true,0.0001),res,zeros_like(y_true))
 
     return K.mean(res, axis=-1)

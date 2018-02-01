@@ -8,7 +8,8 @@ def fileTimeOut(a,b):
 class TrainDataDeepHGCal(TrainData):
     
     def __init__(self):
-        TrainData.__init__()
+        import numpy 
+        TrainData.__init__(self)
         
         self.treename="deepntuplizer/tree"
         

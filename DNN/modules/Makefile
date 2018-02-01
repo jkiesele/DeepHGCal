@@ -19,8 +19,8 @@ OBJ_FILES := $(addprefix obj/,$(notdir $(CPP_FILES:.cpp=.o)))
 MODULES := $(wildcard src/*.C)
 MODULES_OBJ_FILES := $(addprefix ./,$(notdir $(MODULES:.C=.o)))
 MODULES_SHARED_LIBS := $(addprefix ./,$(notdir $(MODULES:.C=.so)))
-DEEPJETINCL=${DEEPJET}/modules/interface
-DEEPJETLIB=${DEEPJET}/modules
+DEEPJETINCL=${DEEPJETCORE}/compiled/interface
+DEEPJETLIB=${DEEPJETCORE}/compiled
 
 all: $(MODULES_SHARED_LIBS)
 
@@ -35,7 +35,7 @@ libdeephgcalhelpers.so: $(OBJ_FILES)
   
 
 %.so: %.o libdeephgcalhelpers.so
-	g++ -shared $(LINUXADD)  $(ROOTSTUFF) -L$(DEEPJETLIB) -ldeepjethelpers -L$(BOOST_LIB)  -lboost_python -L${CONDA_PREFIX}/lib/python$(PYTHON_VERSION)/config -lpython2.7  $< -o $(@) 
+	g++ -shared $(LINUXADD)  $(ROOTSTUFF) -L$(DEEPJETLIB) -ldeepjetcorehelpers -L$(BOOST_LIB)  -lboost_python -L${CONDA_PREFIX}/lib/python$(PYTHON_VERSION)/config -lpython2.7  $< -o $(@) 
 
 
 %.o: src/%.C 

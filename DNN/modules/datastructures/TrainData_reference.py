@@ -90,7 +90,7 @@ class TrainData_reference(TrainDataDeepHGCal):
     def readFromRootFile(self, filename, TupleMeanStd, weighter):
 
         # the first part is standard, no changes needed
-        from preprocessing import MeanNormApply, createDensityLayers, createDensityMap, MeanNormZeroPad, \
+        from DeepJetCore.preprocessing import MeanNormApply, createDensityLayers, createDensityMap, MeanNormZeroPad, \
             MeanNormZeroPadParticles
         import numpy
         import ROOT
