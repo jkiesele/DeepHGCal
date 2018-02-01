@@ -1,8 +1,8 @@
-from training_base import training_base
-<<<<<<< HEAD
+from DeepJetCore.training.training_base import training_base
+
 from Losses import loss_NLL, loss_relMeanSquaredError, loss_NLL_mod, accuracy_SigPred, accuracy_None
-from modelTools import fixLayersContaining
-=======
+from DeepJetCore.modeltools import fixLayersContaining
+
 
 from keras.layers import Dense, Dropout, Flatten, Convolution2D,Convolution3D, merge, Convolution1D, Conv2D, LSTM, LocallyConnected2D
 from keras.layers.pooling import MaxPooling3D

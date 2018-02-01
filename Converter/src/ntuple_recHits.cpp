@@ -9,6 +9,15 @@
 
 
 #include <iostream>
+#include <cmath>
+
+static float deltaPhi(const float & a, const float & b){
+    const float pi = 3.14159265358979323846;
+    float delta = (a -b);
+    while (delta >= pi)  delta-= 2* pi;
+    while (delta < -pi)  delta+= 2* pi;
+    return delta;
+}
 
 
 void ntuple_recHits::initDNNBranches(TTree* t){
@@ -65,8 +74,8 @@ bool ntuple_recHits::addRecHit(const float& eta,
 		rechit_energy_[n_rechits_]=energy;
 		rechit_time_[n_rechits_]=time;
 		rechit_layer_[n_rechits_]=layer;
-
-		rechit_seeddr_[n_rechits_]=std::sqrt((eta-seedeta)*(eta-seedeta)+(phi-seedphi)*(phi-seedphi));
+		float deltaphi= deltaPhi(phi,seedphi);
+		rechit_seeddr_[n_rechits_]=std::sqrt((eta-seedeta)*(eta-seedeta)+deltaphi*deltaphi);
 
 		nrechits_++;
 		n_rechits_++;

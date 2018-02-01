@@ -1,6 +1,6 @@
 
 
-from training_base import training_base
+from DeepJetCore.training.training_base import training_base
 
 from keras.layers import Dense, Dropout, Flatten, Convolution2D,Convolution3D, merge, Convolution1D, Conv2D, LSTM, LocallyConnected2D
 from keras.layers.pooling import MaxPooling3D
@@ -201,8 +201,6 @@ def HGCalModel(Inputs,nclasses,nregressions,dropoutRate=0.25,momentum=0.6):
     model = Model(inputs=Inputs, outputs=predictions)
     return model
 
-
-from DeepHGCal_models import HGCal_model_reg
 
 
 #also dows all the parsing

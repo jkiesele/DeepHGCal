@@ -1,13 +1,13 @@
-from TrainData import TrainData, fileTimeOut
+from TrainDataDeepHGCal import TrainDataDeepHGCal, fileTimeOut
 
 
-class TrainData_reference(TrainData):
+class TrainData_reference(TrainDataDeepHGCal):
     def __init__(self):
         '''
         
         '''
         import numpy
-        TrainData.__init__(self)
+        TrainDataDeepHGCal.__init__(self)
 
         # define truth:
         self.undefTruth = ['']

@@ -1,4 +1,4 @@
-from training_base import training_base
+from DeepJetCore.training.training_base import training_base
 
 from keras.layers import Dense, Dropout, Flatten, Convolution2D, Convolution3D, merge, Convolution1D, Conv2D, LSTM, \
     LocallyConnected2D
