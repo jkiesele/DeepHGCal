@@ -8,4 +8,4 @@ The framework consists of two parts:
 2) DNN training/evaluation (Dependencies: DeepJetCore and all therein).
    
 The DeepJetCore framework and the DeepHGCal framework should be checked out to the same parent directory.
-Before usage, always set up the environment in DNN by sourcing env.sh
+Before usage, always set up the environment by sourcing XXX_env.sh
