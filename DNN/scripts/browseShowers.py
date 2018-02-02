@@ -9,7 +9,7 @@ args = parser.parse_args()
 import matplotlib.pyplot as plt
 from plotting import plot4d
 
-from TrainData import TrainData
+from DeepJetCore.TrainData import TrainData
 import mpl_toolkits.mplot3d.art3d as a3d
 
 td=TrainData()
