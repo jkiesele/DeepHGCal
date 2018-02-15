@@ -23,19 +23,21 @@ public:
 		n_rechits_=0;
 	}
 
-	bool addRecHit(const float& eta,
-			const float& phi,
-			const float& a,
-			const float& b,
-			const float& x,
-			const float& y,
-			const float& z,
-			const float& pt,
-			const float& energy,
-			const float& time,
-			const int& layer,
-            const float& seedeta,
-            const float& seedphi);
+    bool addRecHit(const float &eta,
+                   const float &phi,
+                   const float &a,
+                   const float &b,
+                   const float &x,
+                   const float &y,
+                   const float &z,
+                   const float &pt,
+                   const float &energy,
+                   const float &time,
+                   const int &layer,
+                   const float &seedeta,
+                   const float &seedphi,
+                   const float &recHitFraction,
+                   const float &recHitFromSelectedSimCluster);
 
 
 private:
@@ -56,7 +58,8 @@ private:
 	float rechit_pt_[MAX_RECHITS];
 	float rechit_time_[MAX_RECHITS];
 	float rechit_layer_[MAX_RECHITS];
-
+	float rechit_fraction_[MAX_RECHITS];
+    float rechit_from_selected_sim_cluster_[MAX_RECHITS];
     float rechit_seeddr_[MAX_RECHITS];
 };
 

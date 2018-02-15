@@ -40,45 +40,51 @@ void ntuple_recHits::initDNNBranches(TTree* t){
 	addBranch(t,add+"rechit_time"  ,&rechit_time_,  "rechit_time_[n_rechits_]/f");
 	addBranch(t,add+"rechit_layer"  ,&rechit_layer_,  "rechit_layer_[n_rechits_]/f");
     addBranch(t,add+"rechit_seeddr"  ,&rechit_seeddr_,  "rechit_seeddr_[n_rechits_]/f");
+	addBranch(t,add+"rechit_fraction"  ,&rechit_fraction_,  "rechit_fraction_[n_rechits_]/f");
+	addBranch(t,add+"rechit_from_selected_sim_cluster"  ,&rechit_from_selected_sim_cluster_,  "rechit_from_selected_sim_cluster_[n_rechits_]/f");
 
 
 }
 
 
-bool ntuple_recHits::addRecHit(const float& eta,
-			const float& phi,
-			const float& a,
-			const float& b,
-			const float& x,
-			const float& y,
-			const float& z,
-			const float& pt,
-			const float& energy,
-			const float& time,
-			const int& layer,
-			const float& seedeta,
-			const float& seedphi){
+bool ntuple_recHits::addRecHit(const float &eta,
+							   const float &phi,
+							   const float &a,
+							   const float &b,
+							   const float &x,
+							   const float &y,
+							   const float &z,
+							   const float &pt,
+							   const float &energy,
+							   const float &time,
+							   const int &layer,
+							   const float &seedeta,
+							   const float &seedphi,
+							   const float &recHitFraction,
+							   const float &recHitFromSelectedSimCluster) {
 
-		if(n_rechits_>=MAX_RECHITS){
-			std::cout << "WARNING: MAX NUMBER OF REC HITS REACHED" << std::endl;
-			return false;
-		}
-		rechit_eta_[n_rechits_]=eta;
-		rechit_phi_[n_rechits_]=phi;
-		rechit_a_[n_rechits_]=a;
-		rechit_b_[n_rechits_]=b;
-		rechit_x_[n_rechits_]=x;
-		rechit_y_[n_rechits_]=y;
-		rechit_z_[n_rechits_]=z;
-		rechit_pt_[n_rechits_]=pt;
-		rechit_energy_[n_rechits_]=energy;
-		rechit_time_[n_rechits_]=time;
-		rechit_layer_[n_rechits_]=layer;
-		float deltaphi= deltaPhi(phi,seedphi);
-		rechit_seeddr_[n_rechits_]=std::sqrt((eta-seedeta)*(eta-seedeta)+deltaphi*deltaphi);
-
-		nrechits_++;
-		n_rechits_++;
-
-		return true;
+	if (n_rechits_ >= MAX_RECHITS) {
+		std::cout << "WARNING: MAX NUMBER OF REC HITS REACHED" << std::endl;
+		return false;
 	}
+	rechit_eta_[n_rechits_] = eta;
+	rechit_phi_[n_rechits_] = phi;
+	rechit_a_[n_rechits_] = a;
+	rechit_b_[n_rechits_] = b;
+	rechit_x_[n_rechits_] = x;
+	rechit_y_[n_rechits_] = y;
+	rechit_z_[n_rechits_] = z;
+	rechit_pt_[n_rechits_] = pt;
+	rechit_energy_[n_rechits_] = energy;
+	rechit_time_[n_rechits_] = time;
+	rechit_layer_[n_rechits_] = layer;
+	float deltaphi = deltaPhi(phi, seedphi);
+	rechit_seeddr_[n_rechits_] = std::sqrt((eta - seedeta) * (eta - seedeta) + deltaphi * deltaphi);
+	rechit_fraction_[n_rechits_] = recHitFraction;
+	rechit_from_selected_sim_cluster_[n_rechits_] = recHitFromSelectedSimCluster;
+
+	nrechits_++;
+	n_rechits_++;
+
+	return true;
+}
