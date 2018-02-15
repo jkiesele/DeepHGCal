@@ -22,6 +22,13 @@
 
 using namespace std;
 
+struct RecHitData {
+	unsigned int id;
+	float eta;
+	float phi;
+	float energy;
+};
+
 class converter: public HGCalSel{
 public:
 	converter(TTree* t):HGCalSel(t),testmode_(false),energylowercut_(0){}

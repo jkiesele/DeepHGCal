@@ -11,12 +11,18 @@
 #include "../include/seedMaker.h"
 #include "../include/Transformer.h"
 #include "../include/truthCreator.h"
+#include <stdlib.h>
 
 #include "TCanvas.h"
 #include "TFile.h"
 
 #include <iostream>
 #include <map>
+#include <algorithm>
+#include <unordered_map>
+#include <math.h>
+#include <TH1F.h>
+#include <TGraph.h>
 
 #define LAYER_NUM 52
 #define COORDINATE_A 0
@@ -50,6 +56,9 @@ void converter::Loop(){
     fChain->SetBranchStatus("simcluster_eta",1);
     fChain->SetBranchStatus("simcluster_phi",1);
     fChain->SetBranchStatus("simcluster_energy",1);
+    // Added by SRQ
+    fChain->SetBranchStatus("simcluster_hits",1);
+    fChain->SetBranchStatus("simcluster_fractions",1);
 
     fChain->SetBranchStatus("multiclus_eta",1);
     fChain->SetBranchStatus("multiclus_phi",1);
@@ -75,6 +84,7 @@ void converter::Loop(){
     fChain->SetBranchStatus("rechit_energy",1);
     fChain->SetBranchStatus("rechit_time",1);
     fChain->SetBranchStatus("rechit_layer",1);
+    fChain->SetBranchStatus("rechit_detid",1);
 
 
 
@@ -112,6 +122,7 @@ void converter::Loop(){
         std::vector<truthTarget> truth=truthcreator.createTruthTargets(genpart_eta,genpart_phi,genpart_energy,genpart_pt,
                 genpart_ovz,genpart_dvz,
                 genpart_pid);
+
         //create the seeds per event
         seedMaker seedmaker;
         // seedmaker.createSeedsFromCollection(genpart_eta,genpart_phi,genpart_reachedEE);
@@ -123,7 +134,7 @@ void converter::Loop(){
             globals.reset();
             recHits.reset();
 
-            float DRaroundSeed=0.25;
+            float DRaroundSeed=1;
 
             const seed& s=seedmaker.seeds().at(i_seed);
             globals.setSeedInfo(s.eta(),s.phi(),i_seed,jentry);
@@ -164,36 +175,123 @@ void converter::Loop(){
                 }
             }
 
-            for(size_t i_m=0;i_m<simcluster_eta->size();i_m++){
-                if(s.matches(simcluster_eta->at(i_m), simcluster_phi->at(i_m),0.003)){
-                    globals.setSimCluster(simcluster_eta->at(i_m),
-                            simcluster_phi->at(i_m),
-                            simcluster_energy->at(i_m));
-                    break;
+            std::unordered_map<unsigned int, RecHitData> recHitsMap;
+
+            // Iterate through rechits and put them in hashmap for faster search
+            for(size_t i_r=0;i_r<rechit_eta->size();i_r++) {
+                float eta = rechit_eta->at(i_r);
+                float phi = rechit_phi->at(i_r);
+                float energy = rechit_energy->at(i_r);
+                unsigned int id = rechit_detid->at(i_r);
+                RecHitData recHit = {id, eta, phi, energy};
+                recHitsMap[id] = recHit;
+            }
+            // Iterate through all the sim clusters to recompute their eta and phi
+            for(size_t i_m=0;i_m<simcluster_eta->size();i_m++) {
+                std::vector<unsigned int> simClusterHitsIds = simcluster_hits->at(i_m);
+                std::vector<float> simClusterHitsFractions = simcluster_fractions->at(i_m);
+
+                float etaWeightedSum = 0;
+                float phiWeightedSum = 0;
+                float weightsSum = 0;
+                for(size_t i = 0; i < simClusterHitsIds.size(); i++) {
+                    unsigned int id = simClusterHitsIds[i];
+                    float fraction = simClusterHitsFractions[i];
+
+                    if (recHitsMap.find(id) == recHitsMap.end()) {
+                        continue;
+                    }
+
+                    RecHitData recHit = recHitsMap[id]; // It should exist otherwise it will except
+                    etaWeightedSum += recHit.eta * fraction * recHit.energy;
+                    phiWeightedSum += helpers::deltaPhi(recHit.phi, 0) * fraction * recHit.energy;
+                    weightsSum += fraction * recHit.energy;
+                }
+
+
+                simcluster_eta->at(i_m) = etaWeightedSum / weightsSum;
+                simcluster_phi->at(i_m) = phiWeightedSum / weightsSum;
+                if(etaWeightedSum==0) {
+                    std::cerr << "Error in finding corresponding rechits for sim-clusters." << std::endl;
+                    simcluster_eta->at(i_m) = simcluster_phi->at(i_m) = 10000000;
+                }
+
+            }
+
+
+            if (simcluster_eta->size() == 0) {
+                std::cerr<<"Error in simclusters"<<std::endl;
+                exit(-1);
+            }
+
+            float* seedSimilarityVector = new float[simcluster_eta->size()];
+            int simClusterIndex = 0;
+            float minDistance = helpers::getSeedSimClusterDifference(s.eta(), s.phi(), simcluster_eta->at(0),
+                                                                          simcluster_phi->at(0));
+            seedSimilarityVector[0]=minDistance;
+            for (size_t i_m = 1; i_m < simcluster_eta->size(); i_m++) {
+                float newDistance = helpers::getSeedSimClusterDifference(s.eta(), s.phi(), simcluster_eta->at(i_m),
+                                                                         simcluster_phi->at(i_m));
+                if (newDistance < minDistance) {
+                    minDistance = newDistance;
+                    simClusterIndex = i_m;
+                }
+                seedSimilarityVector[i_m]=minDistance;
+            }
+
+            // ID to fraction
+            float maxFraction = 0;
+            std::unordered_map<unsigned int, float> fractions_map;
+            {
+                std::vector<unsigned int> simClusterHitsIds = simcluster_hits->at(simClusterIndex);
+                std::vector<float> simClusterHitsFractions = simcluster_fractions->at(simClusterIndex);
+                for(size_t i = 0; i <= simClusterHitsIds.size(); i++) {
+                    fractions_map[simClusterHitsIds[i]] = simClusterHitsFractions[i];
+                    maxFraction = max(maxFraction, simClusterHitsFractions[i]);
                 }
             }
 
-            //match the recHits
-
+//            std::cout<<"Max fraction is "<<maxFraction<<std::endl;
+            maxFraction = 0;
+            // match the recHits
             float totalrechitenergy=0;
             for(size_t i_r=0;i_r<rechit_eta->size();i_r++){
                 if(s.matches(rechit_eta->at(i_r),rechit_phi->at(i_r), DRaroundSeed )){
 
                 	count ++;
 
-                	write &= recHits.addRecHit(
+                    unsigned int my_recthit_detid = rechit_detid->at(i_r);
+                    auto fractions_map_iterator = fractions_map.find(my_recthit_detid);
+                    float fraction;
+                    float belongToASimCluster;
+                    if (fractions_map_iterator != fractions_map.end()) {
+                        fraction = fractions_map_iterator->second;
+                        belongToASimCluster = 1;
+                    }
+                    else {
+                        fraction = 0;
+                        belongToASimCluster = 0;
+                    }
+
+                    if (fraction > 1)
+                        fraction = 0;
+
+                    maxFraction = max(maxFraction, fraction);
+
+                    write &= recHits.addRecHit(
                 	        rechit_eta->at(i_r),rechit_phi->at(i_r),
                 	        0,0,
                 	        rechit_x->at(i_r),rechit_y->at(i_r),
                 	        rechit_z->at(i_r),
                 	        rechit_pt->at(i_r), rechit_energy->at(i_r),
                 	        rechit_time->at(i_r), rechit_layer->at(i_r),
-                	        s.eta(),s.phi());
+                	        s.eta(),s.phi(), fraction, belongToASimCluster);
 
                 	totalrechitenergy+=rechit_energy->at(i_r);
 
                 }
             }
+
             globals.setTotalRecHitEnergy(totalrechitenergy);
             globals.computeTrueFraction();
 
