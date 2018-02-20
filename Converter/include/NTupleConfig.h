@@ -8,8 +8,8 @@
 #ifndef CONVERTER_INCLUDE_NTUPLE_CONFIG_H_
 #define CONVERTER_INCLUDE_NTUPLE_CONFIG_H_
 
-#include "ntuple_globals.h"
-#include "ntuple_recHits.h"
+#include "NTupleGlobals.h"
+#include "NTupleRecHits.h"
 
 /*
  *
@@ -17,18 +17,18 @@
  * Mostly used for merging, to have the definition only once
  *
  */
-class ntuple_config{
+class NTupleConfig{
 public:
-    ntuple_config(){
+    NTupleConfig(){
         all_.push_back(&gl_);
         all_.push_back(&rh_);
     }
-    std::vector<ntuple_content*>& getAll(){return all_;}
+    std::vector<NTupleContent*>& getAll(){return all_;}
 
 private:
-    ntuple_globals gl_;
-    ntuple_recHits rh_;
-    std::vector<ntuple_content*> all_;
+    NTupleGlobals gl_;
+    NTupleRecHits rh_;
+    std::vector<NTupleContent*> all_;
 };
 
 

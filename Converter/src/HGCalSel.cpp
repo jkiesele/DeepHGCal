@@ -1,5 +1,5 @@
 #define HGCalSel_cxx
-#include "HGCalSel.h"
+#include "../include/HGCalSel.h"
 #include <TH2.h>
 #include <TStyle.h>
 #include <TCanvas.h>

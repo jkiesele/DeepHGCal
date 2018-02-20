@@ -45,7 +45,7 @@
 #include <unistd.h>
 #include "TROOT.h"
 #include <stdio.h>
-#include "../include/mergeDescriptor.h"
+#include "include/MergeDescriptor.h"
 
 #include <iostream>
 
@@ -71,10 +71,10 @@ std::vector<TString> readSampleFile(const TString& file, const TString& addpath)
 
 
 
-mergeDescriptor prepareSplitting(const std::vector<std::vector<TString> >& infiles,
+MergeDescriptor prepareSplitting(const std::vector<std::vector<TString> >& infiles,
         const size_t entriesperfile,const TString& outpath){
 
-    mergeDescriptor out;
+    MergeDescriptor out;
     out.infiles=infiles;
     out.outpath=outpath;
 
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]){
     }
 
 
-    mergeDescriptor descr=prepareSplitting(infiles,
+    MergeDescriptor descr=prepareSplitting(infiles,
             entriesperfile,outpath);
 
     descr.writeToFile((outpath+"/mergeconfig").Data());

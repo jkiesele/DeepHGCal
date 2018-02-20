@@ -11,14 +11,14 @@
 #include "TTree.h"
 #include "TString.h"
 
-class ntuple_content{
+class NTupleContent{
 public:
 
-	ntuple_content():read_(false){
+	NTupleContent():read_(false){
 		//
 	}
 
-	virtual ~ntuple_content(){}
+	virtual ~NTupleContent(){}
 
 	virtual void reset()=0;
 
@@ -43,7 +43,7 @@ private:
 };
 
 template <class T>
-void ntuple_content::addBranch(TTree* t, const char* name,  T* address, const char* leaflist){
+void NTupleContent::addBranch(TTree* t, const char* name,  T* address, const char* leaflist){
 
 	if(read_ ){
 		t->SetBranchAddress(name,address);

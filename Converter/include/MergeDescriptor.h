@@ -19,8 +19,8 @@
 #include <string>
 #include "TString.h"
 #include "TChain.h"
-#include "ntuple_content.h"
-#include "ntuple_config.h"
+#include "NTupleContent.h"
+#include "NTupleConfig.h"
 
 template <class T, class U>
 inline void serializedWrite(const T& in, U& saveFile){
@@ -99,10 +99,10 @@ bool DirectoryExists( const char* pzPath );
 
 
 
-class mergeDescriptor{
+class MergeDescriptor{
 public:
 
-    ~mergeDescriptor(){
+    ~MergeDescriptor(){
     }
 
     std::vector<std::vector<size_t> > whichchain_perfile;
@@ -118,8 +118,8 @@ public:
             size_t& totalentries, bool usexrootd=false);
 
 private:
-    std::vector<ntuple_content*> branchinfos;
-    ntuple_config allbranches;
+    std::vector<NTupleContent*> branchinfos;
+    NTupleConfig allbranches;
 };
 
 

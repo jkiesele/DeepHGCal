@@ -8,12 +8,12 @@
 #ifndef INCLUDE_NTUPLE_GLOBALS_H_
 #define INCLUDE_NTUPLE_GLOBALS_H_
 
-#include "ntuple_content.h"
+#include "NTupleContent.h"
 #include <vector>
 
-class ntuple_globals : public ntuple_content{
+class NTupleGlobals : public NTupleContent{
 public:
-    ntuple_globals();
+    NTupleGlobals();
 
     void reset();
 
@@ -89,6 +89,17 @@ public:
 
     //void setTruthVertex(); ///..later
 
+    void addSimClusterData(const int& id, const float& cluster_particle_eta, const float& cluster_particle_phi);
+
+    void addParticleData(const float &particleEta, const float &particlePhi, const float &particleOriginR,
+                         const float &particleDecayR,
+                         const float& particleOriginX,
+                         const float& particleOriginY,
+                         const float& particleOriginZ,
+                         const float& particleDecayX,
+                         const float& particleDecayY,
+                         const float& particleDecayZ);
+
 private:
 
 
@@ -150,6 +161,27 @@ private:
 
     // for temp use, only. Not to be stored
     float nmulticlusters_;
+
+
+    const static int MAX_CLUSTERS=1000;
+    int num_clusters_;
+    int cluster_id_[MAX_CLUSTERS];
+    float cluster_particle_eta_[MAX_CLUSTERS];
+    float cluster_particle_phi_[MAX_CLUSTERS];
+
+    const static int MAX_PARTICLES=100;
+    int num_particles_;
+    float particle_eta_[MAX_PARTICLES];
+    float particle_phi_[MAX_PARTICLES];
+    float particle_r_origin_[MAX_PARTICLES];
+    float particle_r_decay_[MAX_PARTICLES];
+    float particle_x_origin_[MAX_PARTICLES];
+    float particle_y_origin_[MAX_PARTICLES];
+    float particle_z_origin_[MAX_PARTICLES];
+    float particle_x_decay_[MAX_PARTICLES];
+    float particle_y_decay_[MAX_PARTICLES];
+    float particle_z_decay_[MAX_PARTICLES];
+
 
 
 };
