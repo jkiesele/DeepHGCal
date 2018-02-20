@@ -24,6 +24,33 @@ namespace helpers {
      */
     float getSeedSimClusterDifference(const float &seedEta, const float &seedPhi, const float &clusterEta,
                                       const float &clusterPhi);
+
+
+    /**
+     * Converts from cartesian x, y, z coordinates to r in spherical coordiantes
+     *
+     *
+     * @param x x coordinate in cartesian
+     * @param y y coordinate in cartesian
+     * @param z z coordinate in cartesian
+     * @return r in spherical coordinates
+     */
+    float cartesianToSphericalR(const float &x, const float &y, const float &z);
+
+    /**
+     * Compute if the rec hit lies within range of the particle from event
+     *
+     * @param particleEta eta of the particle
+     * @param particlePhi phi of the particle
+     * @param eta eta of the rec hit
+     * @param phi phi of the rec hit
+     * @param dR distance
+     * @return
+     */
+    bool recHitMatchesParticle(const float &particleEta, const float &particlePhi, const float &eta, const float &phi,
+                               const float &dR);
+
+
 }
 
 

@@ -8,8 +8,8 @@
 
 
 
-#include "../include/mergeDescriptor.h"
-#include "../include/ntuple_config.h"
+#include "../include/MergeDescriptor.h"
+#include "../include/NTupleConfig.h"
 #include <fstream>
 
 
@@ -74,7 +74,7 @@ bool DirectoryExists( const char* pzPath )
 }
 
 
-void mergeDescriptor::writeToFile(std::string filename){
+void MergeDescriptor::writeToFile(std::string filename){
     std::ofstream file(filename);
     serializedWrite(whichchain_perfile,file);
     serializedWrite(infiles,file);
@@ -83,7 +83,7 @@ void mergeDescriptor::writeToFile(std::string filename){
     serializedWrite(startentries,file);
     file.close();
 }
-void mergeDescriptor::readFromFile(std::string filename, int pickone){
+void MergeDescriptor::readFromFile(std::string filename, int pickone){
     std::ifstream file(filename);
     if(pickone<0){
         serializedRead(whichchain_perfile,file);
@@ -108,7 +108,7 @@ void mergeDescriptor::readFromFile(std::string filename, int pickone){
 }
 
 
-std::vector<TChain* > mergeDescriptor::createChains(
+std::vector<TChain* > MergeDescriptor::createChains(
         std::vector<size_t>& entriesperchain,
         size_t& totalentries, bool usexrootd){
 

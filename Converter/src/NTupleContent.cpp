@@ -5,7 +5,7 @@
  *      Author: jkiesele
  */
 
-#include "../include/ntuple_content.h"
+#include "../include/NTupleContent.h"
 
 
 //empty so far

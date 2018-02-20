@@ -6,7 +6,7 @@
  */
 
 
-#include "../include/mergeDescriptor.h"
+#include "include/MergeDescriptor.h"
 #include "TFile.h"
 
 #include <dirent.h>
@@ -44,7 +44,7 @@ void segfault_callback_handler(int signum){
     exit(signum);
 }
 
-void fillTree( mergeDescriptor descr,
+void fillTree( MergeDescriptor descr,
         const size_t outfileindex
 
 ){
@@ -62,7 +62,7 @@ void fillTree( mergeDescriptor descr,
     TTree * outtree =0;
 
 
-    std::vector<ntuple_content*> branchinfos;
+    std::vector<NTupleContent*> branchinfos;
     std::vector<size_t> entriesperchain;
     size_t totalentries=0;
     std::vector<TChain* > chains = descr.createChains(entriesperchain,totalentries,true);
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]){
     std::string mergefile=argv[1];
     size_t index=atoi(argv[2]);
 
-    mergeDescriptor descr;
+    MergeDescriptor descr;
     descr.readFromFile(mergefile,(int)index);
 
     fillTree(descr,index);

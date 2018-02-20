@@ -5,22 +5,15 @@
  *      Author: jkiesele
  */
 
-#include "../include/ntuple_recHits.h"
+#include "../include/NTupleRecHits.h"
 
 
 #include <iostream>
 #include <cmath>
-
-static float deltaPhi(const float & a, const float & b){
-    const float pi = 3.14159265358979323846;
-    float delta = (a -b);
-    while (delta >= pi)  delta-= 2* pi;
-    while (delta < -pi)  delta+= 2* pi;
-    return delta;
-}
+#include "../include/helpers.h"
 
 
-void ntuple_recHits::initDNNBranches(TTree* t){
+void NTupleRecHits::initDNNBranches(TTree* t){
 
 	TString add="";
 	if(id_.Length() && !id_.EndsWith("_"))
@@ -41,13 +34,13 @@ void ntuple_recHits::initDNNBranches(TTree* t){
 	addBranch(t,add+"rechit_layer"  ,&rechit_layer_,  "rechit_layer_[n_rechits_]/f");
     addBranch(t,add+"rechit_seeddr"  ,&rechit_seeddr_,  "rechit_seeddr_[n_rechits_]/f");
 	addBranch(t,add+"rechit_fraction"  ,&rechit_fraction_,  "rechit_fraction_[n_rechits_]/f");
-	addBranch(t,add+"rechit_from_selected_sim_cluster"  ,&rechit_from_selected_sim_cluster_,  "rechit_from_selected_sim_cluster_[n_rechits_]/f");
+	addBranch(t,add+"rechit_particle"  ,&rechit_particle_,  "rechit_particle[n_rechits_]/i");
 
 
 }
 
 
-bool ntuple_recHits::addRecHit(const float &eta,
+bool NTupleRecHits::addRecHit(const float &eta,
 							   const float &phi,
 							   const float &a,
 							   const float &b,
@@ -61,7 +54,7 @@ bool ntuple_recHits::addRecHit(const float &eta,
 							   const float &seedeta,
 							   const float &seedphi,
 							   const float &recHitFraction,
-							   const float &recHitFromSelectedSimCluster) {
+							   const int &recHitParticle) {
 
 	if (n_rechits_ >= MAX_RECHITS) {
 		std::cout << "WARNING: MAX NUMBER OF REC HITS REACHED" << std::endl;
@@ -78,10 +71,10 @@ bool ntuple_recHits::addRecHit(const float &eta,
 	rechit_energy_[n_rechits_] = energy;
 	rechit_time_[n_rechits_] = time;
 	rechit_layer_[n_rechits_] = layer;
-	float deltaphi = deltaPhi(phi, seedphi);
+	float deltaphi = helpers::deltaPhi(phi, seedphi);
 	rechit_seeddr_[n_rechits_] = std::sqrt((eta - seedeta) * (eta - seedeta) + deltaphi * deltaphi);
 	rechit_fraction_[n_rechits_] = recHitFraction;
-	rechit_from_selected_sim_cluster_[n_rechits_] = recHitFromSelectedSimCluster;
+	rechit_particle_[n_rechits_] = recHitParticle;
 
 	nrechits_++;
 	n_rechits_++;

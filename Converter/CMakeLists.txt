@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.5)
-project(Converter)
+cmake_minimum_required(VERSION 3.4)
+project(DeepHGCal2)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -8,44 +8,28 @@ MESSAGE(STATUS "ROOTSYS $ENV{ROOTSYS}")
 find_package(ROOT REQUIRED COMPONENTS RIO Net)
 include(${ROOT_USE_FILE})
 
-include_directories(include)
-
-
-set(SOURCE_FILES include/clipper.hpp
-        include/converter.h
-        include/GeoReader.h
-        include/helpers.h
-        include/HGCalSel.h
-        include/mergeDescriptor.h
-        include/ntuple_config.h
-        include/ntuple_content.h
-        include/ntuple_globals.h
-        include/ntuple_recHits.h
-        include/seedMaker.h
-        include/Transformer.h
-        include/Transformer2.h
-        include/truthCreator.h
-        src/clipper.cpp
-        src/converter.cpp
-        src/GeoReader.cpp
-        src/helpers.cpp
+set(SOURCE_FILES include/Converter.h
+        src/Converter.cpp
         src/HGCalSel.cpp
-        src/mergeDescriptor.cpp
-        src/ntuple_content.cpp
-        src/ntuple_globals.cpp
-        src/ntuple_recHits.cpp
-        src/seedMaker.cpp
-        src/Transformer.cpp
-        src/Transformer2.cpp
-        src/truthCreator.cpp)
+        include/HGCalSel.h
+        src/NTupleGlobals.cpp
+        include/NTupleGlobals.h
+        src/NTupleRecHits.cpp
+        include/NTupleRecHits.h
+        src/NTupleContent.cpp
+        include/NTupleContent.h
+        src/helpers.cpp
+        include/helpers.h
+        src/NTupleSimClusters.cpp
+        include/NTupleSimClusters.h
+        include/MergeDescriptor.h
+        src/MergeDescriptor.cpp
+        include/NTupleConfig.h)
 
+add_executable(convert2 mainConvert.cpp ${SOURCE_FILES})
+add_executable(createMergeList mainCreateMergeList.cpp ${SOURCE_FILES})
+add_executable(merge mainMerge.cpp ${SOURCE_FILES})
 
-
-add_executable(convert bin/convert.cpp ${SOURCE_FILES})
-add_executable(createMergeList bin/createMergeList.cpp ${SOURCE_FILES})
-add_executable(merge bin/merge.cpp ${SOURCE_FILES})
-
-
-target_link_libraries(convert ${ROOT_LIBRARIES})
+target_link_libraries(convert2 ${ROOT_LIBRARIES})
 target_link_libraries(createMergeList ${ROOT_LIBRARIES})
 target_link_libraries(merge ${ROOT_LIBRARIES})

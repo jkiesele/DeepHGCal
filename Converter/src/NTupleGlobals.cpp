@@ -8,14 +8,15 @@
 
 
 
-#include "../include/ntuple_globals.h"
+#include <iostream>
+#include "../include/NTupleGlobals.h"
 
-ntuple_globals::ntuple_globals():
-ntuple_content()
+NTupleGlobals::NTupleGlobals():
+NTupleContent()
 {reset();}
 
 
-void ntuple_globals::reset(){
+void NTupleGlobals::reset(){
 	event_=0;
 
 	seed_eta_=0;
@@ -61,9 +62,12 @@ void ntuple_globals::reset(){
 	true_vtx_z_=0;
 
 	nmulticlusters_=0;
+
+    num_clusters_ = 0;
+    num_particles_ = 0;
 }
 
-void ntuple_globals::setTruthID(const int& pdgid,const bool& matched){
+void NTupleGlobals::setTruthID(const int& pdgid,const bool& matched){
 
     isGamma_=0;
     isElectron_=0;
@@ -109,7 +113,7 @@ void ntuple_globals::setTruthID(const int& pdgid,const bool& matched){
 
 
 
-void ntuple_globals::initDNNBranches(TTree* t){
+void NTupleGlobals::initDNNBranches(TTree* t){
 
 
 	addBranch(t,"event", &event_, "event_/i");
@@ -160,5 +164,69 @@ void ntuple_globals::initDNNBranches(TTree* t){
 	addBranch(t,"true_vtx_z",   &true_vtx_z_,   "true_vtx_z_/f");
 
 
+    addBranch(t,"num_clusters",   &num_clusters_,   "num_clusters_/i");
+    addBranch(t,"cluster_id",   &cluster_id_,   "cluster_id_[num_clusters_]/i");
+    addBranch(t,"cluster_particle_eta",   &cluster_particle_eta_,   "cluster_particle_eta_[num_clusters_]/f");
+    addBranch(t,"cluster_particle_phi",   &cluster_particle_phi_,   "cluster_particle_phi_[num_clusters_]/f");
+
+
+    addBranch(t,"num_particles",   &num_particles_,   "num_particles_/i");
+    addBranch(t,"particle_eta",   &particle_eta_,   "particle_eta_[num_particles_]/f");
+    addBranch(t,"particle_phi",   &particle_phi_,   "particle_phi_[num_particles_]/f");
+    addBranch(t,"particle_r_origin",   &particle_r_origin_,   "particle_r_origin_[num_particles_]/f");
+    addBranch(t,"particle_r_decay",   &particle_r_decay_,   "particle_r_decay_[num_particles_]/f");
+
+    addBranch(t,"particle_x_origin",   &particle_x_origin_,   "particle_x_origin_[num_particles_]/f");
+    addBranch(t,"particle_y_origin",   &particle_y_origin_,   "particle_y_origin_[num_particles_]/f");
+    addBranch(t,"particle_z_origin",   &particle_z_origin_,   "particle_z_origin_[num_particles_]/f");
+    addBranch(t,"particle_x_decay",   &particle_x_decay_,   "particle_x_decay_[num_particles_]/f");
+    addBranch(t,"particle_y_decay",   &particle_y_decay_,   "particle_y_decay_[num_particles_]/f");
+    addBranch(t,"particle_z_decay",   &particle_z_decay_,   "particle_z_decay_[num_particles_]/f");
+
+
 }
 
+
+
+void NTupleGlobals::addSimClusterData(const int &id, const float &cluster_particle_eta,
+                                      const float &cluster_particle_phi) {
+    if (num_clusters_ > MAX_CLUSTERS) {
+        std::cerr<<"Max clusters exceeding"<<std::endl;
+        return;
+    }
+    cluster_id_[num_clusters_] = id;
+    cluster_particle_eta_[num_clusters_] = cluster_particle_eta;
+    cluster_particle_phi_[num_clusters_] = cluster_particle_phi;
+
+    num_clusters_ ++;
+}
+
+void NTupleGlobals::addParticleData(const float &particleEta, const float &particlePhi, const float &particleOriginR,
+                                    const float &particleDecayR,
+                                    const float& particleOriginX,
+                                    const float& particleOriginY,
+                                    const float& particleOriginZ,
+                                    const float& particleDecayX,
+                                    const float& particleDecayY,
+                                    const float& particleDecayZ) {
+
+    if (num_particles_ > MAX_PARTICLES) {
+        std::cerr<<"Max particles exceeding"<<std::endl;
+        return;
+    }
+
+    particle_eta_[num_particles_] = particleEta;
+    particle_phi_[num_particles_] = particlePhi;
+    particle_r_origin_[num_particles_] = particleOriginR;
+    particle_r_decay_[num_particles_] = particleDecayR;
+
+    particle_x_origin_[num_particles_] = particleOriginX;
+    particle_y_origin_[num_particles_] = particleOriginY;
+    particle_z_origin_[num_particles_] = particleOriginZ;
+
+    particle_x_decay_[num_particles_] = particleDecayX;
+    particle_y_decay_[num_particles_] = particleDecayY;
+    particle_z_decay_[num_particles_] = particleDecayZ;
+
+    num_particles_ ++;
+}
