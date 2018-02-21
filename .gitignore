@@ -1,0 +1,13 @@
+*.pyc
+*.ckpt
+*.cache
+summary
+.idea
+*.ini
+*.class
+out
+*.pth
+*.swp
+cmake-build-debug
+build
+venv
