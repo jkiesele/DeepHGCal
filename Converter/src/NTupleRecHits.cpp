@@ -35,26 +35,16 @@ void NTupleRecHits::initDNNBranches(TTree* t){
     addBranch(t,add+"rechit_seeddr"  ,&rechit_seeddr_,  "rechit_seeddr_[n_rechits_]/f");
 	addBranch(t,add+"rechit_fraction"  ,&rechit_fraction_,  "rechit_fraction_[n_rechits_]/f");
 	addBranch(t,add+"rechit_particle"  ,&rechit_particle_,  "rechit_particle[n_rechits_]/i");
+	addBranch(t,add+"rechit_total_fraction"  ,&rechit_total_fraction_,  "rechit_total_fraction_[n_rechits_]/f");
 
 
 }
 
 
-bool NTupleRecHits::addRecHit(const float &eta,
-							   const float &phi,
-							   const float &a,
-							   const float &b,
-							   const float &x,
-							   const float &y,
-							   const float &z,
-							   const float &pt,
-							   const float &energy,
-							   const float &time,
-							   const int &layer,
-							   const float &seedeta,
-							   const float &seedphi,
-							   const float &recHitFraction,
-							   const int &recHitParticle) {
+bool NTupleRecHits::addRecHit(const float &eta, const float &phi, const float &a, const float &b, const float &x,
+							  const float &y, const float &z, const float &pt, const float &energy, const float &time,
+							  const int &layer, const float &seedeta, const float &seedphi, const float &recHitFraction,
+							  const int &recHitParticle, const float &recHitTotalFraction) {
 
 	if (n_rechits_ >= MAX_RECHITS) {
 		std::cout << "WARNING: MAX NUMBER OF REC HITS REACHED" << std::endl;
@@ -75,6 +65,8 @@ bool NTupleRecHits::addRecHit(const float &eta,
 	rechit_seeddr_[n_rechits_] = std::sqrt((eta - seedeta) * (eta - seedeta) + deltaphi * deltaphi);
 	rechit_fraction_[n_rechits_] = recHitFraction;
 	rechit_particle_[n_rechits_] = recHitParticle;
+	rechit_total_fraction_[n_rechits_] = recHitTotalFraction;
+
 
 	nrechits_++;
 	n_rechits_++;

@@ -69,30 +69,6 @@ void Converter::traceDecayTree(unordered_set<int> &decayParticlesCluster, unorde
 
 unordered_map<int, pair<vector<int>, vector<int>>> Converter::findParticlesFromCollision() const {
 
-//    // Find all truth particles
-//    for(size_t i=0;i<genpart_eta->size();i++) {
-//        int mother = genpart_mother->at(i);
-//
-//        if(mother < 0 ) {
-//            cout<<"Mother < 0\n";
-//            continue;
-//        }
-//
-//        float mDecayX = genpart_dvx->at(mother);
-//        float mDecayY = genpart_dvy->at(mother);
-//        float mDecayZ = genpart_dvz->at(mother);
-//
-//        float cOriginX = genpart_ovx->at(i);
-//        float cOriginY = genpart_ovy->at(i);
-//        float cOriginZ = genpart_ovz->at(i);
-//
-//        float diff = sqrt(pow(mDecayX - cOriginX,2) + pow(mDecayY - cOriginY,2) + pow(mDecayZ - cOriginZ,2));
-//        cout<<diff<<endl;
-//        if (diff > 0.01)
-//            cout<<"Particle origin and mother decay co-ordinates different: "<<diff<<endl;
-//    }
-
-
     /*
      * Collision occurs at z = 0. Boundary A is very close to it to see each particle originating from collision.
      * Boundary B is close to close to the calorimeter. Between A and B, particle breaks into many sub-particles.
@@ -290,7 +266,7 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
 
         for (size_t i_m = 0; i_m < numSimClusters; i_m++) {
 //            if (taken.find(i_m) != taken.end())
-//                ;
+//                continue;
             float newDistance = helpers::getSeedSimClusterDifference(seedEta, seedPhi,
                                                                      simcluster_eta->at(i_m),
                                                                      simcluster_phi->at(i_m));
@@ -301,7 +277,6 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
         }
 
         if (simClusterIndex != -1) {
-            cout<<"Min distance"<<minDistance<<endl;
             simClustersForSeeds[i] = simClusterIndex;
             taken.insert(simClusterIndex);
         }
@@ -341,6 +316,40 @@ pair<int, float> Converter::findParticleForRecHit(int recHitId, unordered_map<in
     return pair<int, float>(maxSeedIndex, maxFraction);
 }
 
+void Converter::findParticleInfoForRecHit(int recHitId, unordered_map<int, int> &simClustersForSeeds,
+                                          std::vector<std::unordered_map<unsigned int, float>> &recHitsForSimClusters,
+                                          pair<int, float> &particleFraction, float &totalFraction) {
+
+    int maxSeedIndex = -1;
+    float maxFraction;
+    int foundIn = 0;
+    totalFraction = 0;
+    for(auto i : simClustersForSeeds) {
+        int simClusterIndex = i.second;
+
+        if(recHitsForSimClusters[simClusterIndex].find(recHitId)==recHitsForSimClusters[simClusterIndex].end())
+            continue;
+        foundIn++;
+
+        float fraction = recHitsForSimClusters[simClusterIndex][recHitId];
+        totalFraction += fraction;
+
+        if(maxSeedIndex == -1 or (maxSeedIndex != -1 and fraction > maxFraction)) {
+            maxSeedIndex = i.first;
+            maxFraction = fraction;
+        }
+    }
+
+    totalFraction = fmax(0,fmin(totalFraction, 1));
+
+    if (maxFraction < THRESHOLD_ASSIGN_TO_CLUSTER)
+        maxFraction = maxSeedIndex = -1;
+    particleFraction.first = maxSeedIndex;
+    particleFraction.second = maxFraction;
+
+}
+
+
 std::vector<std::unordered_map<unsigned int, float>> Converter::indexSimClusterRecHits() {
     std::vector<std::unordered_map<unsigned int, float>> fractionsMaps;
     for (size_t j = 0; j < simcluster_eta->size(); j++) {
@@ -360,7 +369,7 @@ std::vector<std::unordered_map<unsigned int, float>> Converter::indexSimClusterR
 
 void Converter::Loop(){
     initializeBranches();
-    const float DR_AROUND_SEED = 3;
+    const float DR_AROUND_SEED = 0.15;
 
     // Create output file and tree
     if (outfilename_.Length() == 0)
@@ -423,21 +432,20 @@ void Converter::Loop(){
                                                     rechit_eta->at(iRecHit), rechit_phi->at(iRecHit), DR_AROUND_SEED))
                     continue;
 
-                pair<int, float> particleFraction = findParticleForRecHit(rechit_detid->at(iRecHit),
-                                                                          simClustersForSeeds, simClustersRecHits);
+                pair<int, float> particleFraction;
+                float totalFraction;
+                findParticleInfoForRecHit(rechit_detid->at(iRecHit), simClustersForSeeds, simClustersRecHits,
+                                          particleFraction, totalFraction);
 
                 float seedParticleEta = particleFraction.first == -1 ? -1 : genpart_eta->at(particleFraction.first);
                 float seedParticlePhi = particleFraction.first == -1 ? -1 : genpart_phi->at(particleFraction.first);
 
 
-                recHits.addRecHit(
-                        rechit_eta->at(iRecHit), rechit_phi->at(iRecHit),
-                        0, 0,
-                        rechit_x->at(iRecHit), rechit_y->at(iRecHit),
-                        rechit_z->at(iRecHit),
-                        rechit_pt->at(iRecHit), rechit_energy->at(iRecHit),
-                        rechit_time->at(iRecHit), rechit_layer->at(iRecHit),
-                        seedParticleEta, seedParticlePhi, particleFraction.second, particleFraction.first);
+                recHits.addRecHit(rechit_eta->at(iRecHit), rechit_phi->at(iRecHit), 0, 0, rechit_x->at(iRecHit),
+                                  rechit_y->at(iRecHit),
+                                  rechit_z->at(iRecHit), rechit_pt->at(iRecHit), rechit_energy->at(iRecHit),
+                                  rechit_time->at(iRecHit), rechit_layer->at(iRecHit), seedParticleEta,
+                                  seedParticlePhi, particleFraction.second, particleFraction.first, totalFraction);
 
                 totalRecHitsEnergy += rechit_energy->at(iRecHit);
 
@@ -449,12 +457,7 @@ void Converter::Loop(){
             outtree->Fill();
         }
 
-        cout<<"Done"<<jentry<<endl;
-
-
-        // TODO: Remove after debugging
-        if (jentry == 20)
-            break;
+        cout<<"Done "<<jentry<<endl;
     }
 
 

@@ -52,7 +52,10 @@ public:
     unordered_map<int, int> findSimClusterForSeeds(vector<int>& seeds);
     pair<int, float> findParticleForRecHit(int recHitId, unordered_map<int, int> &simClustersForSeeds,
                                            std::vector<std::unordered_map<unsigned int, float>> &recHitsForSimClusters);
-    void traceDecayTree(unordered_set<int> &decayParticlesCluster, unordered_set<int> &allParticles) const;
+	void findParticleInfoForRecHit(int recHitId, unordered_map<int, int> &simClustersForSeeds,
+								   std::vector<std::unordered_map<unsigned int, float>> &recHitsForSimClusters,
+								   pair<int, float> &particleFraction, float &totalFraction);
+	void traceDecayTree(unordered_set<int> &decayParticlesCluster, unordered_set<int> &allParticles) const;
         std::vector<std::unordered_map<unsigned int, float>> indexSimClusterRecHits();
     unordered_map<int, pair<vector<int>, vector<int>>> findParticlesFromCollision() const;
 
