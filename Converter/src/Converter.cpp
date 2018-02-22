@@ -48,8 +48,6 @@ void Converter::traceDecayTree(unordered_set<int> &decayParticlesCluster, unorde
             float cOriginZ = genpart_ovz->at(i);
 
             float diff = sqrt(pow(mDecayX - cOriginX,2) + pow(mDecayY - cOriginY,2) + pow(mDecayZ - cOriginZ,2));
-            if (diff > 0.01)
-                ;
 
             if(decayParticlesCluster.find(mother) != decayParticlesCluster.end()) {
                 decayParticlesCluster.insert(i);
@@ -291,10 +289,8 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
 
 
         for (size_t i_m = 0; i_m < numSimClusters; i_m++) {
-            if (taken.find(i_m) != taken.end())
-                ;
-            float simClusterEta = simcluster_eta->at(i_m);
-            float simClusterPhi = simcluster_phi->at(i_m);
+//            if (taken.find(i_m) != taken.end())
+//                ;
             float newDistance = helpers::getSeedSimClusterDifference(seedEta, seedPhi,
                                                                      simcluster_eta->at(i_m),
                                                                      simcluster_phi->at(i_m));
@@ -383,7 +379,6 @@ void Converter::Loop(){
 
     Long64_t nentries = fChain->GetEntries();
 
-    int count = 0;
     Long64_t nbytes = 0, nb = 0;
     for (Long64_t jentry = 0; jentry < nentries; jentry++) {
 
@@ -422,7 +417,7 @@ void Converter::Loop(){
 
             size_t numRecHits = rechit_eta->size();
             float totalRecHitsEnergy = 0;
-            for(auto iRecHit = 0; iRecHit < numRecHits; iRecHit++) {
+            for(size_t iRecHit = 0; iRecHit < numRecHits; iRecHit++) {
                 if (!helpers::recHitMatchesParticle(genpart_eta->at(particleFromCollisionIterator.first),
                                                     genpart_phi->at(particleFromCollisionIterator.first),
                                                     rechit_eta->at(iRecHit), rechit_phi->at(iRecHit), DR_AROUND_SEED))
