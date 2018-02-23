@@ -11,6 +11,7 @@ import matplotlib
 import matplotlib.cm as cmx
 import random
 import sys
+import timeit
 
 
 branches = []
@@ -73,8 +74,9 @@ if __name__ =="__main__":
 
     file = sys.argv[1]
     A = root_numpy.root2array(file, branches=branches)
-
-    plot_only_calorimeter_particles = sys.argv[2] == 'only_calorimeter_particles'
+    plot_only_calorimeter_particles = False
+    if len(sys.argv) >= 3:
+        plot_only_calorimeter_particles = sys.argv[2] == 'only_calorimeter_particles'
     if plot_only_calorimeter_particles:
         print("Plotting only calorimeter particles")
 
@@ -88,6 +90,14 @@ if __name__ =="__main__":
         C=np.array([])
 
         for j_simcluster in range(num_simclusters):
+            start = timeit.timeit()
+            hits_simcluster = A['simcluster_hits'][i_entry][j_simcluster]
+            indices = np.where(np.in1d(A['rechit_detid'][i_entry], hits_simcluster))[0]
+            # print("Hello, world!")
+            end = timeit.timeit()
+            print end - start
+
+
             hits_simcluster = A['simcluster_hits'][i_entry][j_simcluster]
             indices = np.where(np.in1d(A['rechit_detid'][i_entry], hits_simcluster))[0]
 
