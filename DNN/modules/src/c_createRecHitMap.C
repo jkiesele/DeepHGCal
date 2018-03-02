@@ -73,12 +73,13 @@ double deltaR(const double& phi, const double& eta,
 }
 
 
+
 /*
  * very hardcoded but likely not subject to change
  */
-void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename,
+void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string filename,
         int maxhitsperpixel,
-        int xbins, float xwidth,int maxlayers
+        int xbins, float xwidth,int maxlayers, bool addtiming
 ){
 
     int ybins=xbins;
@@ -98,7 +99,8 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
     __hidden::indata rh_energybranch;
     rh_energybranch.createFrom({"rechit_energy"}, {1.}, {0.}, MAXBRANCHLENGTH);
     __hidden::indata rh_timebranch;
-    rh_timebranch.createFrom(  {"rechit_time"}, {1.}, {0.}, MAXBRANCHLENGTH);
+    if(addtiming)
+    	rh_timebranch.createFrom(  {"rechit_time"}, {1.}, {0.}, MAXBRANCHLENGTH);
 
     __hidden::indata layerbranch;
     layerbranch.createFrom({"rechit_layer"}, {1.}, {0.}, MAXBRANCHLENGTH);
@@ -114,18 +116,22 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
 
 
     rh_energybranch.setup(tree);
-    rh_timebranch.setup(tree);
+    if(addtiming)
+    	rh_timebranch.setup(tree);
     layerbranch.setup(tree);
     //
     rh_phi_eta.setup(tree);
     seed_phi_eta.setup(tree);
     counter.setup(tree);
 
+    bool rechitsarevector=rh_energybranch.isVector();
+
     const int nevents=std::min( (int) tree->GetEntries(), (int) boost::python::len(numpyarray));
     for(int it=0;it<nevents;it++){
 
         rh_energybranch.zeroAndGet(it);
-        rh_timebranch.zeroAndGet(it);
+        if(addtiming)
+        	rh_timebranch.zeroAndGet(it);
         layerbranch.zeroAndGet(it);
 
         rh_phi_eta.zeroAndGet(it);
@@ -138,6 +144,9 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
         double seedphi=seed_phi_eta.getData(0, 0);
         double seedeta=seed_phi_eta.getData(1, 0);
         int nrechits = counter.getData(0, 0);
+        if(rechitsarevector){
+        	nrechits = rh_energybranch.vectorSize(0);
+        }
 
         for(size_t hit=0; hit < nrechits; hit++) {
             double bincentrephi,bincentreeta;
@@ -158,36 +167,49 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
             if(layer<0)
                 layer=0;
 
-            //std::cout << bincentrephi <<", "<<bincentreeta<< " : " << phibin<< " " << etabin << " s: " << seedphi
-            //        <<", " << seedeta<< std::endl;
 
             float drbinseed=deltaR(bincentrephi,bincentreeta,seedphi,seedeta);
 
             float energy=rh_energybranch.getData(0, hit);
-            float time=rh_energybranch.getData(0, hit);
+            float time=0;
+            if(addtiming)
+            	time=rh_energybranch.getData(0, hit);
             float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
             float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
 
 
 
 
-            int offset=entriesperpixel.at(phibin).at(etabin).at(layer)*4+2;
+            int offset=0;
+            if(addtiming)
+            	offset=entriesperpixel.at(phibin).at(etabin).at(layer)*4+2;
+            else
+            	offset=entriesperpixel.at(phibin).at(etabin).at(layer)*3+2;
             bool ismulti=false;
             if(entriesperpixel.at(phibin).at(etabin).at(layer)>=maxhitsperpixel){
                 std::cout << phibin << ", "<< etabin << ". "<<layer<<" e "<<entriesperpixel.at(phibin).at(etabin).at(layer)<< std::endl;
                 std::cout << dphihitbincentre << " - "<< detahitbincentre << std::endl;
                 std::cout << "max hits per pixel reached. "<< entriesperpixel.at(phibin).at(etabin).at(layer)<<"/"
                         <<maxhitsperpixel<< ", "<<offset<< " : "<< it<< std::endl;
-                offset-=4;
+                if(addtiming)
+                	offset-=4;
+                else
+                	offset-=3;
                 ismulti=true;
             }
 
             numpyarray[it][phibin][etabin][layer][0]=drbinseed;
             numpyarray[it][phibin][etabin][layer][1]=((float)layer)/50;
             numpyarray[it][phibin][etabin][layer][offset]  +=energy;
-            numpyarray[it][phibin][etabin][layer][offset+1]+=time;
-            numpyarray[it][phibin][etabin][layer][offset+2]+=dphihitbincentre;
-            numpyarray[it][phibin][etabin][layer][offset+3]+=detahitbincentre;
+            if(addtiming){
+            	numpyarray[it][phibin][etabin][layer][offset+1]+=time;
+            	numpyarray[it][phibin][etabin][layer][offset+2]+=dphihitbincentre;
+            	numpyarray[it][phibin][etabin][layer][offset+3]+=detahitbincentre;
+            }
+            else{
+            	numpyarray[it][phibin][etabin][layer][offset+1]+=dphihitbincentre;
+            	numpyarray[it][phibin][etabin][layer][offset+2]+=detahitbincentre;
+            }
 
             if(entriesperpixel.at(phibin).at(etabin).at(layer)<maxhitsperpixel){
                 entriesperpixel.at(phibin).at(etabin).at(layer)+=1;
@@ -201,6 +223,22 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
     delete tfile;
 }
 
+void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename,
+        int maxhitsperpixel,
+        int xbins, float xwidth,int maxlayers
+){
+	fillRecHitMap_priv(numpyarray,filename,
+        maxhitsperpixel,
+        xbins,  xwidth, maxlayers, true);
+}
+void fillRecHitMapNoTime(boost::python::numeric::array numpyarray,std::string filename,
+        int maxhitsperpixel,
+        int xbins, float xwidth,int maxlayers
+){
+	fillRecHitMap_priv(numpyarray,filename,
+        maxhitsperpixel,
+        xbins,  xwidth, maxlayers, false);
+}
 
 void setTreeName(std::string name){
     treename=name;
@@ -212,5 +250,6 @@ BOOST_PYTHON_MODULE(c_createRecHitMap) {
     __hidden::indata();//for some reason exposing the class prevents segfaults. garbage collector?
     //anyway, it doesn't hurt, just leave this here
     def("fillRecHitMap", &fillRecHitMap);
+    def("fillRecHitMapNoTime", &fillRecHitMapNoTime);
     def("setTreeName", &setTreeName);
 }
