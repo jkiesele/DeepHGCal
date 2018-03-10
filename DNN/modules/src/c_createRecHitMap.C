@@ -30,6 +30,24 @@ using namespace boost::python; //for some reason....
 
 static TString treename="deepntuplizer/tree";
 
+template<typename _RandomAccessIterator, typename _Compare>
+inline std::vector<size_t>
+retsort(_RandomAccessIterator __first, _RandomAccessIterator __last,
+		_Compare __comp){
+	typedef typename std::iterator_traits<_RandomAccessIterator>::value_type
+			_ValueType;
+	std::vector<_ValueType> copy(__first,__last); //copy
+	std::vector<size_t> sortedilo;
+	std::sort(copy.begin(),copy.end(),__comp);
+
+	for(_RandomAccessIterator it=copy.begin();it!=copy.end();++it){
+			//get the position in input
+			size_t pos=std::find(__first,__last,*it)-__first;
+			sortedilo.push_back(pos);
+	}
+	std::copy(copy.begin(),copy.end(),__first);
+	return sortedilo;
+}
 
 
 
@@ -73,12 +91,13 @@ double deltaR(const double& phi, const double& eta,
 }
 
 
+
 /*
  * very hardcoded but likely not subject to change
  */
-void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename,
+void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string filename,
         int maxhitsperpixel,
-        int xbins, float xwidth,int maxlayers
+        int xbins, float xwidth,int maxlayers, bool addtiming
 ){
 
     int ybins=xbins;
@@ -98,7 +117,8 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
     __hidden::indata rh_energybranch;
     rh_energybranch.createFrom({"rechit_energy"}, {1.}, {0.}, MAXBRANCHLENGTH);
     __hidden::indata rh_timebranch;
-    rh_timebranch.createFrom(  {"rechit_time"}, {1.}, {0.}, MAXBRANCHLENGTH);
+    if(addtiming)
+    	rh_timebranch.createFrom(  {"rechit_time"}, {1.}, {0.}, MAXBRANCHLENGTH);
 
     __hidden::indata layerbranch;
     layerbranch.createFrom({"rechit_layer"}, {1.}, {0.}, MAXBRANCHLENGTH);
@@ -114,18 +134,22 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
 
 
     rh_energybranch.setup(tree);
-    rh_timebranch.setup(tree);
+    if(addtiming)
+    	rh_timebranch.setup(tree);
     layerbranch.setup(tree);
     //
     rh_phi_eta.setup(tree);
     seed_phi_eta.setup(tree);
     counter.setup(tree);
 
+    bool rechitsarevector=rh_energybranch.isVector();
+
     const int nevents=std::min( (int) tree->GetEntries(), (int) boost::python::len(numpyarray));
     for(int it=0;it<nevents;it++){
 
         rh_energybranch.zeroAndGet(it);
-        rh_timebranch.zeroAndGet(it);
+        if(addtiming)
+        	rh_timebranch.zeroAndGet(it);
         layerbranch.zeroAndGet(it);
 
         rh_phi_eta.zeroAndGet(it);
@@ -138,6 +162,9 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
         double seedphi=seed_phi_eta.getData(0, 0);
         double seedeta=seed_phi_eta.getData(1, 0);
         int nrechits = counter.getData(0, 0);
+        if(rechitsarevector){
+        	nrechits = rh_energybranch.vectorSize(0);
+        }
 
         for(size_t hit=0; hit < nrechits; hit++) {
             double bincentrephi,bincentreeta;
@@ -158,36 +185,49 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
             if(layer<0)
                 layer=0;
 
-            //std::cout << bincentrephi <<", "<<bincentreeta<< " : " << phibin<< " " << etabin << " s: " << seedphi
-            //        <<", " << seedeta<< std::endl;
 
             float drbinseed=deltaR(bincentrephi,bincentreeta,seedphi,seedeta);
 
             float energy=rh_energybranch.getData(0, hit);
-            float time=rh_energybranch.getData(0, hit);
+            float time=0;
+            if(addtiming)
+            	time=rh_energybranch.getData(0, hit);
             float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
             float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
 
 
 
 
-            int offset=entriesperpixel.at(phibin).at(etabin).at(layer)*4+2;
+            int offset=0;
+            if(addtiming)
+            	offset=entriesperpixel.at(phibin).at(etabin).at(layer)*4+2;
+            else
+            	offset=entriesperpixel.at(phibin).at(etabin).at(layer)*3+2;
             bool ismulti=false;
             if(entriesperpixel.at(phibin).at(etabin).at(layer)>=maxhitsperpixel){
                 std::cout << phibin << ", "<< etabin << ". "<<layer<<" e "<<entriesperpixel.at(phibin).at(etabin).at(layer)<< std::endl;
                 std::cout << dphihitbincentre << " - "<< detahitbincentre << std::endl;
                 std::cout << "max hits per pixel reached. "<< entriesperpixel.at(phibin).at(etabin).at(layer)<<"/"
                         <<maxhitsperpixel<< ", "<<offset<< " : "<< it<< std::endl;
-                offset-=4;
+                if(addtiming)
+                	offset-=4;
+                else
+                	offset-=3;
                 ismulti=true;
             }
 
             numpyarray[it][phibin][etabin][layer][0]=drbinseed;
             numpyarray[it][phibin][etabin][layer][1]=((float)layer)/50;
             numpyarray[it][phibin][etabin][layer][offset]  +=energy;
-            numpyarray[it][phibin][etabin][layer][offset+1]+=time;
-            numpyarray[it][phibin][etabin][layer][offset+2]+=dphihitbincentre;
-            numpyarray[it][phibin][etabin][layer][offset+3]+=detahitbincentre;
+            if(addtiming){
+            	numpyarray[it][phibin][etabin][layer][offset+1]+=time;
+            	numpyarray[it][phibin][etabin][layer][offset+2]+=dphihitbincentre;
+            	numpyarray[it][phibin][etabin][layer][offset+3]+=detahitbincentre;
+            }
+            else{
+            	numpyarray[it][phibin][etabin][layer][offset+1]+=dphihitbincentre;
+            	numpyarray[it][phibin][etabin][layer][offset+2]+=detahitbincentre;
+            }
 
             if(entriesperpixel.at(phibin).at(etabin).at(layer)<maxhitsperpixel){
                 entriesperpixel.at(phibin).at(etabin).at(layer)+=1;
@@ -201,6 +241,140 @@ void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename
     delete tfile;
 }
 
+void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename,
+        int maxhitsperpixel,
+        int xbins, float xwidth,int maxlayers
+){
+	fillRecHitMap_priv(numpyarray,filename,
+        maxhitsperpixel,
+        xbins,  xwidth, maxlayers, true);
+}
+void fillRecHitMapNoTime(boost::python::numeric::array numpyarray,std::string filename,
+        int maxhitsperpixel,
+        int xbins, float xwidth,int maxlayers
+){
+	fillRecHitMap_priv(numpyarray,filename,
+        maxhitsperpixel,
+        xbins,  xwidth, maxlayers, false);
+}
+
+
+//////////////
+
+void fillRecHitList_priv(boost::python::numeric::array numpyarray,std::string filename,
+        int maxrechitsperevent,float maxdr,int maxlayers, bool addtiming
+){
+
+    TFile* tfile= new TFile(filename.c_str(), "READ");
+    TTree* tree = (TTree*) tfile->Get(treename);
+
+
+
+    std::string xbranch="rechit_phi";
+    std::string ybranch="rechit_eta";
+    std::string xcenter="seed_phi";
+    std::string ycenter="seed_eta";
+    std::string counter_branch="nrechits";
+
+    __hidden::indata rh_energybranch;
+    rh_energybranch.createFrom({"rechit_energy"}, {1.}, {0.}, MAXBRANCHLENGTH);
+    __hidden::indata rh_timebranch;
+    if(addtiming)
+    	rh_timebranch.createFrom(  {"rechit_time"}, {1.}, {0.}, MAXBRANCHLENGTH);
+
+    __hidden::indata layerbranch;
+    layerbranch.createFrom({"rechit_layer"}, {1.}, {0.}, MAXBRANCHLENGTH);
+
+    __hidden::indata rh_phi_eta;
+    rh_phi_eta.createFrom({xbranch, ybranch}, {1., 1.}, {0., 0.}, MAXBRANCHLENGTH);
+
+    __hidden::indata seed_phi_eta;
+    seed_phi_eta.createFrom({xcenter, ycenter}, {1., 1.}, {0., 0.}, 1);
+
+    __hidden::indata counter;
+    counter.createFrom({counter_branch}, {1.}, {0.}, 1);
+
+
+    rh_energybranch.setup(tree);
+    if(addtiming)
+    	rh_timebranch.setup(tree);
+    layerbranch.setup(tree);
+    //
+    rh_phi_eta.setup(tree);
+    seed_phi_eta.setup(tree);
+    counter.setup(tree);
+
+    bool rechitsarevector=rh_energybranch.isVector();
+
+    const int nevents=std::min( (int) tree->GetEntries(), (int) boost::python::len(numpyarray));
+    for(int it=0;it<nevents;it++){
+
+        rh_energybranch.zeroAndGet(it);
+        if(addtiming)
+        	rh_timebranch.zeroAndGet(it);
+        layerbranch.zeroAndGet(it);
+
+        rh_phi_eta.zeroAndGet(it);
+        seed_phi_eta.zeroAndGet(it);
+        counter.zeroAndGet(it);
+
+
+        double seedphi=seed_phi_eta.getData(0, 0);
+        double seedeta=seed_phi_eta.getData(1, 0);
+        int nrechits = counter.getData(0, 0);
+        if(rechitsarevector){
+        	nrechits = rh_energybranch.vectorSize(0);
+        }
+        //create energy vector
+        std::vector<float> energies(nrechits,0);
+        for(size_t hit=0; hit < nrechits; hit++) {
+        	energies[hit]=rh_energybranch.getData(0, hit);
+        }
+        std::vector<size_t> sortIDs=retsort(energies.begin(),energies.end(),std::greater<float>());
+        for(size_t i=0; i < nrechits; i++) {
+        	size_t hit= sortIDs.at(i);
+
+            float layer=layerbranch.getData(0, hit);
+            if(layer>(float)maxlayers) continue;
+            if(i>=maxrechitsperevent) break;
+
+            double rechitphi=rh_phi_eta.getData(0, hit);
+            double rechiteta=rh_phi_eta.getData(1, hit);
+
+            float dphihitseed=deltaPhi(rechitphi,seedphi);
+            float detahitseed=rechiteta - seedeta;
+
+            float energy=rh_energybranch.getData(0, hit);
+
+
+            numpyarray[it][i][0]=energy;
+            numpyarray[it][i][1]=dphihitseed;
+            numpyarray[it][i][2]=detahitseed;
+            numpyarray[it][i][3]=layer;
+            if(addtiming)
+            	numpyarray[it][i][4]=rh_energybranch.getData(0, hit);
+
+
+        }
+
+
+
+    }
+    tfile->Close();
+    delete tfile;
+}
+
+void fillRecHitList(boost::python::numeric::array numpyarray,std::string filename,
+        int maxrechitsperevent,float maxdr,int maxlayers){
+	fillRecHitList_priv(numpyarray, filename,
+	         maxrechitsperevent, maxdr, maxlayers, true);
+}
+
+void fillRecHitListNoTime(boost::python::numeric::array numpyarray,std::string filename,
+        int maxrechitsperevent,float maxdr,int maxlayers){
+	fillRecHitList_priv(numpyarray, filename,
+	         maxrechitsperevent, maxdr, maxlayers, false);
+}
 
 void setTreeName(std::string name){
     treename=name;
@@ -212,5 +386,8 @@ BOOST_PYTHON_MODULE(c_createRecHitMap) {
     __hidden::indata();//for some reason exposing the class prevents segfaults. garbage collector?
     //anyway, it doesn't hurt, just leave this here
     def("fillRecHitMap", &fillRecHitMap);
+    def("fillRecHitMapNoTime", &fillRecHitMapNoTime);
+    def("fillRecHitList", &fillRecHitList);
+    def("fillRecHitListNoTime", &fillRecHitListNoTime);
     def("setTreeName", &setTreeName);
 }
