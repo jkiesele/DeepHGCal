@@ -130,6 +130,7 @@ void Converter::initializeBranches() {
     fChain->SetBranchStatus("simcluster_energy",1);
     fChain->SetBranchStatus("simcluster_hits",1);
     fChain->SetBranchStatus("simcluster_fractions",1);
+    fChain->SetBranchStatus("simcluster_hits_indices",1);
 
     fChain->SetBranchStatus("multiclus_eta",1);
     fChain->SetBranchStatus("multiclus_phi",1);
@@ -206,40 +207,27 @@ void Converter::addParticleDataToGlobals(NTupleGlobals &globals, size_t index) {
 }
 
 void Converter::recomputeSimClusterEtaPhi() {
-
-    std::unordered_map<unsigned int, RecHitData> recHitsMap;
-
-    // Iterate through rechits and put them in hashmap for faster search
-    for (size_t i_r = 0; i_r < rechit_eta->size(); i_r++) {
-        float eta = rechit_eta->at(i_r);
-        float phi = rechit_phi->at(i_r);
-        float energy = rechit_energy->at(i_r);
-        unsigned int id = rechit_detid->at(i_r);
-        RecHitData recHit = {id, eta, phi, energy};
-        recHitsMap[id] = recHit;
-    }
-
     size_t numSimClusters = simcluster_hits->size();
     // Iterate through all the sim clusters to recompute their eta and phi
     for (size_t i_m = 0; i_m < numSimClusters; i_m++) {
         std::vector<unsigned int> simClusterHitsIds = simcluster_hits->at(i_m);
+        std::vector<int> simClusterHitsIndices = simcluster_hits_indices->at(i_m);
         std::vector<float> simClusterHitsFractions = simcluster_fractions->at(i_m);
 
         float etaWeightedSum = 0;
         float phiWeightedSum = 0;
         float weightsSum = 0;
         for (size_t i = 0; i < simClusterHitsIds.size(); i++) {
-            unsigned int id = simClusterHitsIds[i];
             float fraction = simClusterHitsFractions[i];
+            int indexRechit = simClusterHitsIndices[i];
 
-            if (recHitsMap.find(id) == recHitsMap.end()) {
+            if (indexRechit < 0 or indexRechit > 7000000) {
                 continue;
             }
 
-            RecHitData recHit = recHitsMap[id];
-            etaWeightedSum += recHit.eta * fraction * recHit.energy;
-            phiWeightedSum += helpers::deltaPhi(recHit.phi, 0) * fraction * recHit.energy;
-            weightsSum += fraction * recHit.energy;
+            etaWeightedSum += rechit_eta->at(indexRechit) * fraction * rechit_energy->at(indexRechit);
+            phiWeightedSum += helpers::deltaPhi(rechit_phi->at(indexRechit), 0) * fraction * rechit_energy->at(indexRechit);
+            weightsSum += fraction * rechit_energy->at(indexRechit);
         }
 
 
@@ -284,88 +272,6 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
     return simClustersForSeeds;
 }
 
-pair<int, float> Converter::findParticleForRecHit(int recHitId, unordered_map<int, int> &simClustersForSeeds,
-                                                  std::vector<std::unordered_map<unsigned int, float>> &recHitsForSimClusters) {
-    int maxSeedIndex = -1;
-    float maxFraction;
-    float maxF = -9999999;
-    float minF = +9999999;
-    int foundIn = 0;
-    for(auto i : simClustersForSeeds) {
-        int simClusterIndex = i.second;
-
-//        std::unordered_map<unsigned int, float> recHitsForSimCluster = recHitsForSimClusters[simClusterIndex];
-
-        if(recHitsForSimClusters[simClusterIndex].find(recHitId)==recHitsForSimClusters[simClusterIndex].end())
-            continue;
-        foundIn++;
-
-        float fraction = recHitsForSimClusters[simClusterIndex][recHitId];
-
-        if(maxSeedIndex == -1 or (maxSeedIndex != -1 and fraction > maxFraction)) {
-            maxSeedIndex = i.first;
-            maxFraction = fraction;
-        }
-        maxF = max(maxF, fraction);
-        minF = min(minF, fraction);
-    }
-
-
-    if (maxFraction < THRESHOLD_ASSIGN_TO_CLUSTER)
-        maxFraction = maxSeedIndex = -1;
-    return pair<int, float>(maxSeedIndex, maxFraction);
-}
-
-void Converter::findParticleInfoForRecHit(int recHitId, unordered_map<int, int> &simClustersForSeeds,
-                                          std::vector<std::unordered_map<unsigned int, float>> &recHitsForSimClusters,
-                                          pair<int, float> &particleFraction, float &totalFraction) {
-
-    int maxSeedIndex = -1;
-    float maxFraction;
-    int foundIn = 0;
-    totalFraction = 0;
-    for(auto i : simClustersForSeeds) {
-        int simClusterIndex = i.second;
-
-        if(recHitsForSimClusters[simClusterIndex].find(recHitId)==recHitsForSimClusters[simClusterIndex].end())
-            continue;
-        foundIn++;
-
-        float fraction = recHitsForSimClusters[simClusterIndex][recHitId];
-        totalFraction += fraction;
-
-        if(maxSeedIndex == -1 or (maxSeedIndex != -1 and fraction > maxFraction)) {
-            maxSeedIndex = i.first;
-            maxFraction = fraction;
-        }
-    }
-
-    totalFraction = fmax(0,fmin(totalFraction, 1));
-
-    if (maxFraction < THRESHOLD_ASSIGN_TO_CLUSTER)
-        maxFraction = maxSeedIndex = -1;
-    particleFraction.first = maxSeedIndex;
-    particleFraction.second = maxFraction;
-
-}
-
-
-std::vector<std::unordered_map<unsigned int, float>> Converter::indexSimClusterRecHits() {
-    std::vector<std::unordered_map<unsigned int, float>> fractionsMaps;
-    for (size_t j = 0; j < simcluster_eta->size(); j++) {
-        std::unordered_map<unsigned int, float> fractionsMap;
-        std::vector<unsigned int> simClusterHitsIds = simcluster_hits->at(j);
-        std::vector<float> simClusterHitsFractions = simcluster_fractions->at(j);
-        for (size_t i = 0; i < simClusterHitsIds.size(); i++) {
-            fractionsMap[simClusterHitsIds[i]] = simClusterHitsFractions[i];
-        }
-
-        fractionsMaps.push_back(fractionsMap);
-    }
-
-    return fractionsMaps;
-
-}
 
 void Converter::Loop(){
     initializeBranches();
@@ -422,32 +328,40 @@ void Converter::Loop(){
                     particleFromCollisionIterator.second.second);
 
 
-            std::vector<std::unordered_map<unsigned int, float>> simClustersRecHits = indexSimClusterRecHits();
-
             size_t numRecHits = rechit_eta->size();
+            vector<float> totalFraction(numRecHits, 0);
+
             float totalRecHitsEnergy = 0;
+
+            for(auto j : simClustersForSeeds) {
+                std::vector<unsigned int> simClusterHitsIds = simcluster_hits->at(j.second);
+                std::vector<int> recHitIndexes= simcluster_hits_indices->at(j.second);
+                std::vector<float> simClusterHitsFractions = simcluster_fractions->at(j.second);
+
+                for(size_t k = 0; k < recHitIndexes.size(); k++) {
+                    if(recHitIndexes[k] < 0 or recHitIndexes[k] > 7000000)
+                        continue;
+                    totalFraction[recHitIndexes[k]] += simClusterHitsFractions[k];
+                }
+            }
+
+
+            int count = 0, count2 = 0;
             for(size_t iRecHit = 0; iRecHit < numRecHits; iRecHit++) {
                 if (!helpers::recHitMatchesParticle(genpart_eta->at(particleFromCollisionIterator.first),
                                                     genpart_phi->at(particleFromCollisionIterator.first),
                                                     rechit_eta->at(iRecHit), rechit_phi->at(iRecHit), DR_AROUND_SEED))
                     continue;
 
-                pair<int, float> particleFraction;
-                float totalFraction;
-                findParticleInfoForRecHit(rechit_detid->at(iRecHit), simClustersForSeeds, simClustersRecHits,
-                                          particleFraction, totalFraction);
-
-                float seedParticleEta = particleFraction.first == -1 ? -1 : genpart_eta->at(particleFraction.first);
-                float seedParticlePhi = particleFraction.first == -1 ? -1 : genpart_phi->at(particleFraction.first);
-
-
                 recHits.addRecHit(rechit_eta->at(iRecHit), rechit_phi->at(iRecHit), 0, 0, rechit_x->at(iRecHit),
                                   rechit_y->at(iRecHit),
                                   rechit_z->at(iRecHit), rechit_pt->at(iRecHit), rechit_energy->at(iRecHit),
-                                  rechit_time->at(iRecHit), rechit_layer->at(iRecHit), seedParticleEta,
-                                  seedParticlePhi, particleFraction.second, particleFraction.first, totalFraction);
+                                  rechit_time->at(iRecHit), rechit_layer->at(iRecHit), fmax(0,fmin(1,totalFraction.at(iRecHit))));
 
                 totalRecHitsEnergy += rechit_energy->at(iRecHit);
+                count += 1;
+                if (fmax(0,fmin(1,totalFraction.at(iRecHit))) > 0.3)
+                    count2 ++;
 
             }
 
