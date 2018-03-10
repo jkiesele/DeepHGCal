@@ -32,8 +32,10 @@ struct RecHitData {
 };
 
 class Converter: public HGCalSel{
+private:
+    Long64_t loadEvent(const Long64_t &eventNo);
 public:
-	Converter(TTree* t):HGCalSel(t),testmode_(false),energylowercut_(0){}
+	Converter(TTree* t, bool noIndices = false);
 
 	void setEnergyThreshold(float thr){energylowercut_=thr;}
 
@@ -62,6 +64,9 @@ private:
 	float energylowercut_;
     const float ZPLANE_CUT = 0.001;
     const float ZPLANE_CUT_CALORIMETER = 319.9;
+    bool noIndices;
+
+	std::vector<std::vector<int> > simcluster_hits_indices_computed;
 };
 
 

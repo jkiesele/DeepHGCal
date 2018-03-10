@@ -22,6 +22,14 @@ int main(int argc, char ** argv) {
     TString infile=argv[1];
     TString outfile=argv[2];
 
+    bool noIndices = false;
+    if (argc==4) {
+        string noIndices_ = argv[3];
+        cout<<"WARNING: Running in slow no-indices mode.\nThis is only for legacy data. Do not run in this mode on new data\n\n";
+        if (noIndices_ == "--no-indices" or noIndices_ == "-n")
+            noIndices = true;
+    }
+
 
     TFile * f=new TFile(infile,"READ");
     if(!f || f->IsZombie()){
@@ -40,7 +48,7 @@ int main(int argc, char ** argv) {
         return -2;
     }
 
-    Converter cv(tree);
+    Converter cv(tree, noIndices);
     cv.setOutFile(outfile);
 
     try{

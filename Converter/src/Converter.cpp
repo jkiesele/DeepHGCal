@@ -22,6 +22,11 @@
 #include <TGraph.h>
 #include "../include/helpers.h"
 
+
+Converter::Converter(TTree *t, bool noIndices) : HGCalSel(t),testmode_(false),energylowercut_(0), noIndices(noIndices){
+
+}
+
 void Converter::traceDecayTree(unordered_set<int> &decayParticlesCluster, unordered_set<int> &allParticles) const {
     if (decayParticlesCluster.size() == 0)
         return;
@@ -130,7 +135,9 @@ void Converter::initializeBranches() {
     fChain->SetBranchStatus("simcluster_energy",1);
     fChain->SetBranchStatus("simcluster_hits",1);
     fChain->SetBranchStatus("simcluster_fractions",1);
-    fChain->SetBranchStatus("simcluster_hits_indices",1);
+
+    if (not noIndices)
+        fChain->SetBranchStatus("simcluster_hits_indices",1);
 
     fChain->SetBranchStatus("multiclus_eta",1);
     fChain->SetBranchStatus("multiclus_phi",1);
@@ -272,6 +279,39 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
     return simClustersForSeeds;
 }
 
+Long64_t Converter::loadEvent(const Long64_t &eventNo) {
+    Long64_t ientry = LoadTree(eventNo);
+    if (ientry < 0) return ientry;
+    fChain->GetEntry(eventNo);
+
+    // Fill the hash map
+    unordered_map<long, long> rechitIdsToIndices;
+    for(size_t iRecHit = 0; iRecHit < rechit_eta->size(); iRecHit++) {
+        rechitIdsToIndices[rechit_detid->at(iRecHit)] = iRecHit;
+    }
+
+    if (noIndices) {
+        simcluster_hits_indices_computed.clear();
+        size_t numSimClusters = simcluster_hits->size();
+        // Iterate through all the sim clusters to recompute their eta and phi
+        for (size_t iSimCluster = 0; iSimCluster < numSimClusters; iSimCluster++) {
+            std::vector<unsigned int> simClusterHitsIds = simcluster_hits->at(iSimCluster);
+            std::vector<int> simClusterHitsIndices(simClusterHitsIds.size());
+            for (size_t j = 0; j < simClusterHitsIds.size(); j++) {
+                auto hitIndex = rechitIdsToIndices.find(simClusterHitsIds[j]);
+                if (hitIndex == rechitIdsToIndices.end())
+                    simClusterHitsIndices[j] = -1;
+                else
+                    simClusterHitsIndices[j] = hitIndex->second;
+            }
+
+            simcluster_hits_indices_computed.push_back(simClusterHitsIndices);
+        }
+
+        simcluster_hits_indices = &simcluster_hits_indices_computed;
+    }
+}
+
 
 void Converter::Loop(){
     initializeBranches();
@@ -294,14 +334,9 @@ void Converter::Loop(){
 
     Long64_t nentries = fChain->GetEntries();
 
-    Long64_t nbytes = 0, nb = 0;
     for (Long64_t jentry = 0; jentry < nentries; jentry++) {
-
-
-        Long64_t ientry = LoadTree(jentry);
-        if (ientry < 0) break;
-        nb = fChain->GetEntry(jentry);
-        nbytes += nb;
+        if (loadEvent(jentry) < 0)
+            break;
 
         if (testmode_ && jentry > 2) break;
 
