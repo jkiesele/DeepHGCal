@@ -25,6 +25,7 @@ def run_conversion(input_file):
     command = '%s %s %s %s' % (args.executable, input_file, (args.output+'/'+just_file_name), ('--no-indices' if args.no_indices else ''))
     os.system(command)
 
+
 def worker():
     while True:
         input_file = jobs_queue.get()
@@ -33,7 +34,7 @@ def worker():
 
 
 jobs_queue = Queue()
-for i in range(args.jobs):
+for i in range(int(args.jobs)):
      t = Thread(target=worker)
      t.daemon = True
      t.start()
