@@ -43,7 +43,7 @@ class TrainData_separation(TrainDataDeepHGCal):
                                'rechit_phi',
                                'rechit_time',
                                'rechit_layer',
-                               'rechit_fraction',
+                               'rechit_total_fraction',
                                'nrechits',
                                'seed_eta',
                                'seed_phi',
@@ -86,7 +86,7 @@ class TrainData_separation(TrainDataDeepHGCal):
 
         Y = createDensityLayers(filename,
                                           TupleMeanStd,
-                                          inbranches=['rechit_fraction'],
+                                          inbranches=['rechit_total_fraction'],
                                           modes=['sum'],
                                           layerbranch='rechit_layer',
                                           maxlayers=55,
