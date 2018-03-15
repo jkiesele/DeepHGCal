@@ -1,0 +1,10 @@
+[recurrent_cal]
+summary_path=/home/srq2/Summaries/recurrent_cal
+model_path=/home/srq2/Models/recurrent_cal
+from_scratch=1
+batch_size=10
+num_layers=55
+num_channels=24
+training_files_list=/media/All/CERN/train_root/out/files.txt
+save_after_iterations=5000
+train_for_iterations=200000
