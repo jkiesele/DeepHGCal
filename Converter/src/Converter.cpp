@@ -353,6 +353,10 @@ void Converter::Loop(){
                                        genpart_pt->at(particleFromCollisionIterator.first));
 
             globals.setTruthID(genpart_pid->at(particleFromCollisionIterator.first), true);
+            globals.setSeedInfo(genpart_eta->at(particleFromCollisionIterator.first),
+                                genpart_phi->at(particleFromCollisionIterator.first),
+                                particleFromCollisionIterator.first,
+                                jentry);
 
             // Add all decay tree
             for(auto daughterIndexIterator : particleFromCollisionIterator.second.first) {
