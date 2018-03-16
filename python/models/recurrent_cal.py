@@ -37,33 +37,33 @@ class RecurrentCal(Model):
         self.__check_init()
         return self.__graph_summary_loss
 
-    """
-    Returns a tuple of placeholders:
-    1. input
-    2. Regression target
-    """
     def get_placeholders(self):
+        """
+        Returns a tuple of placeholders:
+        1. input
+        2. Regression target
+        """
         self.__check_init()
         return self.__placeholder_input, self.__placeholder_regression_target
 
-    """
-    Return the graph op of the output of the model
-    """
     def get_compute_graphs(self):
+        """
+        Return the graph op of the output of the model
+        """
         self.__check_init()
         return self.__graph_output
 
-    """
-    Returns the loss graph op
-    """
     def get_losses(self):
+        """
+        Returns the loss graph op
+        """
         self.__check_init()
         return self.__graph_loss
 
-    """
-    Returns the optimizer graph op
-    """
     def get_optimizer(self):
+        """
+        Returns the optimizer graph op
+        """
         self.__check_init()
         return [self.__graph_optimizer]
 
