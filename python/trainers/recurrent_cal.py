@@ -79,7 +79,7 @@ class RecurrentCalTrainer:
                 coord = tf.train.Coordinator()
                 threads = tf.train.start_queue_runners(coord=coord)
             else:
-                input_data = "/home/srq2/Datasets/three_hgcal/out/dataCollection.dc"
+                input_data = self.config['train_data_path']
                 train_data = DataCollection()
                 train_data.readFromFile(input_data)
 
