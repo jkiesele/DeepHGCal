@@ -113,3 +113,5 @@ class ReshapeBatch(Layer):
         config = {'target_shape': self.target_shape}
         base_config = super(ReshapeBatch, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+global_layers_list = {}
