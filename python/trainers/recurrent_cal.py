@@ -78,6 +78,7 @@ class RecurrentCalTrainer:
             if self.use_tf_records:
                 coord = tf.train.Coordinator()
                 threads = tf.train.start_queue_runners(coord=coord)
+                record_batch_input, record_batch_target = self.get_record_placeholders()
             else:
                 input_data = self.config['train_data_path']
                 train_data = DataCollection()
@@ -100,7 +101,6 @@ class RecurrentCalTrainer:
             else:
                 iteration_number = 0
 
-            record_batch_input, record_batch_target = self.get_record_placeholders()
 
             print("Starting iterations")
             while iteration_number < self.train_for_iterations:
