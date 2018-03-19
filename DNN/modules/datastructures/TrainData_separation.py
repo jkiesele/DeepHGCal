@@ -56,7 +56,7 @@ class TrainData_separation(TrainDataDeepHGCal):
 
         # the first part is standard, no changes needed
         from DeepJetCore.preprocessing import MeanNormApply, createDensityLayers, createDensityMap, MeanNormZeroPad, \
-            MeanNormZeroPadParticles
+            MeanNormZeroPadParticles, createRecHitMap
 
         fileTimeOut(filename, 120)  # give eos 2 minutes to recover
         rfile = ROOT.TFile(filename)
@@ -71,18 +71,11 @@ class TrainData_separation(TrainDataDeepHGCal):
                                        [self.branchcutoffs[0]], self.nsamples)
 
         # flatten everything out for now
-        X = createDensityLayers(filename,
-                                          TupleMeanStd,
-                                          inbranches=['rechit_energy', 'rechit_layer', 'rechit_time'],
-                                          modes=['sum', 'single', 'average'],
-                                          layerbranch='rechit_layer',
-                                          maxlayers=55,
-                                          layeroffset=1,
-                                          nevents=self.nsamples,
-                                          dimension1=['rechit_eta', 'seed_eta', 13, 0.2],
-                                          dimension2=['rechit_phi', 'seed_phi', 13, 0.2],
-                                          counterbranch='nrechits',
-                                          scales=[1, 50, 1])
+        X = createRecHitMap(filename, self.nsamples,
+                                      nbins=13,
+                                      width=0.10,
+                                      maxlayers=52,
+                                      maxhitsperpixel=6)
 
         Y = createDensityLayers(filename,
                                           TupleMeanStd,
