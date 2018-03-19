@@ -2,6 +2,7 @@ from TrainDataDeepHGCal import TrainDataDeepHGCal,fileTimeOut
 import numpy as np
 import ROOT
 import DeepJetCore.preprocessing as prep
+from converters import createRecHitMap
 
 class TrainData_separation(TrainDataDeepHGCal):
     def __init__(self):
@@ -56,7 +57,7 @@ class TrainData_separation(TrainDataDeepHGCal):
 
         # the first part is standard, no changes needed
         from DeepJetCore.preprocessing import MeanNormApply, createDensityLayers, createDensityMap, MeanNormZeroPad, \
-            MeanNormZeroPadParticles, createRecHitMap
+            MeanNormZeroPadParticles
 
         fileTimeOut(filename, 120)  # give eos 2 minutes to recover
         rfile = ROOT.TFile(filename)
@@ -73,8 +74,8 @@ class TrainData_separation(TrainDataDeepHGCal):
         # flatten everything out for now
         X = createRecHitMap(filename, self.nsamples,
                                       nbins=13,
-                                      width=0.10,
-                                      maxlayers=52,
+                                      width=0.2,
+                                      maxlayers=55,
                                       maxhitsperpixel=6)
 
         Y = createDensityLayers(filename,
