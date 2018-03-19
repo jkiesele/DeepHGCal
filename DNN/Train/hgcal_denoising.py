@@ -14,6 +14,8 @@ from keras.layers import Cropping3D
 from keras.regularizers import l2
 import keras
 from keras import backend as K
+from keras.layers.core import Reshape, Permute
+from Layers import PermuteBatch, ReshapeBatch
 
 l2_lambda = 0.0001
 
@@ -21,42 +23,57 @@ l2_lambda = 0.0001
 def denoising_model(Inputs, nclasses, nregressions, dropoutRate=0.05, momentum=0.6):
     # image = Input(shape=(25, 25, 25, 1))
 
+    Inputs = []
+    shapes = [(10, 13, 13, 55, 26)]
+    for s in shapes:
+        Inputs.append(keras.layers.Input(batch_shape=s))
+
     x = Inputs[0]
+    # Shape: [B,13,13,L,C]
+    shape = K.int_shape(x)
+    B, _, _, L, C = shape
 
-    x = Conv3D(32, kernel_size=(1, 1, 1), strides=(1, 1, 1), activation='relu',
+
+    x = PermuteBatch((0, 3, 1, 2, 4))(x)
+    # Shape : [B,L,13,13,C]
+    x = ReshapeBatch((B*L, 13, 13, C))(x)
+    # Shape: [(B*L), 13, 13, C]
+
+
+
+    x = Conv2D(30, kernel_size=(1, 1), padding='same', activation='relu',
                       kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropoutRate)(x)
-    x = Conv3D(12, kernel_size=(1, 1, 1), strides=(1, 1, 1), activation='relu',
-                      kernel_initializer='lecun_uniform')(x)
-    x = BatchNormalization(momentum=momentum)(x)
-    preprocessed = Dropout(dropoutRate)(x)
+    x = Conv2D(30, kernel_size=(1, 1), padding='same', activation='relu',
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(30, kernel_size=(1, 1), padding='same', activation='relu',
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(30, kernel_size=(1, 1), padding='same', activation='relu',
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
+    # Shape: [(B*L), 13, 13, 30]
 
+    x = Conv2D(30, kernel_size=(5, 5), padding='same', activation='relu',
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(30, kernel_size=(5, 5), padding='same', activation='relu',
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(30, kernel_size=(5, 5), padding='same', activation='relu',
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(30, kernel_size=(5, 5), padding='same', activation='relu',
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
 
-    x = Conv3D(32, (5, 5, 5), padding='same', kernel_regularizer=l2(l2_lambda))(preprocessed)
-    x = LeakyReLU()(x)
-    x = Dropout(dropoutRate)(x)
+    # Shape: [(B*L), 13, 13, 30]
+    x = ReshapeBatch((B,L, 13, 13, 30))(x)
+    # Shape: [B,L, 13, 13, 30]
+    x = PermuteBatch((0, 2, 3, 1, 4))(x)
 
+    # Shape: [B,13,13,L,30]
 
-    x = Conv3D(8, (5, 5, 5), padding='same', kernel_regularizer=l2(l2_lambda))(x)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropoutRate)(x)
+    x = ReshapeBatch(((B*13*13),L, 30))(x)
 
+    # Shape: [L, B*13*13, 30] - Time major
+    lstm_1 = LSTM(100, return_state=True, batch_input_shape=((B*13*13),L, 30))
+    lstm_2 = LSTM(100, return_state=True, batch_input_shape=((B*13*13),L, 30))
 
-
-    x = Conv3D(8, (5, 5, 5), padding='same', kernel_regularizer=l2(l2_lambda))(x)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropoutRate)(x)
-
-
-    x = Conv3D(8, (5, 5, 5), padding='same', kernel_regularizer=l2(l2_lambda), )(x)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropoutRate)(x)
-
-    x = Conv3D(1, (1, 1, 1), padding='same', activation='relu', kernel_regularizer=l2(l2_lambda), )(x)
-    x = Conv3D(1, (1, 1, 1), padding='same', kernel_regularizer=l2(l2_lambda), )(x)
+    x, _, _ = lstm_1(x)
 
     model = Model(inputs=Inputs, outputs=x)
     return model
@@ -68,9 +85,9 @@ def masked_mean_square(truth, prediction):
 
 
 inputs = []
-shapes = [(13, 13, 52, 26)]
+shapes = [(10, 13, 13, 55, 26)]
 for s in shapes:
-    inputs.append(keras.layers.Input(shape=s))
+    inputs.append(keras.layers.Input(batch_shape=s))
 
 model = denoising_model(inputs, 5, 2)
 
