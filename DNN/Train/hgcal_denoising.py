@@ -20,11 +20,13 @@ from Layers import PermuteBatch, ReshapeBatch
 l2_lambda = 0.0001
 
 
+batch_size = 50
 def denoising_model(Inputs, nclasses, nregressions, dropoutRate=0.05, momentum=0.6):
+    global batch_size
     # image = Input(shape=(25, 25, 25, 1))
 
     Inputs = []
-    shapes = [(10, 13, 13, 55, 26)]
+    shapes = [(batch_size, 13, 13, 55, 26)]
     for s in shapes:
         Inputs.append(keras.layers.Input(batch_shape=s))
 
@@ -70,10 +72,15 @@ def denoising_model(Inputs, nclasses, nregressions, dropoutRate=0.05, momentum=0
     x = ReshapeBatch(((B*13*13),L, 30))(x)
 
     # Shape: [L, B*13*13, 30] - Time major
-    lstm_1 = LSTM(100, return_state=True, batch_input_shape=((B*13*13),L, 30))
-    lstm_2 = LSTM(100, return_state=True, batch_input_shape=((B*13*13),L, 30))
+    lstm_1 = LSTM(100, return_sequences=True, batch_input_shape=((B*13*13),L, 30))
+    lstm_2 = LSTM(100, return_sequences=True, batch_input_shape=((B*13*13),L, 100))
 
-    x, _, _ = lstm_1(x)
+    x = lstm_1(x)
+    x = lstm_2(x)
+
+    x = ReshapeBatch((B, 13, 13, L, 100))(x)
+    x = Conv3D(1, kernel_size=(1, 1, 1), padding='same', activation=None,
+                      kernel_initializer='lecun_uniform', kernel_regularizer=l2(l2_lambda))(x)
 
     model = Model(inputs=Inputs, outputs=x)
     return model
@@ -103,8 +110,8 @@ print(train.keras_model.summary())
 #train.train_data.maxFilesOpen=4
 #exit()
 
-model,history = train.trainModel(nepochs=1,
-                                 batchsize=300,
+model,history = train.trainModel(nepochs=10,
+                                 batchsize=batch_size,
                                  stop_patience=300,
                                  lr_factor=0.3,
                                  lr_patience=-6,
