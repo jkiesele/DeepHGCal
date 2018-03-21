@@ -96,7 +96,7 @@ class TrainData_separation(TrainDataDeepHGCal):
         Tuple = self.readTreeFromRootToTuple(filename)
 
         self.nsamples = len(x_globalbase)
-        self.w = []
+        self.w = [np.ones_like(Y)]
         self.x = [X]
         self.y = [Y]
 

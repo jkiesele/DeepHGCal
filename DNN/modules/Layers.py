@@ -7,25 +7,6 @@ import copy
 import numpy as np
 
 
-class ReshapeBatch(Layer):
-
-    def __init__(self, output_dim, **kwargs):
-        self.output_dim = output_dim
-        super(ReshapeBatch, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        super(ReshapeBatch, self).build(input_shape)  # Be sure to call this somewhere!
-
-    def call(self, x):
-        return tf.reshape(x, self.output_dim)
-
-    def compute_output_shape(self, input_shape):
-        return self.output_dim
-
-
-
-
-
 class PermuteBatch(Layer):
     """Permutes the dimensions of the input according to a given pattern.
 
@@ -103,7 +84,6 @@ class ReshapeBatch(Layer):
         self.target_shape = tuple(target_shape)
 
     def compute_output_shape(self, input_shape):
-        # input shape known? then we can compute the output shape
         return self.target_shape
 
     def call(self, inputs):
@@ -115,3 +95,5 @@ class ReshapeBatch(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 global_layers_list = {}
+global_layers_list['ReshapeBatch'] = ReshapeBatch
+global_layers_list['PermuteBatch'] = PermuteBatch
