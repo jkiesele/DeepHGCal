@@ -275,7 +275,7 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
         }
 
 
-        if (simClusterIndex != -1) {
+        if (simClusterIndex != -1 && minDistance <= 0.002) {
             simClustersForSeeds[i] = simClusterIndex;
             taken.insert(simClusterIndex);
         }
@@ -369,6 +369,15 @@ void Converter::Loop(){
 
             unordered_map<int, int> simClustersForSeeds = findSimClusterForSeeds(
                     particleFromCollisionIterator.second.second);
+
+            // Filter if we couldn't match any simclusters
+            bool matched = false;
+            for (auto simClusterForSeed : simClustersForSeeds)
+                matched = matched or (simClusterForSeed.second!=-1);
+            if (not matched) {
+                cout<<"Skipping a sample"<<endl;
+                continue;
+            }
 
 
             size_t numRecHits = rechit_eta->size();
