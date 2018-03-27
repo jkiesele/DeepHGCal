@@ -246,6 +246,8 @@ void Converter::recomputeSimClusterEtaPhi() {
     }
 }
 
+
+
 unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
     size_t numSimClusters = simcluster_hits->size();
     unordered_set<int> taken;
@@ -264,12 +266,14 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
 //                continue;
             float newDistance = helpers::getSeedSimClusterDifference(seedEta, seedPhi,
                                                                      simcluster_eta->at(i_m),
-                                                                     simcluster_phi->at(i_m));
+                                                                     simcluster_phi->at(i_m))
+                                + fabs(log(simcluster_energy->at(i_m) / genpart_energy->at(i))*0.02);
             if ((newDistance < minDistance && simClusterIndex != -1) || simClusterIndex == -1) {
                 minDistance = newDistance;
                 simClusterIndex = i_m;
             }
         }
+
 
         if (simClusterIndex != -1) {
             simClustersForSeeds[i] = simClusterIndex;
