@@ -191,7 +191,7 @@ void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string fil
             float energy=rh_energybranch.getData(0, hit);
             float time=0;
             if(addtiming)
-            	time=rh_energybranch.getData(0, hit);
+            	time=rh_timebranch.getData(0, hit);
             float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
             float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
 
