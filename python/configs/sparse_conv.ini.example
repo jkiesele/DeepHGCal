@@ -1,0 +1,13 @@
+[sparse_conv]
+summary_path=/afs/cern.ch/work/s/sqasim/workspace_2/SparseConv/exp1/summary
+model_path=/afs/cern.ch/work/s/sqasim/workspace_2/SparseConv/exp1/model
+from_scratch=1
+batch_size=10
+input_spatial_features=3
+input_all_features=4
+max_neighbors=10
+max_entries=2000
+training_files_list=/afs/cern.ch/work/s/sqasim/workspace_2/SparseConv/exp1/train_files.txt
+save_after_iterations=5000
+train_for_iterations=2000000
+num_classes=6
