@@ -157,15 +157,16 @@ def sparse_conv_2(space_features, all_features, neighbor_matrix, output_all=15):
     expanded_neighbor_matrix = tf.expand_dims(neighbor_matrix, axis=3)
     indexing_tensor = tf.concat([batch_range_vector, expanded_neighbor_matrix], axis=3)
 
-    gathered_space_1 = tf.gather_nd(space_features, indexing_tensor) # [B,E,S] -> [B,E,5,S]
-    delta_space = sparse_conv_delta(gathered_space_1, space_features)
-    delta_gathered_space_2 = tf.reshape(delta_space, [n_batch, n_max_entries, -1])
-    delta_space_flattened = tf.layers.dense(inputs=delta_gathered_space_2, units=n_max_neighbors, activation=tf.nn.relu) # [B,E,N]
-    delta_space_flattened = tf.expand_dims(delta_space_flattened, axis=3)
+    gathered_space_1 = tf.gather_nd(space_features, indexing_tensor) # [B,E,5,S]
+    delta_space = sparse_conv_delta(gathered_space_1, space_features) # [B,E,5,S]
+
+    weighting_factor_for_all_features = tf.reshape(delta_space, [n_batch, n_max_entries, -1])
+    weighting_factor_for_all_features = tf.layers.dense(inputs=weighting_factor_for_all_features, units=n_max_neighbors, activation=tf.nn.relu) # [B,E,N]
+    weighting_factor_for_all_features = tf.expand_dims(weighting_factor_for_all_features, axis=3)  # [B,E,N] - N = neighbors
 
     gathered_all = tf.gather_nd(all_features, indexing_tensor)  # [B,E,5,F]
 
-    gathered_all_dotted = tf.concat((gathered_all * delta_space_flattened, gathered_all), axis=3)
+    gathered_all_dotted = tf.concat((gathered_all * weighting_factor_for_all_features, gathered_all), axis=3)  # [B,E,5,2*F]
     pre_output = tf.layers.dense(gathered_all_dotted, output_all, activation=tf.nn.relu)
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
 
