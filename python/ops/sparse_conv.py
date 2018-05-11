@@ -1,6 +1,12 @@
 import tensorflow as tf
 
 
+# just for testing
+
+def printLayerStuff(l, desc_str):
+    l=tf.Print(l,[l], desc_str+" ",summarize=2000)
+    return l
+
 def sparse_conv_delta(A, B):
     """
     A-B
@@ -121,7 +127,7 @@ def sparse_conv_bare(space_features, all_features, neighbor_matrix, output_all=1
 
 
 
-def sparse_conv_2(space_features, all_features, neighbor_matrix, output_all=15):
+def sparse_conv_2(space_features, all_features, neighbor_matrix, output_all=15, weight_init_width=1e-4):
     """
     Defines sparse convolution layer
 
@@ -161,18 +167,25 @@ def sparse_conv_2(space_features, all_features, neighbor_matrix, output_all=15):
     delta_space = sparse_conv_delta(gathered_space_1, space_features) # [B,E,5,S]
 
     weighting_factor_for_all_features = tf.reshape(delta_space, [n_batch, n_max_entries, -1])
-    weighting_factor_for_all_features = tf.layers.dense(inputs=weighting_factor_for_all_features, units=n_max_neighbors, activation=tf.nn.relu) # [B,E,N]
-    weighting_factor_for_all_features = tf.expand_dims(weighting_factor_for_all_features, axis=3)  # [B,E,N] - N = neighbors
+    # this is a small correction
+    weighting_factor_for_all_features = tf.layers.dense(inputs=weighting_factor_for_all_features, units=n_max_neighbors, 
+                                                        activation=tf.nn.relu) # [B,E,N]
+    weighting_factor_for_all_features = 1 + tf.expand_dims(weighting_factor_for_all_features, axis=3)  # [B,E,N] - N = neighbors
 
+    
     gathered_all = tf.gather_nd(all_features, indexing_tensor)  # [B,E,5,F]
 
     gathered_all_dotted = tf.concat((gathered_all * weighting_factor_for_all_features, gathered_all), axis=3)  # [B,E,5,2*F]
     pre_output = tf.layers.dense(gathered_all_dotted, output_all, activation=tf.nn.relu)
-    output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
+    output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu,)
 
-    weighting_factor_for_spatial_features = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), n_max_neighbors, activation=tf.nn.relu)
-    weighting_factor_for_spatial_features = tf.expand_dims(weighting_factor_for_spatial_features, axis=3)
+    weighting_factor_for_spatial_features = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), n_max_neighbors, 
+                                                            activation=tf.nn.relu, 
+                                                        kernel_initializer=tf.random_normal_initializer(mean=0., stddev=weight_init_width),
+                                                        bias_initializer=tf.random_normal_initializer(mean=0., stddev=weight_init_width))
+    weighting_factor_for_spatial_features = 1 + tf.expand_dims(weighting_factor_for_spatial_features, axis=3)
 
+    
     spatial_output = space_features + tf.reduce_mean(delta_space * weighting_factor_for_spatial_features, axis=2)
 
     return output, spatial_output
