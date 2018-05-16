@@ -150,9 +150,9 @@ def sparse_conv_2(space_features, all_features, neighbor_matrix, output_all=15):
     assert shape_space_features[1] == shape_all_features[1] == shape_neighbor_matrix[1]
 
     # Neighbor matrix should be int as it should be used for indexing
-    assert neighbor_matrix.dtype == tf.int32
+    assert neighbor_matrix.dtype == tf.int64
 
-    batch_range_vector = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1),axis=1), axis=1)
+    batch_range_vector = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, n_batch, dtype=tf.int64), axis=1),axis=1), axis=1)
     batch_range_vector = tf.tile(batch_range_vector, [1,n_max_entries,n_max_neighbors,1])
     expanded_neighbor_matrix = tf.expand_dims(neighbor_matrix, axis=3)
     indexing_tensor = tf.concat([batch_range_vector, expanded_neighbor_matrix], axis=3)

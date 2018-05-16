@@ -50,18 +50,9 @@ class SparseConv(Model):
 
         self.__placeholder_space_features = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries, self.n_space])
         self.__placeholder_all_features = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries, self.n_all])
-        self.__placeholder_neighbors_matrix = tf.placeholder(dtype=tf.int32, shape=[self.batch_size, self.max_entries, self.n_max_neighbors])
-        self.__placeholder_labels = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.num_classes])
-        self.__placeholder_num_entries = tf.placeholder(dtype=tf.int32, shape=[self.batch_size])
-        #
-        # layer_1_space, layer_1_all = sparse_conv(self.__placeholder_space_features, self.__placeholder_all_features,
-        #                                          self.__placeholder_neighbors_matrix)
-        #
-        # layer_2_space, layer_2_all = sparse_conv(layer_1_space, layer_1_all,
-        #                                          self.__placeholder_neighbors_matrix)
-        #
-        # layer_3_space, layer_3_all = sparse_conv(layer_2_space, layer_2_all,
-        #                                          self.__placeholder_neighbors_matrix)
+        self.__placeholder_neighbors_matrix = tf.placeholder(dtype=tf.int64, shape=[self.batch_size, self.max_entries, self.n_max_neighbors])
+        self.__placeholder_labels = tf.placeholder(dtype=tf.int64, shape=[self.batch_size, self.num_classes])
+        self.__placeholder_num_entries = tf.placeholder(dtype=tf.int64, shape=[self.batch_size, 1])
 
         layer_1_out, layer_1_out_spatial = sparse_conv_2(self.__placeholder_space_features, self.__placeholder_all_features, self.__placeholder_neighbors_matrix, 15)
         layer_2_out, layer_2_out_spatial = sparse_conv_2(layer_1_out_spatial, layer_1_out, self.__placeholder_neighbors_matrix, 20)
@@ -71,11 +62,12 @@ class SparseConv(Model):
         layer_6_out, _ = sparse_conv_2(layer_5_out_spatial, layer_5_out, self.__placeholder_neighbors_matrix, 40)
 
         # TODO: Verify this code
-        mask = tf.cast(tf.expand_dims(tf.sequence_mask(self.__placeholder_num_entries, maxlen=self.max_entries), axis=2), tf.float32)
+        squeezed_num_entries = tf.squeeze(self.__placeholder_num_entries)
+        mask = tf.cast(tf.expand_dims(tf.sequence_mask(squeezed_num_entries, maxlen=self.max_entries), axis=2), tf.float32)
 
 
-        flattened_features = tf.reduce_sum(layer_6_out / mask, axis=1)\
-                             / tf.cast(tf.expand_dims(self.__placeholder_num_entries, axis=1), tf.float32) # Should be of size [B,F]
+        flattened_features = tf.reduce_sum(layer_6_out * mask, axis=1)\
+                             / tf.cast(tf.expand_dims(squeezed_num_entries, axis=1), tf.float32) # Should be of size [B,F]
 
         fc_1 = tf.layers.dense(flattened_features, units=100, activation=tf.nn.relu)
         fc_2 = tf.layers.dense(fc_1, units=100, activation=tf.nn.relu)
@@ -91,7 +83,9 @@ class SparseConv(Model):
         # Repeating, maybe there is a better way?
         self.__graph_summary_loss = tf.summary.scalar('Loss', self.__graph_loss)
         self.__graph_summary_accuracy = tf.summary.scalar('Accuracy', self.__accuracy)
-        self.__graph_summaries = tf.summary.merge([self.__graph_summary_loss, self.__graph_summary_accuracy])
+
+        summary_temp = tf.summary.scalar('Temp', tf.reduce_sum(flattened_features))
+        self.__graph_summaries = tf.summary.merge([self.__graph_summary_loss, self.__graph_summary_accuracy, summary_temp])
 
         self.__graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self.__graph_loss)
         self.__graph_summary_accuracy_validation = tf.summary.scalar('Validation Accuracy', self.__accuracy)

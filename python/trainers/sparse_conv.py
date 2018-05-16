@@ -63,93 +63,34 @@ class SparseConvTrainer:
         model = SparseConv(3,10,5,10,1000)
         model.initialize()
 
+    def __get_input_feeds(self, files_list):
+        def _parse_function(example_proto):
+            keys_to_features = {
+                'space_features': tf.FixedLenFeature((self.num_max_entries, self.num_spatial_features), tf.float32),
+                'all_features': tf.FixedLenFeature((self.num_max_entries, self.num_all_features), tf.float32),
+                'neighbor_matrix': tf.FixedLenFeature((self.num_max_entries, self.num_max_neighbors), tf.int64),
+                'labels_one_hot': tf.FixedLenFeature((self.num_classes), tf.int64),
+                'num_entries': tf.FixedLenFeature(1, tf.int64)
+            }
+            parsed_features = tf.parse_single_example(example_proto, keys_to_features)
+            return parsed_features['space_features'], parsed_features['all_features'], parsed_features[
+                'neighbor_matrix'], parsed_features['labels_one_hot'], parsed_features['num_entries']
 
-    def get_tfrecords_input_feeds(self, files_list):
         with open(files_list) as f:
             content = f.readlines()
         file_paths = [x.strip() for x in content]
-        options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.GZIP)
-        reader = tf.TFRecordReader(options=options)
-        filename_queue = tf.train.string_input_producer(file_paths)
-        _, serialized_example = reader.read(filename_queue)
+        dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
+        dataset = dataset.map(_parse_function)
+        dataset = dataset.shuffle(buffer_size=1000)
+        dataset = dataset.repeat()
+        dataset = dataset.batch(self.num_batch)
+        iterator = dataset.make_one_shot_iterator()
+        inputs = iterator.get_next()
 
-        feature = {'space_features': tf.FixedLenFeature([], tf.string),
-                   'space_features_shape': tf.FixedLenFeature([], tf.string),
-                   'all_features': tf.FixedLenFeature([], tf.string),
-                   'all_features_shape': tf.FixedLenFeature([], tf.string),
-                   'neighbor_matrix': tf.FixedLenFeature([], tf.string),
-                   'neighbor_matrix_shape': tf.FixedLenFeature([], tf.string),
-                   'labels_one_hot': tf.FixedLenFeature([], tf.string),
-                   'labels_one_hot_shape': tf.FixedLenFeature([], tf.string),
-                   'num_entries': tf.FixedLenFeature([], tf.string),
-                   'num_entries_shape': tf.FixedLenFeature([], tf.string)} # Shouldn't need to store shape of num_entires
-
-        # Decode the record read by the reader
-        example = tf.parse_single_example(serialized_example, features=feature)
-        space_features = example['space_features']
-        space_features_shape = example['space_features_shape']
-        all_features = example['all_features']
-        all_features_shape = example['all_features_shape']
-        neighbor_matrix = example['neighbor_matrix']
-        neighbor_matrix_shape = example['neighbor_matrix_shape']
-        labels_one_hot = example['labels_one_hot']
-        labels_one_hot_shape = example['labels_one_hot_shape']
-        num_entries = example['num_entries']
-        num_entries_shape = example['num_entries_shape']
-
-        space_features, space_features_shape, all_features, all_features_shape , neighbor_matrix , \
-        neighbor_matrix_shape , labels_one_hot, labels_one_hot_shape, num_entries,num_entries_shape\
-            = tf.train.shuffle_batch (
-                [
-                    space_features, space_features_shape, all_features, all_features_shape , neighbor_matrix , \
-                    neighbor_matrix_shape , labels_one_hot, labels_one_hot_shape, num_entries,num_entries_shape
-                ],
-                batch_size=int(self.config['batch_size']), capacity=int(self.config['batch_size'])*10,
-                min_after_dequeue=int(self.config['batch_size'])
-            )
-
-        feeds = {
-            'space_features' : space_features,
-            'space_features_shape' : space_features_shape,
-            'all_features' : all_features,
-            'all_features_shape' : all_features_shape,
-            'neighbor_matrix' : neighbor_matrix,
-            'neighbor_matrix_shape' : neighbor_matrix_shape,
-            'labels_one_hot' : labels_one_hot,
-            'labels_one_hot_shape' : labels_one_hot_shape,
-            'num_entries' : num_entries,
-            'num_entries_shape' : num_entries_shape
-        }
-
-        return feeds
-
-    def __get_inputs(self, sess, input_feeds):
-        space_features, space_features_shape, all_features, all_features_shape, neighbor_matrix, \
-        neighbor_matrix_shape, labels_one_hot, labels_one_hot_shape, num_entries, num_entries_shape = sess.run([
-            input_feeds['space_features'],
-            input_feeds['space_features_shape'],
-            input_feeds['all_features'],
-            input_feeds['all_features_shape'],
-            input_feeds['neighbor_matrix'],
-            input_feeds['neighbor_matrix_shape'],
-            input_feeds['labels_one_hot'],
-            input_feeds['labels_one_hot_shape'],
-            input_feeds['num_entries'],
-            input_feeds['num_entries_shape']
-        ])
-
-
-        space_features = [np.frombuffer(i, dtype=np.float32).reshape(self.num_max_entries, self.num_spatial_features) for i in space_features]
-        all_features = [np.frombuffer(i, dtype=np.float32).reshape(self.num_max_entries, self.num_all_features) for i in all_features]
-        neighbor_matrix = [np.frombuffer(i, dtype=np.int32).reshape(self.num_max_entries, self.num_max_neighbors) for i in neighbor_matrix]
-        labels_one_hot = [np.frombuffer(i, dtype=np.int32).reshape(self.num_classes) for i in labels_one_hot] # Actually doesn't need to be resized but whatever
-        num_entries = [int(np.frombuffer(i, dtype=np.int32).reshape(1)) for i in num_entries]
-
-        return space_features, all_features, neighbor_matrix, labels_one_hot, num_entries
+        return inputs
 
     def train(self):
-        placeholder_space_features, placeholder_all_features, placeholder_neighbors_matrix, \
-        placeholder_labels, placeholder_num_entries = self. model.get_placeholders()
+        placeholders = self. model.get_placeholders()
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
         graph_summary = self.model.get_summary()
@@ -157,19 +98,18 @@ class SparseConvTrainer:
         graph_accuracy = self.model.get_accuracy()
         graph_logits, graph_prediction = self.model.get_compute_graphs()
 
-
         if self.from_scratch:
             self.clean_summary_dir()
 
-        input_feeds = self.get_tfrecords_input_feeds(self.training_files)
-        input_feeds_validation = self.get_tfrecords_input_feeds(self.validation_files)
+        inputs_feed = self.__get_input_feeds(self.training_files)
+        inputs_validation_feed = self.__get_input_feeds(self.validation_files)
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
         with tf.Session() as sess:
             sess.run(init)
 
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+            # coord = tf.train.Coordinator()
+            # threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
             summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
 
@@ -181,32 +121,30 @@ class SparseConvTrainer:
             else:
                 iteration_number = 0
 
-
             print("Starting iterations")
             while iteration_number < self.train_for_iterations:
-                inputs = self.__get_inputs(sess, input_feeds)
-                inputs_validation = self.__get_inputs(sess, input_feeds)
-
-                input_dict = {
-                    placeholder_space_features: inputs[0],
-                    placeholder_all_features: inputs[1],
-                    placeholder_neighbors_matrix: inputs[2],
-                    placeholder_labels: inputs[3],
-                    placeholder_num_entries: inputs[4]
-                }
-
-                inputs_validation_dict = {
-                    placeholder_space_features: inputs_validation[0],
-                    placeholder_all_features: inputs_validation[1],
-                    placeholder_neighbors_matrix: inputs_validation[2],
-                    placeholder_labels: inputs_validation[3],
-                    placeholder_num_entries: inputs_validation[4]
+                inputs_train = sess.run(list(inputs_feed))
+                inputs_train_dict = {
+                    placeholders[0]: inputs_train[0],
+                    placeholders[1]: inputs_train[1],
+                    placeholders[2]: inputs_train[2],
+                    placeholders[3]: inputs_train[3],
+                    placeholders[4]: inputs_train[4]
                 }
 
                 eval_loss, _, eval_summary, eval_accuracy, test_logits = sess.run([graph_loss, graph_optmiser, graph_summary,
-                                                                      graph_accuracy, graph_prediction], feed_dict=input_dict)
+                                                                      graph_accuracy, graph_prediction], feed_dict=inputs_train_dict)
 
                 if iteration_number % self.validate_after == 0:
+                    inputs_validation = sess.run(list(inputs_validation_feed))
+                    inputs_validation_dict = {
+                        placeholders[0]: inputs_validation[0],
+                        placeholders[1]: inputs_validation[1],
+                        placeholders[2]: inputs_validation[2],
+                        placeholders[3]: inputs_validation[3],
+                        placeholders[4]: inputs_validation[4]
+                    }
+
                     eval_loss_validation, eval_summary_validation, eval_accuracy_validation = sess.run([graph_loss, graph_summary_validation, graph_accuracy], feed_dict=inputs_validation_dict)
                     summary_writer.add_summary(eval_summary_validation, iteration_number)
                     print("Validation - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss_validation, eval_accuracy_validation))
@@ -220,10 +158,9 @@ class SparseConvTrainer:
                     with open(self.model_path + '.txt', 'w') as f:
                         f.write(str(iteration_number))
 
-
-            # Stop the threads
-            coord.request_stop()
-
-            # Wait for threads to stop
-            coord.join(threads)
+            # # Stop the threads
+            # coord.request_stop()
+            #
+            # # Wait for threads to stop
+            # coord.join(threads)
 
