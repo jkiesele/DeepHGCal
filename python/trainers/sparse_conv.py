@@ -124,6 +124,7 @@ class SparseConvTrainer:
             print("Starting iterations")
             while iteration_number < self.train_for_iterations:
                 inputs_train = sess.run(list(inputs_feed))
+
                 inputs_train_dict = {
                     placeholders[0]: inputs_train[0],
                     placeholders[1]: inputs_train[1],
