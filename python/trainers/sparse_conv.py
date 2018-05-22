@@ -1,5 +1,5 @@
 import tensorflow as tf
-from models.sparse_conv import SparseConv
+from models.sparse_conv_2 import SparseConv2
 import numpy as np
 import os
 import configparser as cp
@@ -31,7 +31,7 @@ class SparseConvTrainer:
         self.validation_files = self.config['validation_files_list']
         self.validate_after = int(self.config['validate_after'])
 
-        self.model = SparseConv(
+        self.model = SparseConv2(
             self.num_spatial_features,
             self.num_all_features,
             self.num_max_neighbors,
@@ -44,11 +44,6 @@ class SparseConvTrainer:
         self.model.initialize()
         self.saver_all = tf.train.Saver() # TODO: Might want to move variables etc to a scope or something?
 
-
-
-    def _bytes_feature(value):
-        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
     def clean_summary_dir(self):
         print("Cleaning summary dir")
         for the_file in os.listdir(self.summary_path):
@@ -58,10 +53,6 @@ class SparseConvTrainer:
                     os.unlink(file_path)
             except Exception as e:
                 print(e)
-
-    def test(self):
-        model = SparseConv(3,10,5,10,1000)
-        model.initialize()
 
     def __get_input_feeds(self, files_list):
         def _parse_function(example_proto):
@@ -81,7 +72,7 @@ class SparseConvTrainer:
         file_paths = [x.strip() for x in content]
         dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
         dataset = dataset.map(_parse_function)
-        dataset = dataset.shuffle(buffer_size=1000)
+        dataset = dataset.shuffle(buffer_size=self.num_batch)
         dataset = dataset.repeat()
         dataset = dataset.batch(self.num_batch)
         iterator = dataset.make_one_shot_iterator()
@@ -97,6 +88,7 @@ class SparseConvTrainer:
         graph_summary_validation = self.model.get_summary_validation()
         graph_accuracy = self.model.get_accuracy()
         graph_logits, graph_prediction = self.model.get_compute_graphs()
+        graph_temp = self.model.get_temp()
 
         if self.from_scratch:
             self.clean_summary_dir()
@@ -108,8 +100,8 @@ class SparseConvTrainer:
         with tf.Session() as sess:
             sess.run(init)
 
-            # coord = tf.train.Coordinator()
-            # threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
             summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
 
@@ -133,7 +125,7 @@ class SparseConvTrainer:
                     placeholders[4]: inputs_train[4]
                 }
 
-                eval_loss, _, eval_summary, eval_accuracy, test_logits = sess.run([graph_loss, graph_optmiser, graph_summary,
+                t, eval_loss, _, eval_summary, eval_accuracy, test_logits = sess.run([graph_temp, graph_loss, graph_optmiser, graph_summary,
                                                                       graph_accuracy, graph_prediction], feed_dict=inputs_train_dict)
 
                 if iteration_number % self.validate_after == 0:
@@ -151,6 +143,8 @@ class SparseConvTrainer:
                     print("Validation - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss_validation, eval_accuracy_validation))
 
                 print("Training   - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss, eval_accuracy))
+                # print(t[0])
+                print(inputs_train[3][0])
                 iteration_number += 1
                 summary_writer.add_summary(eval_summary, iteration_number)
                 if iteration_number % self.save_after_iterations == 0:
@@ -159,9 +153,9 @@ class SparseConvTrainer:
                     with open(self.model_path + '.txt', 'w') as f:
                         f.write(str(iteration_number))
 
-            # # Stop the threads
-            # coord.request_stop()
-            #
-            # # Wait for threads to stop
-            # coord.join(threads)
+            # Stop the threads
+            coord.request_stop()
+
+            # Wait for threads to stop
+            coord.join(threads)
 
