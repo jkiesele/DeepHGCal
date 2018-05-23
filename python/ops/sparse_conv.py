@@ -61,7 +61,8 @@ def sparse_conv_bare(space_features, all_features, neighbor_matrix, output_all=1
     return tf.layers.dense(gathered_all, units=output_all, activation=tf.nn.relu), space_features
 
 
-def sparse_conv_2(space_features, all_features, indexing_tensor, output_all=15, weight_init_width=1e-4):
+def sparse_conv_2(space_features, all_features, indexing_tensor, output_all=15, weight_init_width=1e-4,
+                  merge_space_and_colour=False):
     """
     Defines sparse convolution layer
 
@@ -96,12 +97,16 @@ def sparse_conv_2(space_features, all_features, indexing_tensor, output_all=15, 
 
     gathered_space_1 = tf.gather_nd(space_features, indexing_tensor) # [B,E,5,S]
     delta_space = sparse_conv_delta(gathered_space_1, space_features) # [B,E,5,S]
+    
 
     weighting_factor_for_all_features = tf.reshape(delta_space, [n_batch, n_max_entries, -1])
     # this is a small correction
     weighting_factor_for_all_features = tf.layers.dense(inputs=weighting_factor_for_all_features, units=n_max_neighbors, 
-                                                        activation=tf.nn.relu) # [B,E,N]
-    # weighting_factor_for_all_features = tf.clip_by_value(weighting_factor_for_all_features, 0, 1e4)
+                                                        activation=tf.nn.leaky_relu,
+                                                        kernel_initializer=tf.random_normal_initializer(mean=weight_init_width, stddev=weight_init_width),
+                                                        bias_initializer=tf.random_normal_initializer(mean=weight_init_width, stddev=weight_init_width)) # [B,E,N]
+    
+    weighting_factor_for_all_features = tf.clip_by_value(weighting_factor_for_all_features, 0, 1e5)
     weighting_factor_for_all_features = 1 + tf.expand_dims(weighting_factor_for_all_features, axis=3)  # [B,E,N] - N = neighbors
 
     
@@ -112,15 +117,21 @@ def sparse_conv_2(space_features, all_features, indexing_tensor, output_all=15, 
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu,)
 
     weighting_factor_for_spatial_features = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), n_max_neighbors, 
-                                                            activation=tf.nn.relu, 
-                                                        kernel_initializer=tf.random_normal_initializer(mean=0., stddev=weight_init_width),
-                                                        bias_initializer=tf.random_normal_initializer(mean=0., stddev=weight_init_width))
-    # weighting_factor_for_spatial_features = tf.clip_by_value(weighting_factor_for_all_features, 0, 1e4)
+                                                            activation=tf.nn.leaky_relu, 
+                                                        kernel_initializer=tf.random_normal_initializer(mean=weight_init_width, stddev=weight_init_width),
+                                                        bias_initializer=tf.random_normal_initializer(mean=weight_init_width, stddev=weight_init_width))
+    
+    weighting_factor_for_spatial_features = tf.clip_by_value(weighting_factor_for_spatial_features, 0, 1e5)
     weighting_factor_for_spatial_features = 1 + tf.expand_dims(weighting_factor_for_spatial_features, axis=3)
 
     spatial_output = space_features + tf.reduce_mean(delta_space * weighting_factor_for_spatial_features, axis=2)
 
-    return output, spatial_output
+
+    if merge_space_and_colour:
+        output=tf.concat([output, spatial_output], axis=-1)
+        return tf.layers.dense(output, output_all, activation=tf.nn.relu)
+    else:
+        return output, spatial_output
 
 
 def sparse_max_pool(pooling_features, num_entries_result, graphs):
