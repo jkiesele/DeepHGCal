@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-def euclidean_two_batches(A, B):
+def euclidean_squared(A, B):
     """
     Returns euclidean distance between two batches of shape [B,N,F] and [B,M,F] where B is batch size, N is number of
     examples in the batch of first set, M is number of examples in the batch of second set, F is number of spatial
@@ -43,7 +43,7 @@ def nearest_neighbor_matrix(spatial_features, k=10):
     assert spatial_features.dtype == tf.float32 or spatial_features.dtype == tf.float64
     assert len(shape) == 3
 
-    D = euclidean_two_batches(spatial_features, spatial_features)
+    D = euclidean_squared(spatial_features, spatial_features)
     _, N = tf.nn.top_k(-D, k)
     return N
 
@@ -63,9 +63,9 @@ def indexing_tensor(spatial_features, k=10):
 
     neighbor_matrix = nearest_neighbor_matrix(spatial_features, k)
 
-    batch_range_vector = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1),axis=1), axis=1)
-    batch_range_vector = tf.tile(batch_range_vector, [1,n_max_entries,k,1])
+    batch_range = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1),axis=1), axis=1)
+    batch_range = tf.tile(batch_range, [1,n_max_entries,k,1])
     expanded_neighbor_matrix = tf.expand_dims(neighbor_matrix, axis=3)
-    _indexing_tensor = tf.concat([batch_range_vector, expanded_neighbor_matrix], axis=3)
+    _indexing_tensor = tf.concat([batch_range, expanded_neighbor_matrix], axis=3)
 
     return tf.cast(_indexing_tensor, tf.int64)

@@ -134,9 +134,8 @@ def sparse_max_pool(pooling_features, num_entries_result, graphs):
     # Neighbor matrix should be int as it should be used for indexing
     assert pooling_features.dtype == tf.float64 or pooling_features.dtype == tf.float32
 
-    _, I = tf.nn.top_k(tf.reduce_sum(pooling_features, axis=2), num_entries_result)
+    _, I = tf.nn.top_k(tf.reduce_sum(tf.abs(pooling_features), axis=2), num_entries_result)
     I = tf.expand_dims(I, axis=2)
-
 
     batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1), axis=1)
     batch_range = tf.tile(batch_range, [1,num_entries_result, 1])
