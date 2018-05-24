@@ -17,6 +17,7 @@ class SparseConvTrainer:
         self.from_scratch = int(self.config['from_scratch'])==1
         self.model_path = self.config['model_path']
         self.summary_path = self.config['summary_path']
+        self.test_out_path = self.config['test_out_path']
         self.train_for_iterations = int(self.config['train_for_iterations'])
         self.save_after_iterations = int(self.config['save_after_iterations'])
 
@@ -29,6 +30,7 @@ class SparseConvTrainer:
         self.learning_rate = float(self.config['learning_rate'])
         self.training_files = self.config['training_files_list']
         self.validation_files = self.config['validation_files_list']
+        self.test_files = self.config['test_files_list']
         self.validate_after = int(self.config['validate_after'])
 
         self.model = SparseConv2(
@@ -54,7 +56,7 @@ class SparseConvTrainer:
             except Exception as e:
                 print(e)
 
-    def __get_input_feeds(self, files_list):
+    def __get_input_feeds(self, files_list, repeat=True):
         def _parse_function(example_proto):
             keys_to_features = {
                 'space_features': tf.FixedLenFeature((self.num_max_entries, self.num_spatial_features), tf.float32),
@@ -73,7 +75,7 @@ class SparseConvTrainer:
         dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
         dataset = dataset.map(_parse_function)
         dataset = dataset.shuffle(buffer_size=self.num_batch)
-        dataset = dataset.repeat()
+        dataset = dataset.repeat(None if repeat else 1)
         dataset = dataset.batch(self.num_batch)
         iterator = dataset.make_one_shot_iterator()
         inputs = iterator.get_next()
@@ -159,3 +161,76 @@ class SparseConvTrainer:
             # Wait for threads to stop
             coord.join(threads)
 
+    def test(self):
+        placeholders = self.model.get_placeholders()
+        graph_loss = self.model.get_losses()
+        graph_optmiser = self.model.get_optimizer()
+        graph_summary = self.model.get_summary()
+        graph_summary_validation = self.model.get_summary_validation()
+        graph_confusion_matrix = self.model.get_confusion_matrix()
+        graph_accuracy = self.model.get_accuracy()
+        graph_logits, graph_prediction = self.model.get_compute_graphs()
+        graph_temp = self.model.get_temp()
+
+        if self.from_scratch:
+            self.clean_summary_dir()
+
+        inputs_feed = self.__get_input_feeds(self.test_files, repeat=False)
+
+        accuracy_sum = 0
+        num_examples = 0
+
+        confusion_matrix = np.zeros((self.num_classes, self.num_classes), dtype=np.float32)
+
+        init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
+        with tf.Session() as sess:
+            sess.run(init)
+
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+            self.saver_all.restore(sess, self.model_path)
+            print("\n\nINFO: Loading model\n\n")
+            iteration_number = 0
+
+            print("Starting iterations")
+            while iteration_number < self.train_for_iterations:
+                try:
+                    inputs = sess.run(inputs_feed)
+                except tf.errors.OutOfRangeError:
+                    break
+
+                inputs_train_dict = {
+                    placeholders[0]: inputs[0],
+                    placeholders[1]: inputs[1],
+                    placeholders[2]: inputs[2],
+                    placeholders[3]: inputs[3],
+                    placeholders[4]: inputs[4]
+                }
+
+                t, eval_loss, eval_accuracy, eval_confusion, test_logits = sess.run(
+                    [graph_temp, graph_loss, graph_accuracy, graph_confusion_matrix, graph_prediction],
+                    feed_dict=inputs_train_dict)
+
+                confusion_matrix += eval_confusion
+                accuracy_sum += eval_accuracy * self.num_batch
+                num_examples += self.num_batch
+
+                print("Test - Batch %4d: loss %0.5f accuracy %03.3f accuracy (cumm) %03.3f" % (
+                iteration_number, eval_loss, eval_accuracy, accuracy_sum / num_examples))
+                iteration_number += 1
+
+            # Stop the threads
+            coord.request_stop()
+
+            # Wait for threads to stop
+            coord.join(threads)
+
+        print("Evaluation complete")
+        print("Evaluation accuracy ", accuracy_sum / num_examples)
+        print("Confusion matrix:")
+        print(confusion_matrix)
+        confusion_path = os.path.join(self.test_out_path, 'confusion_matrix.np')
+        print("Confusion matrix written to ", confusion_path)
+        with open(confusion_path, 'wb') as f:
+            confusion_matrix.tofile(f)

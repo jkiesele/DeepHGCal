@@ -49,6 +49,9 @@ class SparseConv(Model):
     def get_accuracy(self):
         return self.__accuracy
 
+    def get_confusion_matrix(self):
+        return self.__confusion_matrix
+
     def get_temp(self):
         return self.__graph_temp
 
@@ -112,7 +115,10 @@ class SparseConv(Model):
 
         self.__graph_prediction = tf.argmax(self.__graph_logits, axis=1)
 
-        self.__accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(self._placeholder_labels, axis=1), self.__graph_prediction), tf.float32)) * 100
+        argmax_labels = tf.argmax(self._placeholder_labels, axis=1)
+
+        self.__accuracy = tf.reduce_mean(tf.cast(tf.equal(argmax_labels, self.__graph_prediction), tf.float32)) * 100
+        self.__confusion_matrix = tf.confusion_matrix(labels=argmax_labels, predictions=self.__graph_prediction, num_classes=self.num_classes)
         self.__graph_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.__graph_logits, labels=self._placeholder_labels))
 
         self.__graph_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.__graph_loss)
