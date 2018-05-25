@@ -1,18 +1,19 @@
-from .sparse_conv import SparseConv
-from ..ops.sparse_conv import *
 import tensorflow as tf
+from models.sparse_conv import SparseConv
+from ops.sparse_conv import *
 
 
 class SparseConv2(SparseConv):
 
-    def __init__(self, n_space, n_all, n_max_neighbors, batch_size, max_entries, num_classes, learning_rate=0.0001):
-        super(SparseConv2, self).__init__(n_space, n_all, n_max_neighbors, batch_size, max_entries, num_classes,
-                                         learning_rate)
+    def __init__(self, n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries, num_classes,
+                 learning_rate=0.0001):
+        super(SparseConv2, self).__init__(n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries,
+                                          num_classes, learning_rate)
 
     def _find_logits(self):
         _input = construct_sparse_io_dict(tf.scalar_mul(0.001, self._placeholder_all_features),
                                           self._placeholder_space_features, self._placeholder_space_features_local,
-                                          self._placeholder_num_entries)
+                                          tf.squeeze(self._placeholder_num_entries))
 
         net = sparse_conv(_input, num_neighbors=10, output_all=15)
         net = sparse_conv(net, num_neighbors=10, output_all=30)

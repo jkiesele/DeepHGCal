@@ -1,5 +1,5 @@
 import tensorflow as tf
-from models.sparse_conv import SparseConv2
+from models.sparse_conv_2 import SparseConv2
 import numpy as np
 import os
 import configparser as cp
