@@ -1,5 +1,5 @@
 import tensorflow as tf
-from models.sparse_conv import SparseConv
+from models.sparse_conv import SparseConv2
 import numpy as np
 import os
 import configparser as cp
@@ -34,7 +34,7 @@ class SparseConvTrainer:
         self.test_files = self.config['test_files_list']
         self.validate_after = int(self.config['validate_after'])
 
-        self.model = SparseConv(
+        self.model = SparseConv2(
             self.num_spatial_features,
             self.num_spatial_features_local,
             self.num_all_features,
