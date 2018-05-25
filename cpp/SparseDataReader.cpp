@@ -60,17 +60,20 @@ p::tuple SparseDataReader::execute() {
 
     vector<vector<float>> _dataAllFeatures;
     vector<vector<float>> _dataSpatialFeatures;
-    vector<vector<int64_t >> _dataNeighborMatrix;
+    vector<vector<float>> _dataSpatialLocalFeatures;
     vector<vector<int64_t >> _dataLabelsOneHot;
     vector<int64_t> _dataNumEntries;
 
-    for(size_t i = 0; i < numEvents; i++) {
-        tree->LoadTree(i);
-        tree->GetEntry(i);
+    size_t numEventsInserted = 0;
+    for(; numEventsInserted < numEvents; numEventsInserted++) {
+        tree->LoadTree(numEventsInserted);
+        tree->GetEntry(numEventsInserted);
 
         assert(root_rechit_z->size() == root_rechit_y->size() and
                root_rechit_z->size() == root_rechit_x->size() and
-               root_rechit_z->size() == root_rechit_energy->size());
+               root_rechit_z->size() == root_rechit_energy->size() and
+               root_rechit_z->size() == root_rechit_vxy->size() and
+               root_rechit_z->size() == root_rechit_vz->size());
 
         size_t n = min(root_rechit_x->size(), maxEntries);
 
@@ -80,29 +83,29 @@ p::tuple SparseDataReader::execute() {
         vector<float> rechit_y(root_rechit_y->begin(), root_rechit_y->begin() + n);
         vector<float> rechit_z(root_rechit_z->begin(), root_rechit_z->begin() + n);
         vector<float> rechit_energy(root_rechit_energy->begin(), root_rechit_energy->begin() + n);
+        vector<float> rechit_vxy(root_rechit_vxy->begin(), root_rechit_vxy->begin() + n);
+        vector<float> rechit_vz(root_rechit_vz->begin(), root_rechit_vz->begin() + n);
 
         vector<float> dataAllFeatures(maxEntries * 4);
         vector<float> dataSpatialFeatures(maxEntries * 3);
+        vector<float> dataSpatialLocalFeatures(maxEntries * 2);
         vector<int64_t > dataNeighborMatrix(maxEntries * 10);
         vector<int64_t > dataLabelsOneHot(6);
 
-        vector<vector<size_t>> neighborMatrix = findNeighborMatrix(rechit_x, rechit_y, rechit_z);
+        for(size_t j = 0; j < n ;j++) {
+            dataAllFeatures[j*4 + 0] = rechit_x[j];
+            dataAllFeatures[j*4 + 1] = rechit_y[j];
+            dataAllFeatures[j*4 + 2] = rechit_z[j];
+            dataAllFeatures[j*4 + 3] = rechit_energy[j];
 
-//        for(size_t j = 0; j < n ;j++) {
-//            dataAllFeatures[j*4 + 0] = rechit_x[j];
-//            dataAllFeatures[j*4 + 1] = rechit_y[j];
-//            dataAllFeatures[j*4 + 2] = rechit_z[j];
-//            dataAllFeatures[j*4 + 3] = rechit_energy[j];
-//
-//            dataSpatialFeatures[j*3 + 0] = rechit_x[j];
-//            dataSpatialFeatures[j*3 + 1] = rechit_y[j];
-//            dataSpatialFeatures[j*3 + 2] = rechit_z[j];
-//
-//
-//            for (int k = 0; k < maxNeighbors; k++) {
-//                dataNeighborMatrix[j*maxNeighbors + k] = neighborMatrix[j][k];
-//            }
-//        }
+            dataSpatialFeatures[j*3 + 0] = rechit_x[j];
+            dataSpatialFeatures[j*3 + 1] = rechit_y[j];
+            dataSpatialFeatures[j*3 + 2] = rechit_z[j];
+
+            dataSpatialLocalFeatures[j*2 + 0] = rechit_vxy[j];
+            dataSpatialLocalFeatures[j*2 + 1] = rechit_vz[j];
+        }
+
         dataLabelsOneHot[0] = (int64_t) (root_isElectron);
         dataLabelsOneHot[1] = (int64_t) (root_isMuon);
         dataLabelsOneHot[2] = (int64_t) (root_isPionCharged);
@@ -115,44 +118,39 @@ p::tuple SparseDataReader::execute() {
         _dataNumEntries.push_back(n);
         _dataAllFeatures.push_back(dataAllFeatures);
         _dataSpatialFeatures.push_back(dataSpatialFeatures);
-        _dataNeighborMatrix.push_back(dataNeighborMatrix);
+        _dataSpatialLocalFeatures.push_back(dataSpatialLocalFeatures);
         _dataLabelsOneHot.push_back(dataLabelsOneHot);
 
-        cout<<"Event "<<i<<endl;
+        cout<<"Event "<<numEventsInserted<<endl;
     }
-
-    size_t numEventsInserted = numEvents; // If later, we need to skip
 
     np::ndarray return_all = np::zeros(p::make_tuple(numEventsInserted,maxEntries, 4), np::dtype::get_builtin<float>());
     np::ndarray return_spatial = np::zeros(p::make_tuple(numEventsInserted,maxEntries, 3), np::dtype::get_builtin<float>());
-    np::ndarray return_neighbor_matrix = np::zeros(p::make_tuple(numEventsInserted,maxEntries, 10), np::dtype::get_builtin<int64_t>());
+    np::ndarray return_spatial_local = np::zeros(p::make_tuple(numEventsInserted,maxEntries, 2), np::dtype::get_builtin<float>());
     np::ndarray return_labels_one_hot = np::zeros(p::make_tuple(numEventsInserted, 6), np::dtype::get_builtin<int64_t>());
     np::ndarray return_num_entries = np::zeros(p::make_tuple(numEventsInserted, 1), np::dtype::get_builtin<int64_t>());
 
+    float* __dataAllFeatures = reinterpret_cast<float*>(return_all.get_data());
+    float* __dataSpatialFeatures = reinterpret_cast<float *>(return_spatial.get_data());
+    float* __dataSpatialLocalFeatures = reinterpret_cast<float *>(return_spatial_local.get_data());
+    int64_t * __dataLabelsOneHot = reinterpret_cast<int64_t*>(return_labels_one_hot.get_data());
+    int64_t * __dataNumEntries = reinterpret_cast<int64_t*>(return_num_entries.get_data());
 
-//    float* __dataAllFeatures = reinterpret_cast<float*>(return_all.get_data());
-//    float* __dataSpatialFeatures = reinterpret_cast<float *>(return_spatial.get_data());
-//    int64_t * __dataNeighborMatrix = reinterpret_cast<int64_t*>(return_neighbor_matrix.get_data());
-//    int64_t * __dataLabelsOneHot = reinterpret_cast<int64_t*>(return_labels_one_hot.get_data());
-//    int64_t * __dataNumEntries = reinterpret_cast<int64_t*>(return_num_entries.get_data());
-//
-//
-//    for (size_t i = 0; i < numEventsInserted; i++) {
-//        float* offsetAll = __dataAllFeatures + maxEntries * 4 * i;
-//        float* offsetSpatial = __dataSpatialFeatures + maxEntries * 3 * i;
-//        int64_t* offsetNeighborMatrix = __dataNeighborMatrix + maxEntries * 10 * i;
-//        int64_t* offsetLabelsOneHot = __dataLabelsOneHot + 6 * i;
-//
-//        std::copy(_dataAllFeatures[i].begin(), _dataAllFeatures[i].end(), offsetAll);
-//        std::copy(_dataSpatialFeatures[i].begin(), _dataSpatialFeatures[i].end(), offsetSpatial);
-//        std::copy(_dataNeighborMatrix[i].begin(), _dataNeighborMatrix[i].end(), offsetNeighborMatrix);
-//        std::copy(_dataLabelsOneHot[i].begin(), _dataLabelsOneHot[i].end(), offsetLabelsOneHot);
-//        __dataNumEntries[i] = _dataNumEntries[i];
-//    }
+    for (size_t i = 0; i < numEventsInserted; i++) {
+        float* offsetAll = __dataAllFeatures + maxEntries * 4 * i;
+        float* offsetSpatial = __dataSpatialFeatures + maxEntries * 3 * i;
+        float* offsetSpatialLocal = __dataSpatialLocalFeatures + maxEntries * 2 * i;
+        int64_t* offsetLabelsOneHot = __dataLabelsOneHot + 6 * i;
 
-    return p::make_tuple(return_all, return_spatial, return_neighbor_matrix, return_labels_one_hot, return_num_entries);
+        std::copy(_dataAllFeatures[i].begin(), _dataAllFeatures[i].end(), offsetAll);
+        std::copy(_dataSpatialFeatures[i].begin(), _dataSpatialFeatures[i].end(), offsetSpatial);
+        std::copy(_dataSpatialLocalFeatures[i].begin(), _dataSpatialLocalFeatures[i].end(), offsetSpatialLocal);
+        std::copy(_dataLabelsOneHot[i].begin(), _dataLabelsOneHot[i].end(), offsetLabelsOneHot);
+        __dataNumEntries[i] = _dataNumEntries[i];
+    }
+
+    return p::make_tuple(return_all, return_spatial, return_spatial_local, return_labels_one_hot, return_num_entries);
 }
-
 
 void SparseDataReader::open() {
     TFile * f=new TFile(inputFile.c_str(),"READ");
@@ -173,7 +171,10 @@ void SparseDataReader::open() {
     }
 
     root_rechit_x = root_rechit_y = root_rechit_z = 0;
+    root_rechit_layer = 0;
     root_rechit_energy = 0;
+    root_rechit_vxy = 0;
+    root_rechit_vz = 0;
     root_isElectron = root_isMuon = root_isPionCharged = root_isPionNeutral = root_isK0Long = root_isK0Short = 0;
 
     tree->SetBranchStatus("*",0);
@@ -188,6 +189,10 @@ void SparseDataReader::open() {
     tree->SetBranchStatus("rechit_x", 1);
     tree->SetBranchStatus("rechit_y", 1);
     tree->SetBranchStatus("rechit_z", 1);
+    tree->SetBranchStatus("rechit_layer", 1);
+
+    tree->SetBranchStatus("rechit_vxy", 1);
+    tree->SetBranchStatus("rechit_vz", 1);
 
     tree->SetBranchAddress("isElectron", &root_isElectron);
     tree->SetBranchAddress("isMuon", &root_isMuon);
@@ -200,5 +205,8 @@ void SparseDataReader::open() {
     tree->SetBranchAddress("rechit_x", &root_rechit_x);
     tree->SetBranchAddress("rechit_y", &root_rechit_y);
     tree->SetBranchAddress("rechit_z", &root_rechit_z);
+    tree->SetBranchAddress("rechit_vxy", &root_rechit_vxy);
+    tree->SetBranchAddress("rechit_vz", &root_rechit_vz);
+    tree->SetBranchAddress("rechit_layer", &root_rechit_layer);
 
 }

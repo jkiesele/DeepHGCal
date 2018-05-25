@@ -43,6 +43,10 @@ private:
     std::vector<float>* root_rechit_x;
     std::vector<float>* root_rechit_y;
     std::vector<float>* root_rechit_z;
+    std::vector<float>* root_rechit_layer;
+
+    std::vector<float>* root_rechit_vxy;
+    std::vector<float>* root_rechit_vz;
     TBranch *b_temp;
 
     template <typename T>

@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(DeepHGCal2)
 
-
 set(CMAKE_CXX_STANDARD 11)
 list(APPEND CMAKE_PREFIX_PATH $ENV{ROOTSYS})
 MESSAGE(STATUS "ROOTSYS $ENV{ROOTSYS}")
@@ -14,8 +13,6 @@ include_directories(${PYTHON_INCLUDE_DIRS})
 
 find_package(Boost 1.63.0 COMPONENTS system python numpy)
 include_directories(${Boost_INCLUDE_DIRS})
-
-
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
