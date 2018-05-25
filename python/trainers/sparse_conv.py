@@ -1,5 +1,5 @@
 import tensorflow as tf
-from models.sparse_conv_2 import SparseConv2
+from models.sparse_conv import SparseConv
 import numpy as np
 import os
 import configparser as cp
@@ -23,6 +23,7 @@ class SparseConvTrainer:
 
         self.num_batch = int(self.config['batch_size'])
         self.num_spatial_features = int(self.config['input_spatial_features'])
+        self.num_spatial_features_local = int(self.config['input_spatial_features_local'])
         self.num_all_features = int(self.config['input_all_features'])
         self.num_max_entries = int(self.config['max_entries'])
         self.num_classes = int(self.config['num_classes'])
@@ -33,8 +34,9 @@ class SparseConvTrainer:
         self.test_files = self.config['test_files_list']
         self.validate_after = int(self.config['validate_after'])
 
-        self.model = SparseConv2(
+        self.model = SparseConv(
             self.num_spatial_features,
+            self.num_spatial_features_local,
             self.num_all_features,
             self.num_max_neighbors,
             self.num_batch,
@@ -59,15 +61,16 @@ class SparseConvTrainer:
     def __get_input_feeds(self, files_list, repeat=True):
         def _parse_function(example_proto):
             keys_to_features = {
-                'space_features': tf.FixedLenFeature((self.num_max_entries, self.num_spatial_features), tf.float32),
+                'spatial_features': tf.FixedLenFeature((self.num_max_entries, self.num_spatial_features), tf.float32),
+                'spatial_local_features': tf.FixedLenFeature((self.num_max_entries, self.num_spatial_features_local),
+                                                             tf.float32),
                 'all_features': tf.FixedLenFeature((self.num_max_entries, self.num_all_features), tf.float32),
-                'neighbor_matrix': tf.FixedLenFeature((self.num_max_entries, self.num_max_neighbors), tf.int64),
-                'labels_one_hot': tf.FixedLenFeature((self.num_classes), tf.int64),
+                'labels_one_hot': tf.FixedLenFeature((self.num_classes,), tf.int64),
                 'num_entries': tf.FixedLenFeature(1, tf.int64)
             }
             parsed_features = tf.parse_single_example(example_proto, keys_to_features)
-            return parsed_features['space_features'], parsed_features['all_features'], parsed_features[
-                'neighbor_matrix'], parsed_features['labels_one_hot'], parsed_features['num_entries']
+            return parsed_features['spatial_features'], parsed_features['spatial_local_features'], parsed_features[
+                'all_features'], parsed_features['labels_one_hot'], parsed_features['num_entries']
 
         with open(files_list) as f:
             content = f.readlines()
