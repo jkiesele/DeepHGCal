@@ -57,15 +57,16 @@ def worker():
 
         jobs_queue.task_done()
 
+jobs_queue = Queue()
+jobs = int(args.jobs)
+for i in range(jobs):
+    t = Thread(target=worker)
+    t.daemon = True
+    t.start()
+
 
 def run_conversion_multi_threaded(input_file):
     global jobs_queue, max_gpu_events
-    jobs_queue = Queue()
-    jobs = int(args.jobs)
-    for i in range(jobs):
-        t = Thread(target=worker)
-        t.daemon = True
-        t.start()
 
     just_file_name = os.path.splitext(os.path.split(input_file)[1])[0] + '_'
     all_features, spatial, spatial_local, labels_one_hot, num_entries = sparse_hgcal.read_sparse_data(input_file, 3000)

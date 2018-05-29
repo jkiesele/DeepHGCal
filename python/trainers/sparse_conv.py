@@ -46,7 +46,7 @@ class SparseConvTrainer:
         )
 
         self.model.initialize()
-        self.saver_all = tf.train.Saver() # TODO: Might want to move variables etc to a scope or something?
+        self.saver_sparse = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.model.get_variable_scope()))
 
     def clean_summary_dir(self):
         print("Cleaning summary dir")
@@ -111,7 +111,7 @@ class SparseConvTrainer:
             summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
 
             if not self.from_scratch:
-                self.saver_all.restore(sess, self.model_path)
+                self.saver_sparse.restore(sess, self.model_path)
                 print("\n\nINFO: Loading model\n\n")
                 with open(self.model_path + '.txt', 'r') as f:
                     iteration_number = int(f.read())
@@ -148,13 +148,13 @@ class SparseConvTrainer:
                     print("Validation - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss_validation, eval_accuracy_validation))
 
                 print("Training   - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss, eval_accuracy))
-                # print(t[0])
-                print(inputs_train[3][0])
+                print(t[0])
+                # print(inputs_train[3][0])
                 iteration_number += 1
                 summary_writer.add_summary(eval_summary, iteration_number)
                 if iteration_number % self.save_after_iterations == 0:
                     print("\n\nINFO: Saving model\n\n")
-                    self.saver_all.save(sess, self.model_path)
+                    self.saver_sparse.save(sess, self.model_path)
                     with open(self.model_path + '.txt', 'w') as f:
                         f.write(str(iteration_number))
 
@@ -192,7 +192,7 @@ class SparseConvTrainer:
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-            self.saver_all.restore(sess, self.model_path)
+            self.saver_sparse.restore(sess, self.model_path)
             print("\n\nINFO: Loading model\n\n")
             iteration_number = 0
 

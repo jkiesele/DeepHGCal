@@ -25,13 +25,18 @@ class SparseConv2(SparseConv):
         flattened_features = sparse_merge_flat(net, combine_three=True)
 
         fc_1 = tf.layers.dense(flattened_features, units=100, activation=tf.nn.relu,
-                               kernel_initializer=tf.random_normal_initializer(mean=0., stddev=self.weight_init_width),
-                               bias_initializer=tf.random_normal_initializer(mean=0., stddev=self.weight_init_width))
+                               kernel_initializer=tf.random_normal_initializer(mean=0., stddev=1),
+                               bias_initializer=tf.zeros_initializer())
         fc_2 = tf.layers.dense(fc_1, units=30, activation=tf.nn.relu,
                                kernel_initializer=tf.random_normal_initializer(mean=0., stddev=self.weight_init_width),
-                               bias_initializer=tf.random_normal_initializer(mean=0., stddev=self.weight_init_width))
+                               bias_initializer=tf.zeros_initializer())
         fc_3 = tf.layers.dense(fc_2, units=self.num_classes, activation=None,
                                kernel_initializer=tf.random_normal_initializer(mean=0., stddev=self.weight_init_width),
-                               bias_initializer=tf.random_normal_initializer(mean=0., stddev=self.weight_init_width))
+                               bias_initializer=tf.zeros_initializer())
+
+        self._graph_temp = flattened_features
 
         return fc_3
+
+    def get_variable_scope(self):
+        return 'sparse_conv_v2'

@@ -23,3 +23,6 @@ class Model:
 
     def get_optimizer(self):
         raise NotImplementedError(Model.error)
+
+    def get_variable_scope(self):
+        raise NotImplementedError(Model.error)

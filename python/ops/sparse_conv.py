@@ -223,9 +223,7 @@ def sparse_conv(sparse_dict, num_neighbors=10, output_all=15, weight_init_width=
                                                         activation=tf.nn.leaky_relu,
                                                         kernel_initializer=tf.random_normal_initializer(
                                                             mean=weight_init_width, stddev=weight_init_width),
-                                                        bias_initializer=tf.random_normal_initializer(
-                                                            mean=weight_init_width,
-                                                            stddev=weight_init_width))  # [B,E,N]
+                                                        bias_initializer=tf.zeros_initializer())  # [B,E,N]
 
     weighting_factor_for_all_features = tf.clip_by_value(weighting_factor_for_all_features, 0, 1e5)
     weighting_factor_for_all_features = 1 + tf.expand_dims(weighting_factor_for_all_features,
@@ -243,8 +241,7 @@ def sparse_conv(sparse_dict, num_neighbors=10, output_all=15, weight_init_width=
                                                             activation=tf.nn.leaky_relu,
                                                             kernel_initializer=tf.random_normal_initializer(
                                                                 mean=weight_init_width, stddev=weight_init_width),
-                                                            bias_initializer=tf.random_normal_initializer(
-                                                                mean=weight_init_width, stddev=weight_init_width))
+                                                            bias_initializer=tf.zeros_initializer())
 
     weighting_factor_for_spatial_features = tf.clip_by_value(weighting_factor_for_spatial_features, 0, 1e5)
     weighting_factor_for_spatial_features = 1 + tf.expand_dims(weighting_factor_for_spatial_features, axis=3)
@@ -269,13 +266,15 @@ def sparse_merge_flat(sparse_dict, combine_three=True):
                                                                                  sparse_dict['num_entries']
 
     shape_space_features = spatial_features_global.get_shape().as_list()
+    n_batch = shape_space_features[0]
     n_max_entries = shape_space_features[1]
 
     mask = tf.cast(tf.expand_dims(tf.sequence_mask(num_entries, maxlen=n_max_entries), axis=2), tf.float32)
     nonzeros = tf.count_nonzero(mask, axis=1, dtype=tf.float32)
-    flattened_features_all = tf.reduce_sum(all_features * mask, axis=1) / nonzeros
-    flattened_features_spatial_features_global = tf.reduce_sum(spatial_features_global * mask, axis=1) / nonzeros
-    flattened_features_spatial_features_local = tf.reduce_sum(spatial_features_local * mask, axis=1) / nonzeros
+
+    flattened_features_all = tf.reshape(all_features, [n_batch, -1])
+    flattened_features_spatial_features_global = tf.reshape(spatial_features_global, [n_batch, -1])
+    flattened_features_spatial_features_local = tf.reshape(spatial_features_local, [n_batch, -1])
 
     if combine_three:
         output = tf.concat([flattened_features_all, flattened_features_spatial_features_global, flattened_features_spatial_features_local], axis=-1)
