@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <boost/python/numpy.hpp>
 #include "SparseDataReader.h"
+#include "GenericDataReader.h"
 
 
 namespace p = boost::python;
@@ -26,8 +27,13 @@ p::tuple readSparseData(p::str filename,
 
 }
 
+p::list readGenericData(p::str file_path, p::str location, p::list branches, p::list types, p::list max_size) {
+    return GenericDataReader(file_path, location, branches, types, max_size).execute();
+}
+
 BOOST_PYTHON_MODULE(sparse_hgcal) {
     Py_Initialize();
     np::initialize();
     p::def("read_sparse_data", readSparseData);
+    p::def("read_np_array", readGenericData);
 }

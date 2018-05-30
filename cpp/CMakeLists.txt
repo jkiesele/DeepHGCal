@@ -22,7 +22,8 @@ if (OPENMP_FOUND)
 endif()
 set (CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
 
-set(SOURCE_FILES main.cpp SparseDataReader.cpp SparseDataReader.h)
+set(SOURCE_FILES main.cpp SparseDataReader.cpp SparseDataReader.h GenericDataReader.h GenericDataReader.cpp
+        Helpers.h Helpers.cpp)
 
 add_library(sparse_hgcal SHARED ${SOURCE_FILES})
 
