@@ -27,7 +27,7 @@ p::tuple readSparseData(p::str filename,
 
 }
 
-p::list readGenericData(p::str file_path, p::str location, p::list branches, p::list types, p::list max_size) {
+p::tuple readGenericData(p::str file_path, p::str location, p::list branches, p::list types, p::list max_size) {
     return GenericDataReader(file_path, location, branches, types, max_size).execute();
 }
 

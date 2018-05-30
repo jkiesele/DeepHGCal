@@ -330,5 +330,4 @@ void SparseDataReader::open() {
     tree->SetBranchAddress("rechit_vxy", &root_rechit_vxy);
     tree->SetBranchAddress("rechit_vz", &root_rechit_vz);
     tree->SetBranchAddress("rechit_layer", &root_rechit_layer);
-
 }

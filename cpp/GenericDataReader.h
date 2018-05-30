@@ -23,12 +23,13 @@ private:
     p::list types;
     p::list max_size;
     std::vector<np::ndarray> arrays;
+    std::vector<np::ndarray> arraySizes;
 public:
     GenericDataReader(const boost::python::str &file_name, const boost::python::str &location,
                       const boost::python::list &branches, const boost::python::list &types,
                       const boost::python::list &max_size);
 
-    p::list execute();
+    p::tuple execute();
 
 private:
     void makeResultArrays(const size_t& maxEvents);

@@ -27,6 +27,7 @@ void GenericDataReader::makeResultArrays(const size_t& maxEvents) {
     assert(p::len(types) == p::len(max_size));
 
     vector<np::ndarray>& output = arrays;
+    vector<np::ndarray>& outputSizes = arraySizes;
 
     for (int i = 0; i < p::len(types); i++) {
         string type = str2string(p::extract<p::str>(types[i]));
@@ -66,6 +67,12 @@ void GenericDataReader::makeResultArrays(const size_t& maxEvents) {
                 output.push_back(np::zeros(p::make_tuple(maxEvents), np::dtype::get_builtin<int64_t>()));
             }
         }
+        else {
+            cout<<"Error: Unknown type."<<endl;
+            throw -1; // TODO: Change to exception later?
+
+        }
+        outputSizes.push_back(np::zeros(p::make_tuple(maxEvents), np::dtype::get_builtin<int64_t>()));
     }
 }
 void GenericDataReader::makeValueReaders(TTreeReader& reader, vector<void *> &valueReaders) {
@@ -188,6 +195,7 @@ void GenericDataReader::fillFromValueReaders(TTreeReader& reader, vector<void *>
         string type = str2string(p::extract<p::str>(types[i]));
         int maxSize = p::extract<int>(max_size[i]);
         bool isArray = maxSize != 1;
+        int64_t* __dataSizesStart = reinterpret_cast<int64_t*>(arraySizes[i].get_data());
 
         if (type == "float32") {
             float* __dataStart = reinterpret_cast<float*>(arrays[i].get_data());
@@ -197,12 +205,14 @@ void GenericDataReader::fillFromValueReaders(TTreeReader& reader, vector<void *>
                 std::vector<float>* dataRoot = valueReader->Get();
                 int n = min((int)dataRoot->size(), maxSize);
                 std::copy(dataRoot->begin(), dataRoot->begin() + n, offset);
+                __dataSizesStart[eventNumber] = n;
 
             }
             else {
                 TTreeReaderValue<float>* valueReader = reinterpret_cast<TTreeReaderValue<float>*>(readers[i]);
                 float dataRoot = *valueReader->Get();
                 *offset = dataRoot;
+                __dataSizesStart[eventNumber] = 1;
             }
         }
         else if (type == "float64") {
@@ -213,11 +223,13 @@ void GenericDataReader::fillFromValueReaders(TTreeReader& reader, vector<void *>
                 std::vector<double>* dataRoot = valueReader->Get();
                 int n = min((int)dataRoot->size(), maxSize);
                 std::copy(dataRoot->begin(), dataRoot->begin() + n, offset);
+                __dataSizesStart[eventNumber] = n;
             }
             else {
                 TTreeReaderValue<double>* valueReader = reinterpret_cast<TTreeReaderValue<double>*>(readers[i]);
                 double dataRoot = *valueReader->Get();
                 *offset = dataRoot;
+                __dataSizesStart[eventNumber] = 1;
             }
         }
         else if (type == "int32") {
@@ -228,11 +240,13 @@ void GenericDataReader::fillFromValueReaders(TTreeReader& reader, vector<void *>
                 std::vector<int32_t>* dataRoot = valueReader->Get();
                 int n = min((int)dataRoot->size(), maxSize);
                 std::copy(dataRoot->begin(), dataRoot->begin() + n, offset);
+                __dataSizesStart[eventNumber] = n;
             }
             else {
                 TTreeReaderValue<int32_t>* valueReader = reinterpret_cast<TTreeReaderValue<int32_t>*>(readers[i]);
                 int32_t dataRoot = *valueReader->Get();
                 *offset = dataRoot;
+                __dataSizesStart[eventNumber] = 1;
             }
 
         }
@@ -244,25 +258,27 @@ void GenericDataReader::fillFromValueReaders(TTreeReader& reader, vector<void *>
                 std::vector<int64_t>* dataRoot = valueReader->Get();
                 int n = min((int)dataRoot->size(), maxSize);
                 std::copy(dataRoot->begin(), dataRoot->begin() + n, offset);
+                __dataSizesStart[eventNumber] = n;
             }
             else {
                 TTreeReaderValue<int64_t>* valueReader = reinterpret_cast<TTreeReaderValue<int64_t>*>(readers[i]);
                 int64_t dataRoot = *valueReader->Get();
                 *offset = dataRoot;
+                __dataSizesStart[eventNumber] = 1;
             }
         }
     }
 }
 
 
-p::list GenericDataReader::execute() {
+p::tuple GenericDataReader::execute() {
     string inputFile = str2string(file_name);
     TFile * f=new TFile(inputFile.c_str(),"READ");
     if(!f || f->IsZombie()){
         std::cerr << "Input file not found" <<std::endl;
         if(f->IsZombie())
             delete f;
-        return p::list();
+        return p::tuple();
     }
 
     TTreeReader reader(str2string(location).c_str(), f);
@@ -277,11 +293,15 @@ p::list GenericDataReader::execute() {
         fillFromValueReaders(reader, valueReaders, eventNo);
         eventNo++;
     }
-    boost::python::list returnList;
+    boost::python::list returnListData;
+    boost::python::list returnListSizes;
     for (auto &i : arrays) {
-        returnList.append(i);
+        returnListData.append(i);
     }
-    return returnList;
+    for (auto &i : arraySizes) {
+        returnListSizes.append(i);
+    }
+    return p::make_tuple(returnListData, returnListSizes);
 
 //    freeValueReaders(reader, valueReaders);
 }
