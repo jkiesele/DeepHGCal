@@ -55,7 +55,7 @@ def plot_rechits(X, Y, Z, E, text):
     fig = plt.figure()
     ax = Axes3D(fig)
 
-    ax.scatter(Z, X, Y, s=np.log(E + 1) * 100, cmap=cmx.hsv)
+    ax.scatter(Z, X, Y, s=np.log(np.log(E + 1)+1) * 100, cmap=cmx.hsv)
     ax.set_xlabel('z')
     ax.set_ylabel('x')
     ax.set_zlabel('y')
