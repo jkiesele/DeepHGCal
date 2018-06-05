@@ -19,11 +19,15 @@ def simpleRecurrent(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6):
     
     x = Inputs[0]
     #mask the zero entries
-    x = Dropout(dropoutRate)(x)
-    x = Masking(mask_value=0.0)(x)
-    x = LSTM (256,go_backwards=True,implementation=2, name='listlstm_0')(x)
+    #x = Masking(mask_value=0.0)(x)
+    #x = LSTM (64,go_backwards=False,implementation=1, name='listlstm_0')(x)
+    x = Flatten()(x)
+    #x = Dropout(dropoutRate)(x)
     x = Dense(100, activation='relu',kernel_initializer='lecun_uniform', name='dense_0')(x)
-   
+    x = Dropout(dropoutRate)(x)
+    idpred = Dense(nclasses, activation='relu',kernel_initializer='lecun_uniform', name='IDpred')(x)
+    epred = Dense(nregressions, activation='relu',kernel_initializer='lecun_uniform', name='Epred')(x)
+    predictions = [idpred,epred]
     
     model = Model(inputs=Inputs, outputs=predictions)
     return model
@@ -45,13 +49,13 @@ print(train.keras_model.summary())
 #train.train_data.maxFilesOpen=4
 #exit()
 model,history = train.trainModel(nepochs=1, 
-                                 batchsize=300, 
+                                 batchsize=512, 
                                  stop_patience=300, 
                                  lr_factor=0.3, 
                                  lr_patience=-6, 
                                  lr_epsilon=0.001, 
                                  lr_cooldown=8, 
                                  lr_minimum=0.000001, 
-                                 maxqsize=20,
+                                 maxqsize=1,
                                  checkperiod=1,
                                  verbose=1)
