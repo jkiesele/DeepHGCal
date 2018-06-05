@@ -18,7 +18,7 @@ class TrainData_FCC_rec(TrainData_FCC):
         
         fileTimeOut(filename,120) #give eos 2 minutes to recover
         
-        
+       
         
         
         Tuple = self.readTreeFromRootToTuple(filename)  
@@ -41,7 +41,12 @@ class TrainData_FCC_rec(TrainData_FCC):
         
         notremoves=numpy.zeros(energytruth.shape[0])
         notremoves+=1
-    
+        for i in range(4):
+            notremoves=numpy.concatenate((notremoves,notremoves))
+            weights=numpy.concatenate((weights,weights))
+            rechitlist=numpy.concatenate((rechitlist,rechitlist))
+            idtruthtuple=numpy.concatenate((idtruthtuple,idtruthtuple))
+            energytruth=numpy.concatenate((energytruth,energytruth))
        
         before=len(rechitlist)
         
@@ -50,6 +55,10 @@ class TrainData_FCC_rec(TrainData_FCC):
             rechitlist=rechitlist[notremoves>0]
             idtruthtuple=idtruthtuple[notremoves>0]
             energytruth=energytruth[notremoves>0]
+            
+        #for testing extend everything
+        
+             
         
         print('reduced to '+str(len(rechitlist))+' of '+ str(before))
         self.nsamples=len(rechitlist)
