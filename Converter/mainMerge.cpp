@@ -84,8 +84,8 @@ void fillTree( MergeDescriptor descr,
     tempoutfile=temp;
     fout= new TFile(temp,"RECREATE");
 
-    TDirectory* tdir=fout->mkdir("deepntuplizer","deepntuplizer");
-    tdir->cd();
+   // TDirectory* tdir=fout->mkdir("deepntuplizer","deepntuplizer");
+   // tdir->cd();
     outtree = chains.at(0)->CloneTree(0);//new TTree("tree","tree");//
 
     if(debug){

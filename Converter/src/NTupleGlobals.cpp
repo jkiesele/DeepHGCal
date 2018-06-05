@@ -116,72 +116,72 @@ void NTupleGlobals::setTruthID(const int& pdgid,const bool& matched){
 void NTupleGlobals::initDNNBranches(TTree* t){
 
 
-	addBranch(t,"event", &event_, "event_/i");
+	//addBranch(t,"event", &event_, "event_/i");
 
 	addBranch(t,"seed_eta",   &seed_eta_,   "seed_eta_/f");
 	addBranch(t,"seed_phi",   &seed_phi_,   "seed_phi_/f");
-	addBranch(t,"seed_index", &seed_index_, "seed_index_/i");
+	//addBranch(t,"seed_index", &seed_index_, "seed_index_/i");
 
-	addBranch(t,"totalrechit_energy",   &totalrechit_energy_,   "totalrechit_energy_/f");
-    addBranch(t,"true_energyfraction",   &true_energyfraction_,   "true_energyfraction_/f");
+	//addBranch(t,"totalrechit_energy",   &totalrechit_energy_,   "totalrechit_energy_/f");
+    //addBranch(t,"true_energyfraction",   &true_energyfraction_,   "true_energyfraction_/f");
+    //
+	//addBranch(t,"multicluster_eta",   &multicluster_eta_,   "multicluster_eta_/f");
+	//addBranch(t,"multicluster_phi",   &multicluster_phi_,   "multicluster_phi_/f");
+	//addBranch(t,"multicluster_energy",   &multicluster_energy_,   "multicluster_energy_/f");
+    //
+    //addBranch(t,"simcluster_eta",      &simcluster_eta_,      "simcluster_eta_/f");
+    //addBranch(t,"simcluster_phi",      &simcluster_phi_,      "simcluster_phi_/f");
+    //addBranch(t,"simcluster_energy",   &simcluster_energy_,   "simcluster_energy_/f");
+    //
+    //
+    //addBranch(t,"true_ncloseparticles",   &true_ncloseparticles_,   "true_ncloseparticles_");
+    //addBranch(t,"true_drclosestparticle",   &true_drclosestparticle_,   "true_drclosestparticle_/f");
+    //addBranch(t,"true_averagedr",   &true_averagedr_,   "true_averagedr_/f");
+    //addBranch(t,"true_closeparticledr",   &true_closeparticledr_);
 
-	addBranch(t,"multicluster_eta",   &multicluster_eta_,   "multicluster_eta_/f");
-	addBranch(t,"multicluster_phi",   &multicluster_phi_,   "multicluster_phi_/f");
-	addBranch(t,"multicluster_energy",   &multicluster_energy_,   "multicluster_energy_/f");
 
-    addBranch(t,"simcluster_eta",      &simcluster_eta_,      "simcluster_eta_/f");
-    addBranch(t,"simcluster_phi",      &simcluster_phi_,      "simcluster_phi_/f");
-    addBranch(t,"simcluster_energy",   &simcluster_energy_,   "simcluster_energy_/f");
-
-
-    addBranch(t,"true_ncloseparticles",   &true_ncloseparticles_,   "true_ncloseparticles_");
-    addBranch(t,"true_drclosestparticle",   &true_drclosestparticle_,   "true_drclosestparticle_/f");
-    addBranch(t,"true_averagedr",   &true_averagedr_,   "true_averagedr_/f");
-    addBranch(t,"true_closeparticledr",   &true_closeparticledr_);
-
-
-	addBranch(t,"true_eta",   &true_eta_,   "true_eta_/f");
-	addBranch(t,"true_phi",   &true_phi_,   "true_phi_/f");
-    addBranch(t,"true_pt",   &true_pt_,   "true_pt_/f");
+	//addBranch(t,"true_eta",   &true_eta_,   "true_eta_/f");
+	//addBranch(t,"true_phi",   &true_phi_,   "true_phi_/f");
+    //addBranch(t,"true_pt",   &true_pt_,   "true_pt_/f");
 	addBranch(t,"true_energy",&true_energy_,"true_energy_/f");
-	addBranch(t,"true_pid",&true_pid_,"true_pid_/i");
+	//addBranch(t,"true_pid",&true_pid_,"true_pid_/i");
 
 
 	addBranch(t,"isGamma",   &isGamma_,   "isGamma_/i");
     addBranch(t,"isElectron",   &isElectron_,   "isElectron_/i");
     addBranch(t,"isMuon",   &isMuon_,   "isMuon_/i");
-    addBranch(t,"isTau",   &isTau_,   "isTau_/i");
-    addBranch(t,"isPionZero",   &isPionZero_,   "isPionZero_/i");
+    //addBranch(t,"isTau",   &isTau_,   "isTau_/i");
+    addBranch(t,"isNeutralPion",   &isPionZero_,   "isNeutralPion/i");
     addBranch(t,"isPionCharged",   &isPionCharged_,   "isPionCharged_/i");
-    addBranch(t,"isProton",   &isProton_,   "isProton_/i");
-    addBranch(t,"isKaonCharged",   &isKaonCharged_,   "isKaonCharged_/i");
-    addBranch(t,"isEta",   &isEta_,   "isEta_/i");
-    addBranch(t,"isOther",   &isOther_,   "isOther_/i");
-	addBranch(t,"isFake",    &isFake_,    "isFake_/i");
-
-	addBranch(t,"true_vtx_x",   &true_vtx_x_,   "true_vtx_x_/f");
-	addBranch(t,"true_vtx_y",   &true_vtx_y_,   "true_vtx_y_/f");
-	addBranch(t,"true_vtx_z",   &true_vtx_z_,   "true_vtx_z_/f");
-
-
-    addBranch(t,"num_clusters",   &num_clusters_,   "num_clusters_/i");
-    addBranch(t,"cluster_id",   &cluster_id_,   "cluster_id_[num_clusters_]/i");
-    addBranch(t,"cluster_particle_eta",   &cluster_particle_eta_,   "cluster_particle_eta_[num_clusters_]/f");
-    addBranch(t,"cluster_particle_phi",   &cluster_particle_phi_,   "cluster_particle_phi_[num_clusters_]/f");
-
-
-    addBranch(t,"num_particles",   &num_particles_,   "num_particles_/i");
-    addBranch(t,"particle_eta",   &particle_eta_,   "particle_eta_[num_particles_]/f");
-    addBranch(t,"particle_phi",   &particle_phi_,   "particle_phi_[num_particles_]/f");
-    addBranch(t,"particle_r_origin",   &particle_r_origin_,   "particle_r_origin_[num_particles_]/f");
-    addBranch(t,"particle_r_decay",   &particle_r_decay_,   "particle_r_decay_[num_particles_]/f");
-
-    addBranch(t,"particle_x_origin",   &particle_x_origin_,   "particle_x_origin_[num_particles_]/f");
-    addBranch(t,"particle_y_origin",   &particle_y_origin_,   "particle_y_origin_[num_particles_]/f");
-    addBranch(t,"particle_z_origin",   &particle_z_origin_,   "particle_z_origin_[num_particles_]/f");
-    addBranch(t,"particle_x_decay",   &particle_x_decay_,   "particle_x_decay_[num_particles_]/f");
-    addBranch(t,"particle_y_decay",   &particle_y_decay_,   "particle_y_decay_[num_particles_]/f");
-    addBranch(t,"particle_z_decay",   &particle_z_decay_,   "particle_z_decay_[num_particles_]/f");
+    //addBranch(t,"isProton",   &isProton_,   "isProton_/i");
+    //addBranch(t,"isKaonCharged",   &isKaonCharged_,   "isKaonCharged_/i");
+    //addBranch(t,"isEta",   &isEta_,   "isEta_/i");
+    //addBranch(t,"isOther",   &isOther_,   "isOther_/i");
+	//addBranch(t,"isFake",    &isFake_,    "isFake_/i");
+    //
+	//addBranch(t,"true_vtx_x",   &true_vtx_x_,   "true_vtx_x_/f");
+	//addBranch(t,"true_vtx_y",   &true_vtx_y_,   "true_vtx_y_/f");
+	//addBranch(t,"true_vtx_z",   &true_vtx_z_,   "true_vtx_z_/f");
+    //
+    //
+    //addBranch(t,"num_clusters",   &num_clusters_,   "num_clusters_/i");
+    //addBranch(t,"cluster_id",   &cluster_id_,   "cluster_id_[num_clusters_]/i");
+    //addBranch(t,"cluster_particle_eta",   &cluster_particle_eta_,   "cluster_particle_eta_[num_clusters_]/f");
+    //addBranch(t,"cluster_particle_phi",   &cluster_particle_phi_,   "cluster_particle_phi_[num_clusters_]/f");
+    //
+    //
+    //addBranch(t,"num_particles",   &num_particles_,   "num_particles_/i");
+    //addBranch(t,"particle_eta",   &particle_eta_,   "particle_eta_[num_particles_]/f");
+    //addBranch(t,"particle_phi",   &particle_phi_,   "particle_phi_[num_particles_]/f");
+    //addBranch(t,"particle_r_origin",   &particle_r_origin_,   "particle_r_origin_[num_particles_]/f");
+    //addBranch(t,"particle_r_decay",   &particle_r_decay_,   "particle_r_decay_[num_particles_]/f");
+    //
+    //addBranch(t,"particle_x_origin",   &particle_x_origin_,   "particle_x_origin_[num_particles_]/f");
+    //addBranch(t,"particle_y_origin",   &particle_y_origin_,   "particle_y_origin_[num_particles_]/f");
+    //addBranch(t,"particle_z_origin",   &particle_z_origin_,   "particle_z_origin_[num_particles_]/f");
+    //addBranch(t,"particle_x_decay",   &particle_x_decay_,   "particle_x_decay_[num_particles_]/f");
+    //addBranch(t,"particle_y_decay",   &particle_y_decay_,   "particle_y_decay_[num_particles_]/f");
+    //addBranch(t,"particle_z_decay",   &particle_z_decay_,   "particle_z_decay_[num_particles_]/f");
 
 
 }

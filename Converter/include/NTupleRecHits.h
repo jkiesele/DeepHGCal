@@ -21,6 +21,21 @@ public:
 	void reset(){
 		nrechits_=0;
 		n_rechits_=0;
+
+		rechit_energy_.clear();
+		rechit_eta_.clear();
+		rechit_phi_.clear();
+		rechit_a_.clear();
+		rechit_b_.clear();
+		rechit_x_.clear();
+		rechit_y_.clear();
+		rechit_z_.clear();
+		rechit_pt_.clear();
+		rechit_time_.clear();
+		rechit_layer_.clear();
+		rechit_total_fraction_.clear();
+
+
 	}
 
     bool addRecHit(const float &eta, const float &phi, const float &a, const float &b, const float &x,
@@ -35,18 +50,18 @@ private:
 	TString id_;
 	int n_rechits_;
 	float nrechits_;
-	float rechit_energy_[MAX_RECHITS];
-	float rechit_eta_[MAX_RECHITS];
-	float rechit_phi_[MAX_RECHITS];
-	float rechit_a_[MAX_RECHITS];
-	float rechit_b_[MAX_RECHITS];
-	float rechit_x_[MAX_RECHITS];
-	float rechit_y_[MAX_RECHITS];
-	float rechit_z_[MAX_RECHITS];
-	float rechit_pt_[MAX_RECHITS];
-	float rechit_time_[MAX_RECHITS];
-	float rechit_layer_[MAX_RECHITS];
-	float rechit_total_fraction_[MAX_RECHITS];
+	std::vector<float> rechit_energy_;
+	std::vector<float> rechit_eta_;
+	std::vector<float> rechit_phi_;
+	std::vector<float> rechit_a_;
+	std::vector<float> rechit_b_;
+	std::vector<float> rechit_x_;
+	std::vector<float> rechit_y_;
+	std::vector<float> rechit_z_;
+	std::vector<float> rechit_pt_;
+	std::vector<float> rechit_time_;
+	std::vector<float> rechit_layer_;
+	std::vector<float> rechit_total_fraction_;
 };
 
 

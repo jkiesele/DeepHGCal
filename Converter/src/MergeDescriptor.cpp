@@ -135,9 +135,10 @@ std::vector<TChain* > MergeDescriptor::createChains(
     for(size_t i=0;i<infiles.size();i++){
         for(const auto& f:infiles.at(i)){
             TString xrootdedpath=f;
+            if(! f.EndsWith(".root")) continue;
             if(usexrootd)
                 xrootdedpath=prependXRootD(xrootdedpath);
-            chains.at(i)->Add(xrootdedpath+"/deepntuplizer/tree");
+            chains.at(i)->Add(xrootdedpath+"/tree");
         }
         for(auto& bi:branchinfos){
             bi->setIsRead(true);
