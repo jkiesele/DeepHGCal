@@ -19,6 +19,7 @@ class TrainData_FCC(TrainData):
                            'isElectron',
                            'isPionCharged',
                            'isNeutralPion',
+                           'isMuon',
                            ]
         
         self.weightbranchX='true_energy'
@@ -52,7 +53,7 @@ class TrainData_FCC(TrainData):
     def readFromRootFile(self,filename,TupleMeanStd, weighter):
         
         #the first part is standard, no changes needed
-        from converters import createRecHitMapNoTime, setTreeName
+        from converters import simple3Dstructure, setTreeName
         setTreeName("tree")
         import numpy
         import ROOT
@@ -62,11 +63,21 @@ class TrainData_FCC(TrainData):
         tree = rfile.Get("tree")
         self.nsamples=tree.GetEntries()
         
-        x_chmapbase=createRecHitMapNoTime(filename,self.nsamples,
-                                    nbins=29,
-                                    width=0.15,
-                                    maxlayers=20,
-                                    maxhitsperpixel=6)
+        x_chmapecal=simple3Dstructure(filename,self.nsamples,
+                                    xbins=34,
+                                    xwidth=0.1517246452,
+                                    ybins=34,
+                                    ywidth=0.17,
+                                    maxlayer=8, minlayer=7)
+        
+        
+        #granularity needs to be checked  deltaEta=0.025 und deltaPhi=2Pi/256
+        x_chmaphcal=simple3Dstructure(filename,self.nsamples,
+                                    xbins=14,
+                                    xwidth=0.1718058482,
+                                    ybins=14,
+                                    ywidth=0.175,
+                                    maxlayer=18, minlayer=8,sumenergy=True)
         
         
         
@@ -75,17 +86,19 @@ class TrainData_FCC(TrainData):
         idtruthtuple =  self.reduceTruth(Tuple[self.truthclasses])
         energytruth  =  numpy.array(Tuple[self.regtruth])
         #simple by-hand scaling to around 0 with a width of max about 1
-        energytruth = energytruth/100.
+        
         
         weights=numpy.zeros(len(idtruthtuple))
         
         notremoves=numpy.zeros(energytruth.shape[0])
         notremoves+=1
         
-        if self.remove:
+        #no augmentation so far
+        if False and self.remove:
             from augmentation import mirrorInPhi,duplicateImage,evaluateTwice
             
-            x_chmapbase= mirrorInPhi(x_chmapbase)
+            x_chmapecal= mirrorInPhi(x_chmapecal)
+            x_chmaphcal= mirrorInPhi(x_chmaphcal)
             
             notremoves=evaluateTwice(weighter.createNotRemoveIndices,Tuple)
             
@@ -96,19 +109,20 @@ class TrainData_FCC(TrainData):
             #notremoves -= energytruth<50
             
         
-        before=len(x_chmapbase)
+        before=len(x_chmapecal)
         
         if self.remove:
             weights=weights[notremoves>0]
-            x_chmapbase=x_chmapbase[notremoves>0]
+            x_chmapecal=x_chmapecal[notremoves>0]
+            x_chmaphcal=x_chmaphcal[notremoves>0]
             idtruthtuple=idtruthtuple[notremoves>0]
             energytruth=energytruth[notremoves>0]
         
-        print('reduced to '+str(len(x_chmapbase))+' of '+ str(before))
-        self.nsamples=len(x_chmapbase)
+        print('reduced to '+str(len(x_chmapecal))+' of '+ str(before))
+        self.nsamples=len(x_chmapecal)
         
         self.w=[weights,weights]
-        self.x=[x_chmapbase]
+        self.x=[x_chmapecal,x_chmaphcal]
         self.y=[idtruthtuple,energytruth]
         
         

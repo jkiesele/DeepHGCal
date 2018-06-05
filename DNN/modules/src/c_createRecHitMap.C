@@ -97,11 +97,11 @@ double deltaR(const double& phi, const double& eta,
  */
 void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string filename,
         int maxhitsperpixel,
-        int xbins, float xwidth,int maxlayers, bool addtiming
+        int xbins, float xwidth,
+		int ybins, float ywidth,
+		int maxlayer, int minlayer, bool addtiming
 ){
 
-    int ybins=xbins;
-    float ywidth=xwidth;
     TFile* tfile= new TFile(filename.c_str(), "READ");
     TTree* tree = (TTree*) tfile->Get(treename);
 
@@ -157,7 +157,7 @@ void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string fil
         counter.zeroAndGet(it);
 
         std::vector<std::vector<std::vector<float> > >
-        entriesperpixel(xbins,std::vector<std::vector<float> >(ybins,std::vector<float>(maxlayers,0)));
+        entriesperpixel(xbins,std::vector<std::vector<float> >(ybins,std::vector<float>(maxlayer,0)));
 
         double seedphi=seed_phi_eta.getData(0, 0);
         double seedeta=seed_phi_eta.getData(1, 0);
@@ -180,10 +180,10 @@ void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string fil
             int layer=0;
             layer=round(layerbranch.getData(0, hit))-layer_offset;
 
-            if(layer>=maxlayers)
-                layer=maxlayers-1;
-            if(layer<0)
-                layer=0;
+            if(layer>=maxlayer)
+                continue;
+            if(layer<minlayer)
+                continue;
 
 
             float drbinseed=deltaR(bincentrephi,bincentreeta,seedphi,seedeta);
@@ -241,21 +241,152 @@ void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string fil
     delete tfile;
 }
 
+
+void simple3Dstructure(boost::python::numeric::array numpyarray,std::string filename,
+        int xbins, float xwidth,
+		int ybins, float ywidth,
+		int maxlayer, int minlayer,
+		bool sumenergy
+){
+
+    TFile* tfile= new TFile(filename.c_str(), "READ");
+    TTree* tree = (TTree*) tfile->Get(treename);
+
+    int layer_offset=0;
+
+    int maxhitsperpixel=1;
+
+    std::string xbranch="rechit_phi";
+    std::string ybranch="rechit_eta";
+    std::string xcenter="seed_phi";
+    std::string ycenter="seed_eta";
+    std::string counter_branch="nrechits";
+
+    __hidden::indata rh_energybranch;
+    rh_energybranch.createFrom({"rechit_energy"}, {1.}, {0.}, MAXBRANCHLENGTH);
+    __hidden::indata rh_timebranch;
+
+    __hidden::indata layerbranch;
+    layerbranch.createFrom({"rechit_layer"}, {1.}, {0.}, MAXBRANCHLENGTH);
+
+    __hidden::indata rh_phi_eta;
+    rh_phi_eta.createFrom({xbranch, ybranch}, {1., 1.}, {0., 0.}, MAXBRANCHLENGTH);
+
+    __hidden::indata seed_phi_eta;
+    seed_phi_eta.createFrom({xcenter, ycenter}, {1., 1.}, {0., 0.}, 1);
+
+    __hidden::indata counter;
+    counter.createFrom({counter_branch}, {1.}, {0.}, 1);
+
+
+    rh_energybranch.setup(tree);
+    layerbranch.setup(tree);
+    //
+    rh_phi_eta.setup(tree);
+    seed_phi_eta.setup(tree);
+    counter.setup(tree);
+
+    bool rechitsarevector=rh_energybranch.isVector();
+
+    const int nevents=std::min( (int) tree->GetEntries(), (int) boost::python::len(numpyarray));
+    for(int it=0;it<nevents;it++){
+
+        rh_energybranch.zeroAndGet(it);
+        layerbranch.zeroAndGet(it);
+
+        rh_phi_eta.zeroAndGet(it);
+        seed_phi_eta.zeroAndGet(it);
+        counter.zeroAndGet(it);
+
+        std::vector<std::vector<std::vector<float> > >
+        entriesperpixel(xbins,std::vector<std::vector<float> >(ybins,std::vector<float>(maxlayer-minlayer,0)));
+
+        double seedphi=seed_phi_eta.getData(0, 0);
+        double seedeta=seed_phi_eta.getData(1, 0);
+        int nrechits = counter.getData(0, 0);
+        if(rechitsarevector){
+        	nrechits = rh_energybranch.vectorSize(0);
+        }
+
+        for(size_t hit=0; hit < nrechits; hit++) {
+            double bincentrephi,bincentreeta;
+            double rechitphi=rh_phi_eta.getData(0, hit);
+            double rechiteta=rh_phi_eta.getData(1, hit);
+
+            int phibin = square_bins(rechitphi, seedphi, xbins, xwidth,true,bincentrephi);
+            int etabin = square_bins(rechiteta, seedeta-0.0001, ybins, ywidth,false,bincentreeta);
+
+
+            if(phibin == -1 || etabin == -1) continue;
+
+            int layer=0;
+            layer=round(layerbranch.getData(0, hit))-layer_offset;
+
+            if(layer>=maxlayer)
+                continue;
+            if(layer<minlayer)
+                continue;
+            layer-=minlayer;
+
+            float drbinseed=deltaR(bincentrephi,bincentreeta,seedphi,seedeta);
+
+            float energy=1000*rh_energybranch.getData(0, hit);
+            float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
+            float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
+
+
+            //std::cout << phibin << ", " << etabin << ": " << energy << std::endl;
+
+
+            bool ismulti=false;
+            if(!sumenergy && entriesperpixel.at(phibin).at(etabin).at(layer)>=maxhitsperpixel){
+                std::cout << phibin << ", "<< etabin << ". "<<layer<<" e "<<entriesperpixel.at(phibin).at(etabin).at(layer)<< std::endl;
+                std::cout << dphihitbincentre << " - "<< detahitbincentre << std::endl;
+                std::cout << "max hits per pixel reached. "<< entriesperpixel.at(phibin).at(etabin).at(layer)<<"/"
+                        <<maxhitsperpixel<< ", "<< " : "<< it<< std::endl;
+
+                ismulti=true;
+            }
+
+            //numpyarray[it][phibin][etabin][layer][0]=drbinseed;
+            numpyarray[it][phibin][etabin][layer][0]=layer+minlayer;
+            numpyarray[it][phibin][etabin][layer][1]  +=energy;
+
+
+            if(entriesperpixel.at(phibin).at(etabin).at(layer)<maxhitsperpixel){
+                entriesperpixel.at(phibin).at(etabin).at(layer)+=1;
+            }
+        }
+
+
+
+    }
+    tfile->Close();
+    delete tfile;
+}
+
 void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename,
         int maxhitsperpixel,
-        int xbins, float xwidth,int maxlayers
+        int xbins, float xwidth,
+		int ybins, float ywidth,
+		int maxlayers, int minlayer
 ){
 	fillRecHitMap_priv(numpyarray,filename,
         maxhitsperpixel,
-        xbins,  xwidth, maxlayers, true);
+        xbins,  xwidth,
+		ybins, ywidth,
+		maxlayers,minlayer, true);
 }
 void fillRecHitMapNoTime(boost::python::numeric::array numpyarray,std::string filename,
         int maxhitsperpixel,
-        int xbins, float xwidth,int maxlayers
+        int xbins, float xwidth,
+		int ybins, float ywidth,
+		int maxlayer, int minlayer
 ){
 	fillRecHitMap_priv(numpyarray,filename,
         maxhitsperpixel,
-        xbins,  xwidth, maxlayers, false);
+        xbins,  xwidth,
+		ybins, ywidth, maxlayer, minlayer, false);
 }
 
 
@@ -390,4 +521,5 @@ BOOST_PYTHON_MODULE(c_createRecHitMap) {
     def("fillRecHitList", &fillRecHitList);
     def("fillRecHitListNoTime", &fillRecHitListNoTime);
     def("setTreeName", &setTreeName);
+    def("simple3Dstructure", &simple3Dstructure);
 }

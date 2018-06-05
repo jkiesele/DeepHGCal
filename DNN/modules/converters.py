@@ -1,7 +1,7 @@
 
 def createRecHitMap(Filename_in,nevents,
                     nbins,width,
-                    maxlayers,
+                    maxlayer, minlayer,
                     maxhitsperpixel):
     
     import numpy as np
@@ -10,15 +10,16 @@ def createRecHitMap(Filename_in,nevents,
     array = np.zeros((nevents,nbins,nbins,maxlayers,2+4*maxhitsperpixel) , dtype='float32')
     
     
-    c_createRecHitMap.fillRecHitMap(array,Filename_in,maxhitsperpixel,nbins,width,maxlayers)
+    c_createRecHitMap.fillRecHitMap(array,Filename_in,maxhitsperpixel,nbins,width,maxlayer,minlayer)
    
     
    
     return array
 
 def createRecHitMapNoTime(Filename_in,nevents,
-                    nbins,width,
-                    maxlayers,
+                    xbins,xwidth,
+                    ybins,ywidth,
+                    maxlayer,minlayer,
                     maxhitsperpixel):
     
     import numpy as np
@@ -27,12 +28,35 @@ def createRecHitMapNoTime(Filename_in,nevents,
     array = np.zeros((nevents,nbins,nbins,maxlayers,2+3*maxhitsperpixel) , dtype='float32')
     
     
-    c_createRecHitMap.fillRecHitMapNoTime(array,Filename_in,maxhitsperpixel,nbins,width,maxlayers)
+    c_createRecHitMap.fillRecHitMapNoTime(array,Filename_in,maxhitsperpixel,
+                                          xbins,xwidth,
+                                          ybins,ywidth,
+                                          maxlayer,minlayer)
    
     
    
     return array
 
+
+def simple3Dstructure(Filename_in,nevents,
+                    xbins,xwidth,
+                    ybins,ywidth,
+                    maxlayer,minlayer,sumenergy=False):
+    
+    import numpy as np
+    import c_createRecHitMap
+    
+    array = np.zeros((nevents,xbins,ybins,maxlayer-minlayer,2) , dtype='float32')
+    
+    
+    c_createRecHitMap.simple3Dstructure(array,Filename_in,
+                                          xbins,xwidth,
+                                          ybins,ywidth,
+                                          maxlayer,minlayer,sumenergy)
+   
+    
+   
+    return array
 
 def setTreeName(name):
     import c_createRecHitMap
