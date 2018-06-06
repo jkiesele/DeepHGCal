@@ -100,6 +100,7 @@ public :
     std::vector<float> *simcluster_simEnergy;
     std::vector<std::vector<unsigned int> > *simcluster_hits;
     std::vector<std::vector<int> > *simcluster_hits_indices;
+    std::vector<int> *simcluster_genpart_index;
     std::vector<std::vector<float> > *simcluster_fractions;
     std::vector<std::vector<unsigned int> > *simcluster_layers;
     std::vector<std::vector<unsigned int> > *simcluster_wafers;
@@ -204,6 +205,7 @@ public :
     TBranch *b_simcluster_simEnergy;   //!
     TBranch *b_simcluster_hits;   //!
     TBranch *b_simcluster_hits_indices;   //!
+    TBranch *b_simcluster_genpart_indices;   //!
     TBranch *b_simcluster_fractions;   //!
     TBranch *b_simcluster_layers;   //!
     TBranch *b_simcluster_wafers;   //!
@@ -375,6 +377,7 @@ void HGCalSel::Init(TTree *tree) {
     simcluster_simEnergy = 0;
     simcluster_hits = 0;
     simcluster_hits_indices = 0;
+    simcluster_genpart_index = 0;
     simcluster_fractions = 0;
     simcluster_layers = 0;
     simcluster_wafers = 0;
@@ -483,6 +486,7 @@ void HGCalSel::Init(TTree *tree) {
     fChain->SetBranchAddress("simcluster_simEnergy", &simcluster_simEnergy, &b_simcluster_simEnergy);
     fChain->SetBranchAddress("simcluster_hits", &simcluster_hits, &b_simcluster_hits);
     fChain->SetBranchAddress("simcluster_hits_indices", &simcluster_hits_indices, &b_simcluster_hits_indices);
+    fChain->SetBranchAddress("simcluster_gen_part_index", &simcluster_genpart_index, &b_simcluster_genpart_indices);
     fChain->SetBranchAddress("simcluster_fractions", &simcluster_fractions, &b_simcluster_fractions);
     fChain->SetBranchAddress("simcluster_layers", &simcluster_layers, &b_simcluster_layers);
     fChain->SetBranchAddress("simcluster_wafers", &simcluster_wafers, &b_simcluster_wafers);

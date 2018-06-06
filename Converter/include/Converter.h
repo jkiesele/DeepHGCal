@@ -35,7 +35,7 @@ class Converter: public HGCalSel{
 private:
     Long64_t loadEvent(const Long64_t &eventNo);
 public:
-	Converter(TTree* t, bool noIndices = false);
+	Converter(TTree* t, const bool& noIndices, const float& zCut, const float& energyThreshold, const bool& simClustersHaveIndices);
 
 	void setEnergyThreshold(float thr){energylowercut_=thr;}
 
@@ -65,6 +65,9 @@ private:
     const float ZPLANE_CUT = 0.001;
     const float ZPLANE_CUT_CALORIMETER = 319.9;
     bool noIndices;
+	float zCut;
+	float energyThreshold;
+	bool simClustersHaveIndices;
 
 	std::vector<std::vector<int> > simcluster_hits_indices_computed;
 };

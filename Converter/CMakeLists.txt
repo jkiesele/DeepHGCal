@@ -5,8 +5,11 @@ project(DeepHGCal2)
 set(CMAKE_CXX_STANDARD 11)
 list(APPEND CMAKE_PREFIX_PATH $ENV{ROOTSYS})
 MESSAGE(STATUS "ROOTSYS $ENV{ROOTSYS}")
-find_package(ROOT REQUIRED RIO Tree MathCore Core Hist Gui Gpad TreeViewer MLP Matrix Thread Graf)
+find_package(ROOT REQUIRED Core)
 include(${ROOT_USE_FILE})
+
+set (CMAKE_CXX_FLAGS "-pthread -std=c++11 -Wno-deprecated-declarations -m64 ${CMAKE_CXX_FLAGS}")
+
 
 include_directories(${ROOT_INCLUDE_DIR} include)
 link_directories(${ROOT_LIBRARY_DIR})

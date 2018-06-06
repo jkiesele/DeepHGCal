@@ -23,7 +23,10 @@
 #include "../include/helpers.h"
 
 
-Converter::Converter(TTree *t, bool noIndices) : HGCalSel(t),testmode_(false),energylowercut_(0), noIndices(noIndices){
+Converter::Converter(TTree *t, const bool& noIndices, const float& zCut, const float& energyThreshold, const bool& simClustersHaveIndices)
+ : HGCalSel(t),testmode_(false),energylowercut_(0), noIndices(noIndices), zCut(zCut), energyThreshold(energyThreshold), simClustersHaveIndices(simClustersHaveIndices) {
+     if (zCut < 0 or zCut > 320)
+        cout<<"WARNING: Value of zCut maybe wrong. Please check!"<<endl;
 
 }
 
@@ -43,16 +46,6 @@ void Converter::traceDecayTree(unordered_set<int> &decayParticlesCluster, unorde
             if(mother < 0 ) {
                 continue;
             }
-
-            float mDecayX = genpart_dvx->at(mother);
-            float mDecayY = genpart_dvy->at(mother);
-            float mDecayZ = genpart_dvz->at(mother);
-
-            float cOriginX = genpart_ovx->at(i);
-            float cOriginY = genpart_ovy->at(i);
-            float cOriginZ = genpart_ovz->at(i);
-
-            float diff = sqrt(pow(mDecayX - cOriginX,2) + pow(mDecayY - cOriginY,2) + pow(mDecayZ - cOriginZ,2));
 
             if(decayParticlesCluster.find(mother) != decayParticlesCluster.end()) {
                 decayParticlesCluster.insert(i);
@@ -75,8 +68,8 @@ void Converter::traceDecayTree(unordered_set<int> &decayParticlesCluster, unorde
 unordered_map<int, pair<vector<int>, vector<int>>> Converter::findParticlesFromCollision() const {
 
     /*
-     * Collision occurs at z = 0. Boundary A is very close to it to see each particle originating from collision.
-     * Boundary B is close to close to the calorimeter. Between A and B, particle breaks into many sub-particles.
+     * Collision occurs at z = 0. Cut A is very close to it to see each particle originating from collision.
+     * Cut B is close to close to the calorimeter. Between A and B, particle breaks into many sub-particles.
      * And each of these particles will likely generate a sim-cluster.
      *
      */
@@ -88,9 +81,9 @@ unordered_map<int, pair<vector<int>, vector<int>>> Converter::findParticlesFromC
     // Find all truth particles
     for(size_t i=0;i<genpart_eta->size();i++) {
         allParticles.insert(i);
-        if (fabs(genpart_ovz->at(i)) >= ZPLANE_CUT)
+        if (fabs(genpart_ovz->at(i)) >= zCut)
             continue;
-        if (fabs(genpart_dvz->at(i)) < ZPLANE_CUT)
+        if (fabs(genpart_dvz->at(i)) < zCut)
             continue;
 
         interestingParticles[i] = pair<vector<int>, vector<int>>();
@@ -105,11 +98,11 @@ unordered_map<int, pair<vector<int>, vector<int>>> Converter::findParticlesFromC
         for(auto j : decayParticles) {
             particles.push_back(j);
 
-            const float direction = genpart_eta->at(j) >= 0 ? 1. : -1.;
-
             if (fabs(genpart_ovz->at(j)) >= ZPLANE_CUT_CALORIMETER)
                 continue;
             if (fabs(genpart_dvz->at(j)) < ZPLANE_CUT_CALORIMETER)
+                continue;
+            if (!(energyThreshold == -1 or genpart_energy->at(j) > energyThreshold))
                 continue;
 
             calorimeterParticles.push_back(j);
@@ -138,6 +131,10 @@ void Converter::initializeBranches() {
 
     if (not noIndices)
         fChain->SetBranchStatus("simcluster_hits_indices",1);
+    if (simClustersHaveIndices) {
+        cout<<"Setting simcluster have indices"<<endl;
+        fChain->SetBranchStatus("simcluster_gen_part_index",1); // TODO: remove _ in gen_part
+    }
 
     fChain->SetBranchStatus("multiclus_eta",1);
     fChain->SetBranchStatus("multiclus_phi",1);
@@ -216,6 +213,8 @@ void Converter::addParticleDataToGlobals(NTupleGlobals &globals, size_t index) {
 void Converter::recomputeSimClusterEtaPhi() {
     size_t numSimClusters = simcluster_hits->size();
     // Iterate through all the sim clusters to recompute their eta and phi
+    cout<<"HERE: "<<simcluster_hits_indices->size()<<" "<< simcluster_hits->size() << " " << simcluster_fractions->size()<<endl;
+
     for (size_t i_m = 0; i_m < numSimClusters; i_m++) {
         std::vector<unsigned int> simClusterHitsIds = simcluster_hits->at(i_m);
         std::vector<int> simClusterHitsIndices = simcluster_hits_indices->at(i_m);
@@ -253,11 +252,33 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
     unordered_set<int> taken;
     unordered_map<int, int> simClustersForSeeds;
 
-    for (auto i : seeds) {
-        float seedEta = genpart_exeta->at(i);
-        float seedPhi = genpart_exphi->at(i);
+    unordered_map<int, int> genPartsToSimClusters;
+    if (simClustersHaveIndices) {
+        for (size_t i_m = 0; i_m < numSimClusters; i_m++) {
+            if (simcluster_genpart_index->at(i_m) != -1)
+                genPartsToSimClusters[simcluster_genpart_index->at(i_m)] = i_m;
+        }
+    }
 
-        float minDistance;
+    for (auto i : seeds) {
+        float seedEta = genpart_eta->at(i);
+        float seedPhi = genpart_phi->at(i);
+
+        if (simClustersHaveIndices) {
+            if (genPartsToSimClusters.find(i) != genPartsToSimClusters.end()) {
+                simClustersForSeeds[i] = genPartsToSimClusters[i];
+                cout<<"DR: "<<helpers::getSeedSimClusterDifference(seedEta, seedPhi,
+                                                                     simcluster_eta->at(simClustersForSeeds[i]),
+                                                                     simcluster_phi->at(simClustersForSeeds[i]))<<endl;
+            }
+            else {
+                simClustersForSeeds[i] = -1;
+                cout<<"Not found"<<endl;
+            }
+            continue;
+        }
+
+        float minDistance = -1;
         int simClusterIndex = -1;
 
 
@@ -266,8 +287,8 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
 //                continue;
             float newDistance = helpers::getSeedSimClusterDifference(seedEta, seedPhi,
                                                                      simcluster_eta->at(i_m),
-                                                                     simcluster_phi->at(i_m))
-                                + fabs(log(simcluster_energy->at(i_m) / genpart_energy->at(i))*0.02);
+                                                                     simcluster_phi->at(i_m));
+                                // + fabs(log(simcluster_energy->at(i_m) / genpart_energy->at(i))*0.02);
             if ((newDistance < minDistance && simClusterIndex != -1) || simClusterIndex == -1) {
                 minDistance = newDistance;
                 simClusterIndex = i_m;
@@ -275,7 +296,8 @@ unordered_map<int, int> Converter::findSimClusterForSeeds(vector<int>& seeds) {
         }
 
 
-        if (simClusterIndex != -1 && minDistance <= 0.002) {
+        if (simClusterIndex != -1) {
+            // cout<<"DR-min: "<<minDistance<<endl;
             simClustersForSeeds[i] = simClusterIndex;
             taken.insert(simClusterIndex);
         }
@@ -314,6 +336,7 @@ Long64_t Converter::loadEvent(const Long64_t &eventNo) {
 
         simcluster_hits_indices = &simcluster_hits_indices_computed;
     }
+    return 1;
 }
 
 
@@ -343,9 +366,11 @@ void Converter::Loop(){
             break;
 
         if (testmode_ && jentry > 2) break;
+        std::cout<<"TESTX: "<<simcluster_fractions->size()<<endl;
 
         unordered_map<int, pair<vector<int>, vector<int>>> particlesFromCollision = findParticlesFromCollision();
-        recomputeSimClusterEtaPhi();
+        // recomputeSimClusterEtaPhi();
+
 
         for (auto particleFromCollisionIterator : particlesFromCollision) {
             globals.reset();
@@ -361,7 +386,6 @@ void Converter::Loop(){
                                 genpart_phi->at(particleFromCollisionIterator.first),
                                 particleFromCollisionIterator.first,
                                 jentry);
-
             // Add all decay tree
             for(auto daughterIndexIterator : particleFromCollisionIterator.second.first) {
                 addParticleDataToGlobals(globals, daughterIndexIterator);
