@@ -64,7 +64,7 @@ class H3dConvTrainer:
             except Exception as e:
                 print(e)
 
-    def __get_input_feeds(self, files_list, repeat=True):
+    def __get_input_feeds(self, files_list, repeat=True, shuffle_size=None):
         def _parse_function(example_proto):
             keys_to_features = {
                 'x': tf.FixedLenFeature((self.num_dim_x, self.num_dim_y, self.num_dim_z, self.num_input_features), tf.float32),
@@ -78,7 +78,7 @@ class H3dConvTrainer:
         file_paths = [x.strip() for x in content]
         dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
         dataset = dataset.map(_parse_function)
-        dataset = dataset.shuffle(buffer_size=self.num_batch*3)
+        dataset = dataset.shuffle(buffer_size=self.num_batch * 3 if shuffle_size is None else shuffle_size)
         dataset = dataset.repeat(None if repeat else 1)
         dataset = dataset.batch(self.num_batch)
         iterator = dataset.make_one_shot_iterator()
@@ -197,7 +197,7 @@ class H3dConvTrainer:
             scores = np.zeros((1000000, self.num_classes))
 
             print("Starting iterations")
-            while iteration_number < 100:
+            while iteration_number < 1000000:
                 try:
                     inputs = sess.run(inputs_feed)
                 except tf.errors.OutOfRangeError:
