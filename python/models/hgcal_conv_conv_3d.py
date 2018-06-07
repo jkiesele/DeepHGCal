@@ -17,6 +17,9 @@ class HgCal3d(Model):
     def get_variable_scope(self):
         return 'h3d_conv_1'
 
+    def get_human_name(self):
+        return 'Dummy 3d conv net'
+
     def initialize(self):
         if self.initialized:
             print("Already initialized")

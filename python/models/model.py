@@ -26,3 +26,6 @@ class Model:
 
     def get_variable_scope(self):
         raise NotImplementedError(Model.error)
+
+    def get_human_name(self):
+        raise NotImplementedError(Model.error)

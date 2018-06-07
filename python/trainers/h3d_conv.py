@@ -4,7 +4,10 @@ import numpy as np
 import os
 import configparser as cp
 import sys
-
+import pickle
+import gzip
+from helpers.helpers import get_num_parameters
+from experiment.classification_model_test_result import ClassificationModelTestResult
 
 class H3dConvTrainer:
     def read_config(self, config_file_path, config_name):
@@ -36,8 +39,8 @@ class H3dConvTrainer:
         self.test_files = self.config['test_files_list']
         self.validate_after = int(self.config['validate_after'])
 
+    def initialize(self):
         model_type = self.config['model_type']
-
         self.model = globals()[model_type](
             self.num_dim_x,
             self.num_dim_y,
@@ -84,6 +87,8 @@ class H3dConvTrainer:
         return inputs
 
     def train(self):
+        self.initialize()
+
         placeholders = self. model.get_placeholders()
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
@@ -157,6 +162,9 @@ class H3dConvTrainer:
             coord.join(threads)
 
     def test(self):
+        self.num_batch = 1
+        self.initialize()
+
         placeholders = self.model.get_placeholders()
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
@@ -167,10 +175,7 @@ class H3dConvTrainer:
         graph_logits, graph_prediction = self.model.get_compute_graphs()
         graph_temp = self.model.get_temp()
 
-        if self.from_scratch:
-            self.clean_summary_dir()
-
-        inputs_feed = self.__get_input_feeds(self.test_files, repeat=True)
+        inputs_feed = self.__get_input_feeds(self.test_files, repeat=False)
 
         accuracy_sum = 0
         num_examples = 0
@@ -188,39 +193,36 @@ class H3dConvTrainer:
             print("\n\nINFO: Loading model\n\n")
             iteration_number = 0
 
+            labels = np.zeros((1000000, self.num_classes))
+            scores = np.zeros((1000000, self.num_classes))
+
             print("Starting iterations")
-            while iteration_number < self.train_for_iterations:
+            while iteration_number < 100:
                 try:
                     inputs = sess.run(inputs_feed)
                 except tf.errors.OutOfRangeError:
                     break
 
-                print(np.shape(inputs[0]), np.shape(inputs[1]), np.shape(inputs[2]), np.shape(inputs[3]), np.shape(inputs[4]))
-                print(placeholders[0].get_shape().as_list(), placeholders[1].get_shape().as_list(), placeholders[2].get_shape().as_list(),
-                      placeholders[3].get_shape().as_list(),placeholders[4].get_shape().as_list())
-
                 inputs_train_dict = {
                     placeholders[0]: inputs[0],
-                    placeholders[1]: inputs[1],
-                    placeholders[2]: inputs[2],
-                    placeholders[3]: inputs[3],
-                    placeholders[4]: inputs[4]
+                    placeholders[1]: inputs[1]
                 }
+                print(inputs[1])
+                labels[iteration_number] = np.squeeze(inputs[1])
 
-                t, eval_loss, eval_accuracy, eval_confusion, test_logits = sess.run(
-                    [graph_temp, graph_loss, graph_accuracy, graph_confusion_matrix, graph_prediction],
+                t, eval_loss, eval_accuracy, eval_confusion, test_logits, eval_logits = sess.run(
+                    [graph_temp, graph_loss, graph_accuracy, graph_confusion_matrix, graph_prediction, graph_logits],
                     feed_dict=inputs_train_dict)
 
                 confusion_matrix += eval_confusion
                 accuracy_sum += eval_accuracy * self.num_batch
                 num_examples += self.num_batch
 
+                scores[iteration_number] = np.squeeze(eval_logits)
+
                 print("Test - Batch %4d: loss %0.5f accuracy %03.3f accuracy (cumm) %03.3f" % (
                 iteration_number, eval_loss, eval_accuracy, accuracy_sum / num_examples))
                 iteration_number += 1
-
-                if iteration_number == 100:
-                    break
 
             # Stop the threads
             coord.request_stop()
@@ -228,11 +230,15 @@ class H3dConvTrainer:
             # Wait for threads to stop
             coord.join(threads)
 
+        classes_names = 'Electron', 'Muon', 'Pion Charged', 'Pion Neutral', 'K0 Long', 'K0 Short' # TODO: Pick from config
+
+        test_result = ClassificationModelTestResult()
+        test_result.initialize(confusion_matrix, labels, scores, self.model.get_human_name(),
+                                    get_num_parameters(self.model.get_human_name()), classes_names, self.summary_path)
+        test_result.evaluate(self.test_out_path)
+
         print("Evaluation complete")
         print("Evaluation accuracy ", accuracy_sum / num_examples)
         print("Confusion matrix:")
         print(confusion_matrix)
-        confusion_path = os.path.join(self.test_out_path, 'confusion_matrix.np')
-        print("Confusion matrix written to ", confusion_path)
-        with open(confusion_path, 'wb') as f:
-            confusion_matrix.tofile(f)
+
