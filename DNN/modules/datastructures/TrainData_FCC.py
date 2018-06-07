@@ -11,7 +11,7 @@ class TrainData_FCC(TrainData):
         import numpy 
         TrainData.__init__(self)
         
-        self.treename="tree"
+        self.treename="events"
         
         self.undefTruth=['']
     
@@ -54,31 +54,44 @@ class TrainData_FCC(TrainData):
         
         #the first part is standard, no changes needed
         from converters import simple3Dstructure, setTreeName
-        setTreeName("tree")
+        setTreeName("events")
         import numpy
         import ROOT
         
         fileTimeOut(filename,120) #give eos 2 minutes to recover
         rfile = ROOT.TFile(filename)
-        tree = rfile.Get("tree")
+        tree = rfile.Get("events")
         self.nsamples=tree.GetEntries()
+        
+        import math
         
         x_chmapecal=simple3Dstructure(filename,self.nsamples,
                                     xbins=34,
-                                    xwidth=0.1517246452,
+                                    xwidth=2*math.pi/704*34/2,
                                     ybins=34,
                                     ywidth=0.17,
-                                    maxlayer=8, minlayer=7)
+                                    maxlayer=8, minlayer=0)
         
         
         #granularity needs to be checked  deltaEta=0.025 und deltaPhi=2Pi/256
         x_chmaphcal=simple3Dstructure(filename,self.nsamples,
-                                    xbins=14,
-                                    xwidth=0.1718058482,
-                                    ybins=14,
-                                    ywidth=0.175,
+                                    xbins=17,
+                                    xwidth=2*math.pi/256*17/2,
+                                    ybins=17,
+                                    ywidth=0.2125,
                                     maxlayer=18, minlayer=8,sumenergy=True)
         
+        
+        #from plotting import plot4d
+        #
+        #
+        #for i in range(10):
+        #    plot4d(x_chmapecal[i],"ecal"+str(i)+".pdf")
+        #    
+        #    plot4d(x_chmaphcal[i],"hcal"+str(i)+".pdf")
+        #    print('printed '+str(i))
+        #
+        #exit()
         
         
         Tuple = self.readTreeFromRootToTuple(filename)  
@@ -94,18 +107,18 @@ class TrainData_FCC(TrainData):
         notremoves+=1
         
         #no augmentation so far
-        if False and self.remove:
-            from augmentation import mirrorInPhi,duplicateImage,evaluateTwice
-            
-            x_chmapecal= mirrorInPhi(x_chmapecal)
-            x_chmaphcal= mirrorInPhi(x_chmaphcal)
-            
-            notremoves=evaluateTwice(weighter.createNotRemoveIndices,Tuple)
-            
-            weights=duplicateImage(weighter.getJetWeights(Tuple))
-            energytruth   =duplicateImage(energytruth)
-            idtruthtuple  =duplicateImage(idtruthtuple)
-            
+        #if False and self.remove:
+        #    from augmentation import mirrorInPhi,duplicateImage,evaluateTwice
+        #    
+        #    x_chmapecal= mirrorInPhi(x_chmapecal)
+        #    x_chmaphcal= mirrorInPhi(x_chmaphcal)
+        #    
+        #    notremoves=evaluateTwice(weighter.createNotRemoveIndices,Tuple)
+        #    
+        #    weights=duplicateImage(weighter.getJetWeights(Tuple))
+        #    energytruth   =duplicateImage(energytruth)
+        #    idtruthtuple  =duplicateImage(idtruthtuple)
+        #    
             #notremoves -= energytruth<50
             
         

@@ -10,3 +10,4 @@ cd $DEEPHGCAL
 export PATH=$DEEPHGCAL/scripts:$PATH
 export PYTHONPATH=$DEEPHGCAL/DNN/modules:$PYTHONPATH
 export PATH=$DEEPHGCAL/Converter/exe:$DEEPHGCAL/Converter/scripts:$PATH
+export LD_LIBRARY_PATH=~/.lib:$LD_LIBRARY_PATH

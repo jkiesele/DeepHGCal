@@ -35,8 +35,11 @@ add_executable(convert2 mainConvert.cpp ${SOURCE_FILES})
 add_executable(createMergeList mainCreateMergeList.cpp ${SOURCE_FILES})
 add_executable(merge mainMerge.cpp ${SOURCE_FILES})
 add_executable(index mainIndex.cpp ${SOURCE_FILES})
+add_executable(checkFileList mainCheckFiles.cpp)
 
 target_link_libraries(convert2 ${ROOT_LIBRARIES})
 target_link_libraries(createMergeList ${ROOT_LIBRARIES})
 target_link_libraries(merge ${ROOT_LIBRARIES})
 target_link_libraries(index ${ROOT_LIBRARIES})
+target_link_libraries(checkFileList ${ROOT_LIBRARIES})
+

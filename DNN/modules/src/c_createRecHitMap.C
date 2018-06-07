@@ -166,6 +166,7 @@ void fillRecHitMap_priv(boost::python::numeric::array numpyarray,std::string fil
         	nrechits = rh_energybranch.vectorSize(0);
         }
 
+
         for(size_t hit=0; hit < nrechits; hit++) {
             double bincentrephi,bincentreeta;
             double rechitphi=rh_phi_eta.getData(0, hit);
@@ -307,6 +308,31 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
         if(rechitsarevector){
         	nrechits = rh_energybranch.vectorSize(0);
         }
+
+        double etasum=0;
+        double phisum=0;
+        double energysum=0;
+        //re-calculate center
+        for(size_t hit=0; hit < nrechits; hit++) {
+            double rechitphi=rh_phi_eta.getData(0, hit);
+            if(fabs(deltaPhi(rechitphi, seedphi))>xwidth) continue;
+            double rechiteta=rh_phi_eta.getData(1, hit);
+            if(fabs(rechiteta - seedeta)>ywidth) continue;
+            float  energy=rh_energybranch.getData(0, hit);
+
+            //all is around phi=0, so no special considerations needed
+            etasum+=energy*rechiteta;
+            phisum+=energy*rechitphi;
+            energysum+=energy;
+        }
+        double newphi=phisum/energysum;
+        double neweta=etasum/energysum;
+
+        //std::cout << "phicorr " << newphi - seedphi << std::endl;
+        //std::cout << "etacorr " << neweta - seedeta << '\n' << std::endl;
+
+        newphi=seedphi;
+        neweta=seedeta;
 
         for(size_t hit=0; hit < nrechits; hit++) {
             double bincentrephi,bincentreeta;

@@ -138,7 +138,7 @@ std::vector<TChain* > MergeDescriptor::createChains(
             if(! f.EndsWith(".root")) continue;
             if(usexrootd)
                 xrootdedpath=prependXRootD(xrootdedpath);
-            chains.at(i)->Add(xrootdedpath+"/tree");
+            chains.at(i)->Add(xrootdedpath+"/events");
         }
         for(auto& bi:branchinfos){
             bi->setIsRead(true);
