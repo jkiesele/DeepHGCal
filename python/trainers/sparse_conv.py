@@ -185,9 +185,6 @@ class SparseConvTrainer:
         graph_logits, graph_prediction = self.model.get_compute_graphs()
         graph_temp = self.model.get_temp()
 
-        if self.from_scratch:
-            self.clean_summary_dir()
-
         inputs_feed = self.__get_input_feeds(self.test_files, repeat=True)
 
         accuracy_sum = 0
