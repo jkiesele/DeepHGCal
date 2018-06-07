@@ -207,7 +207,6 @@ class H3dConvTrainer:
                     placeholders[0]: inputs[0],
                     placeholders[1]: inputs[1]
                 }
-                print(inputs[1])
                 labels[iteration_number] = np.squeeze(inputs[1])
 
                 t, eval_loss, eval_accuracy, eval_confusion, test_logits, eval_logits = sess.run(

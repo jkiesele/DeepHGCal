@@ -1,8 +1,12 @@
 import tensorflow as tf
 from models.sparse_conv_2 import SparseConv2
+from models.sparse_conv_3 import SparseConv3
 import numpy as np
 import os
 import configparser as cp
+import sys
+from helpers.helpers import get_num_parameters
+from experiment.classification_model_test_result import ClassificationModelTestResult
 
 
 class SparseConvTrainer:
@@ -34,7 +38,9 @@ class SparseConvTrainer:
         self.test_files = self.config['test_files_list']
         self.validate_after = int(self.config['validate_after'])
 
-        self.model = SparseConv2(
+    def initialize(self):
+        model_type = self.config['model_type']
+        self.model = globals()[model_type](
             self.num_spatial_features,
             self.num_spatial_features_local,
             self.num_all_features,
@@ -44,7 +50,6 @@ class SparseConvTrainer:
             self.num_classes,
             self.learning_rate
         )
-
         self.model.initialize()
         self.saver_sparse = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.model.get_variable_scope()))
 
@@ -86,6 +91,8 @@ class SparseConvTrainer:
         return inputs
 
     def train(self):
+        self.initialize()
+
         placeholders = self. model.get_placeholders()
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
@@ -165,6 +172,9 @@ class SparseConvTrainer:
             coord.join(threads)
 
     def test(self):
+        self.num_batch = 1
+        self.initialize()
+
         placeholders = self.model.get_placeholders()
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
@@ -178,7 +188,7 @@ class SparseConvTrainer:
         if self.from_scratch:
             self.clean_summary_dir()
 
-        inputs_feed = self.__get_input_feeds(self.test_files, repeat=False)
+        inputs_feed = self.__get_input_feeds(self.test_files, repeat=True)
 
         accuracy_sum = 0
         num_examples = 0
@@ -196,12 +206,19 @@ class SparseConvTrainer:
             print("\n\nINFO: Loading model\n\n")
             iteration_number = 0
 
+            labels = np.zeros((1000000, self.num_classes))
+            scores = np.zeros((1000000, self.num_classes))
+
             print("Starting iterations")
             while iteration_number < self.train_for_iterations:
                 try:
                     inputs = sess.run(inputs_feed)
                 except tf.errors.OutOfRangeError:
                     break
+
+                print(np.shape(inputs[0]), np.shape(inputs[1]), np.shape(inputs[2]), np.shape(inputs[3]), np.shape(inputs[4]))
+                print(placeholders[0].get_shape().as_list(), placeholders[1].get_shape().as_list(), placeholders[2].get_shape().as_list(),
+                      placeholders[3].get_shape().as_list(),placeholders[4].get_shape().as_list())
 
                 inputs_train_dict = {
                     placeholders[0]: inputs[0],
@@ -211,9 +228,13 @@ class SparseConvTrainer:
                     placeholders[4]: inputs[4]
                 }
 
-                t, eval_loss, eval_accuracy, eval_confusion, test_logits = sess.run(
-                    [graph_temp, graph_loss, graph_accuracy, graph_confusion_matrix, graph_prediction],
+                labels[iteration_number] = np.squeeze(inputs[3])
+
+                t, eval_loss, eval_accuracy, eval_confusion, test_logits, eval_logits = sess.run(
+                    [graph_temp, graph_loss, graph_accuracy, graph_confusion_matrix, graph_prediction, graph_logits],
                     feed_dict=inputs_train_dict)
+
+                scores[iteration_number] = np.squeeze(eval_logits)
 
                 confusion_matrix += eval_confusion
                 accuracy_sum += eval_accuracy * self.num_batch
@@ -223,17 +244,24 @@ class SparseConvTrainer:
                 iteration_number, eval_loss, eval_accuracy, accuracy_sum / num_examples))
                 iteration_number += 1
 
+                if iteration_number == 100:
+                    break
+
             # Stop the threads
             coord.request_stop()
 
             # Wait for threads to stop
             coord.join(threads)
 
+        classes_names = 'Electron', 'Muon', 'Pion Charged', 'Pion Neutral', 'K0 Long', 'K0 Short' # TODO: Pick from config
+
+        test_result = ClassificationModelTestResult()
+        test_result.initialize(confusion_matrix, labels, scores, self.model.get_human_name(),
+                                    get_num_parameters(self.model.get_human_name()), classes_names, self.summary_path)
+        test_result.evaluate(self.test_out_path)
+
         print("Evaluation complete")
         print("Evaluation accuracy ", accuracy_sum / num_examples)
         print("Confusion matrix:")
         print(confusion_matrix)
-        confusion_path = os.path.join(self.test_out_path, 'confusion_matrix.np')
-        print("Confusion matrix written to ", confusion_path)
-        with open(confusion_path, 'wb') as f:
-            confusion_matrix.tofile(f)
+
