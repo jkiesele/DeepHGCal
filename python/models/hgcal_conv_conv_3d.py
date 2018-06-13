@@ -68,21 +68,29 @@ class HgCal3d(Model):
                 return arg_sc
 
     def _find_logits(self):
+        # [Batch, Height, Width, Depth, Channels]
         x = self._placeholder_inputs
         with tf.variable_scope(self.get_variable_scope()):
             with slim.arg_scope(self.arg_scope()):
-                x = slim.conv3d(x, 32, [1, 1, 1], activation_fn=tf.nn.relu, scope='p1_c1', weights_initializer=tf.keras.initializers.lecun_uniform())
-                x = slim.conv3d(x, 12, [1, 1, 1], activation_fn=tf.nn.relu, scope='p1_c2', weights_initializer=tf.keras.initializers.lecun_uniform())
-                x = slim.batch_norm(x)
-                x = slim.conv3d(x, 32, [5, 5, 5], activation_fn=tf.nn.leaky_relu, scope='p1_c3')
-                x = slim.conv3d(x, 8, [5, 5, 5], activation_fn=tf.nn.leaky_relu, scope='p1_c4')
-                x = slim.conv3d(x, 8, [5, 5, 5], activation_fn=tf.nn.leaky_relu, scope='p1_c5')
-                x = slim.conv3d(x, 8, [5, 5, 5], activation_fn=tf.nn.leaky_relu, scope='p1_c6')
+                # [Batch, Depth, Height, Width, Channels]
+                # x = tf.transpose(x, perm=[0,3,1,2,4])
 
-                x = slim.max_pool3d(x, [6, 2, 2], scope='p2_m1')
-                x = slim.conv3d(x, 8, [3, 3, 3], activation_fn=tf.nn.leaky_relu, scope='p2_c1')
-                x = slim.conv3d(x, 8, [3, 3, 3], activation_fn=tf.nn.leaky_relu, scope='p2_c2')
-                x = slim.conv3d(x, 8, [3, 3, 3], activation_fn=tf.nn.leaky_relu, scope='p2_c3')
+                x = slim.conv3d(x, 50, [1, 1, 1], activation_fn=tf.nn.relu, scope='p1_c1')
+                x = slim.conv3d(x, 50, [1, 1, 1], activation_fn=tf.nn.relu, scope='p1_c2')
+                x = slim.conv3d(x, 32, [1, 1, 1], activation_fn=tf.nn.relu, scope='p1_c3')
+                # x = slim.batch_norm(x)
+                x = slim.conv3d(x, 16, [3, 3, 5], activation_fn=tf.nn.relu, scope='p2_c1')
+                x = slim.conv3d(x, 16, [3, 3, 5], activation_fn=tf.nn.relu, scope='p2_c2')
+                x = slim.conv3d(x, 16, [3, 3, 5], activation_fn=tf.nn.relu, scope='p2_c3')
+                x = slim.max_pool3d(x, [2, 2, 2], scope='p1')
+                x = slim.conv3d(x, 32, [3, 3, 5], activation_fn=tf.nn.relu, scope='p2_c4')
+                x = slim.conv3d(x, 32, [3, 3, 5], activation_fn=tf.nn.relu, scope='p2_c5')
+                x = slim.max_pool3d(x, [2, 2, 2], scope='p2')
+                x = slim.conv3d(x, 32, [3, 3, 5], activation_fn=tf.nn.relu, scope='p2_c6')
+                x = slim.conv3d(x, 64, [3, 3, 5], activation_fn=tf.nn.relu, scope='p3_c1')
+                x = slim.max_pool3d(x, [2, 2, 2], scope='p3')
+                x = slim.conv3d(x, 64, [3, 3, 5], activation_fn=tf.nn.relu, scope='p3_c2')
+                x = slim.conv3d(x, 64, [3, 3, 5], activation_fn=tf.nn.relu, scope='p3_c3')
 
                 # x should be [B, H, W, D, 8]
 
