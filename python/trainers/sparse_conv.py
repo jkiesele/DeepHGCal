@@ -1,6 +1,7 @@
 import tensorflow as tf
 from models.sparse_conv_2 import SparseConv2
 from models.sparse_conv_3 import SparseConv3
+from models.sparse_conv_4 import SparseConv4
 import numpy as np
 import os
 import configparser as cp
@@ -92,6 +93,7 @@ class SparseConvTrainer:
 
     def train(self):
         self.initialize()
+        print("Beginning to train network with parameters", get_num_parameters(self.model.get_variable_scope()))
 
         placeholders = self. model.get_placeholders()
         graph_loss = self.model.get_losses()
@@ -155,7 +157,6 @@ class SparseConvTrainer:
                     print("Validation - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss_validation, eval_accuracy_validation))
 
                 print("Training   - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss, eval_accuracy))
-                print(t[0])
                 # print(inputs_train[3][0])
                 iteration_number += 1
                 summary_writer.add_summary(eval_summary, iteration_number)
@@ -174,6 +175,7 @@ class SparseConvTrainer:
     def test(self):
         self.num_batch = 1
         self.initialize()
+        print("Beginning to test network with parameters", get_num_parameters(self.model.get_variable_scope()))
 
         placeholders = self.model.get_placeholders()
         graph_loss = self.model.get_losses()
@@ -254,7 +256,7 @@ class SparseConvTrainer:
 
         test_result = ClassificationModelTestResult()
         test_result.initialize(confusion_matrix, labels, scores, self.model.get_human_name(),
-                                    get_num_parameters(self.model.get_human_name()), classes_names, self.summary_path)
+                               get_num_parameters(self.model.get_variable_scope()), classes_names, self.summary_path)
         test_result.evaluate(self.test_out_path)
 
         print("Evaluation complete")
