@@ -2,6 +2,8 @@ import tensorflow as tf
 from models.sparse_conv_2 import SparseConv2
 from models.sparse_conv_3 import SparseConv3
 from models.sparse_conv_4 import SparseConv4
+from models.sparse_conv_5 import SparseConv5
+from models.sparse_conv_bare import SparseConvBare
 import numpy as np
 import os
 import configparser as cp
@@ -94,7 +96,6 @@ class SparseConvTrainer:
     def train(self):
         self.initialize()
         print("Beginning to train network with parameters", get_num_parameters(self.model.get_variable_scope()))
-
         placeholders = self. model.get_placeholders()
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
@@ -157,7 +158,7 @@ class SparseConvTrainer:
                     print("Validation - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss_validation, eval_accuracy_validation))
 
                 print("Training   - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss, eval_accuracy))
-                # print(inputs_train[3][0])
+                print(t[0])
                 iteration_number += 1
                 summary_writer.add_summary(eval_summary, iteration_number)
                 if iteration_number % self.save_after_iterations == 0:
