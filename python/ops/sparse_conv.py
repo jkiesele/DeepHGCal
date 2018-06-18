@@ -1,5 +1,5 @@
 import tensorflow as tf
-from .neighbors import indexing_tensor
+from .neighbors import indexing_tensor, sort_last_dim_tensor
 
 
 # just for testing
@@ -294,3 +294,97 @@ def sparse_conv_bare(sparse_dict, num_neighbors=10, output_all=15, weight_init_w
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
 
     return construct_sparse_io_dict(output, spatial_features_global, spatial_features_local, num_entries)
+
+
+def sparse_conv_2(sparse_dict, num_neighbors=10, num_filters=15, n_prespace_conditions=3):
+    """
+    Defines sparse convolutional layer
+
+    :param sparse_dict: Dictionary containing input
+    :param num_neighbors: An integer containing number of neighbors to pick + 1 (+1 is for yourself)
+    :param num_filters: Number of output features for color like outputs
+    :return: Dictionary containing output which can be made input to the next layer
+    """
+
+    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
+                                                                                 sparse_dict['spatial_features_global'], \
+                                                                                 sparse_dict['spatial_features_local'], \
+                                                                                 sparse_dict['num_entries']
+
+    _indexing_tensor = indexing_tensor(spatial_features_global, num_neighbors)
+
+    shape_space_features = spatial_features_global.get_shape().as_list()
+    shape_space_features_local = spatial_features_local.get_shape().as_list()
+    shape_all_features = all_features.get_shape().as_list()
+    shape_indexing_tensor = _indexing_tensor.get_shape().as_list()
+
+    n_batch = shape_space_features[0]
+    n_max_entries = shape_space_features[1]
+    n_features_input_all = shape_all_features[2]
+    n_features_input_space = shape_space_features[2]
+    n_max_neighbors = shape_indexing_tensor[2]
+
+    # All of these tensors should be 3-dimensional
+    # TODO: Add assert for indexing_tensor shape
+    assert len(shape_space_features) == 3 and len(shape_all_features) == 3 and len(shape_indexing_tensor) == 4
+
+    # First dimension is batch, second is number of entries, hence these two should be same for all
+    assert shape_space_features[0] == shape_all_features[0]
+    assert shape_space_features[1] == shape_all_features[1]
+
+    # Neighbor matrix should be int as it should be used for indexing
+    assert _indexing_tensor.dtype == tf.int64
+
+    print("Indexing tensor shape", _indexing_tensor.shape)
+    gathered_spatial = tf.gather_nd(spatial_features_global, _indexing_tensor)  # [B,E,5,S]
+
+    print("Gathered spatial shape", spatial_features_global.shape, gathered_spatial.shape)
+    delta_space = sparse_conv_delta(gathered_spatial, spatial_features_global)  # [B,E,5,S]
+
+    spatial_features_local_gathered = tf.gather_nd(spatial_features_local, _indexing_tensor)
+    gathered_all = tf.gather_nd(all_features, _indexing_tensor)  # [B,E,N,A]
+
+    """
+    Hint: (from next line onward)
+        B = Batch Size
+        E = Num max entries
+        N = Number of neighbors
+        S = number of spatial features (both local and global combined)
+        F = number of filters
+        M = Number of pre-space conditions
+    """
+    spatial_features_concatenated = tf.concat([delta_space, spatial_features_local_gathered], axis=-1)  # [B, E, N, S]
+
+    # delta_space = tf.concat([delta_space,delta_space*delta_space], axis=-1)
+
+
+    sorting_condition = tf.layers.dense(inputs=spatial_features_concatenated,
+                                          units=num_filters,
+                                          activation=tf.nn.relu)   # [B, E, N, F]
+
+    space_condition = tf.layers.dense(inputs=spatial_features_concatenated,
+                                          units=(num_filters*n_prespace_conditions),
+                                          activation=tf.nn.relu)  # [B, E, N, F*M]
+    space_condition = tf.reshape(space_condition, [n_batch, n_max_entries, num_neighbors, num_filters, -1])
+
+    filter_outputs = []
+    for i in range(num_filters):
+        filter_input = space_condition[:,:,:, i, :]
+        filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=gauss_activation)
+        tf.expand_dims(filter_output, dim=3)
+        filter_outputs.append(filter_output)
+
+    space_condition = tf.concat(filter_outputs, axis=3)
+    sorting_values = tf.multiply(space_condition, sorting_condition) # [B, E, N, F]
+
+    filter_outputs = []
+    for i in range(num_filters):
+        filter_neighbor_values = sorting_values[..., i] # [B, E, N]
+        sorting_tensor = sort_last_dim_tensor(filter_neighbor_values)
+        filter_input = tf.reshape(tf.gather_nd(gathered_all, sorting_tensor), shape=[n_batch, n_max_entries, -1])
+        filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=tf.nn.relu)
+        filter_outputs.append(filter_output)
+
+    color_like_output = tf.concat(filter_outputs, axis=-1)
+
+    return construct_sparse_io_dict(color_like_output , spatial_features_global, spatial_features_local, num_entries)

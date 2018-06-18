@@ -66,6 +66,37 @@ def indexing_tensor(spatial_features, k=10):
     batch_range = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1),axis=1), axis=1)
     batch_range = tf.tile(batch_range, [1,n_max_entries,k,1])
     expanded_neighbor_matrix = tf.expand_dims(neighbor_matrix, axis=3)
+
     _indexing_tensor = tf.concat([batch_range, expanded_neighbor_matrix], axis=3)
 
     return tf.cast(_indexing_tensor, tf.int64)
+
+
+def n_range_tensor(dims):
+    assert type(dims) is list
+    assert len(dims) != 0
+
+    n_range_tensor = []
+    for i in range(len(dims)):
+        range_in_this_dim = tf.range(dims[i])
+        for j in range(len(dims)):
+            if j != i:
+                range_in_this_dim = tf.expand_dims(range_in_this_dim, axis=j)
+        tile_vector = dims[:]
+        tile_vector[i] = 1
+        range_in_this_dim = tf.tile(range_in_this_dim, tile_vector)
+        range_in_this_dim = tf.expand_dims(range_in_this_dim, axis=len(dims))
+        n_range_tensor.append(range_in_this_dim)
+
+    return tf.concat(n_range_tensor, axis=len(dims))
+
+
+def sort_last_dim_tensor(x):
+    shape = x.shape.as_list()
+    v, ind = tf.nn.top_k(x, shape[-1])
+
+    ind = tf.expand_dims(ind, axis=-1)
+    tensor_combine_with = n_range_tensor(shape)
+    tensor_combine_with = tensor_combine_with[...,0:-1]
+    _indexing_tensor = tf.concat([tensor_combine_with, ind], axis=-1)
+    return _indexing_tensor
