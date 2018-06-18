@@ -3,6 +3,7 @@ from models.sparse_conv_2 import SparseConv2
 from models.sparse_conv_3 import SparseConv3
 from models.sparse_conv_4 import SparseConv4
 from models.sparse_conv_5 import SparseConv5
+from models.sparse_conv_6 import SparseConv6
 from models.sparse_conv_bare import SparseConvBare
 import numpy as np
 import os

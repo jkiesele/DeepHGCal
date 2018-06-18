@@ -2,11 +2,9 @@ import tensorflow as tf
 from .neighbors import indexing_tensor, sort_last_dim_tensor
 
 
-# just for testing
+def gauss_activation(x, name=None):
+    return tf.exp(-x * x / 4, name)
 
-def printLayerStuff(l, desc_str):
-    l=tf.Print(l,[l], desc_str+" ",summarize=2000)
-    return l
 
 def sparse_conv_delta(A, B):
     """
