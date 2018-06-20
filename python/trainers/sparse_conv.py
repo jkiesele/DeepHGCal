@@ -11,6 +11,8 @@ import configparser as cp
 import sys
 from helpers.helpers import get_num_parameters
 from experiment.classification_model_test_result import ClassificationModelTestResult
+from tensorflow.python.profiler import option_builder
+from tensorflow.python.profiler.model_analyzer import Profiler
 
 
 class SparseConvTrainer:
@@ -93,6 +95,83 @@ class SparseConvTrainer:
         inputs = iterator.get_next()
 
         return inputs
+
+    def profile(self):
+        self.initialize()
+        print("Beginning to profile network with parameters", get_num_parameters(self.model.get_variable_scope()))
+        placeholders = self. model.get_placeholders()
+        graph_loss = self.model.get_losses()
+        graph_optmiser = self.model.get_optimizer()
+        graph_summary = self.model.get_summary()
+        graph_summary_validation = self.model.get_summary_validation()
+        graph_accuracy = self.model.get_accuracy()
+        graph_logits, graph_prediction = self.model.get_compute_graphs()
+        graph_temp = self.model.get_temp()
+
+        inputs_feed = self.__get_input_feeds(self.training_files)
+        inputs_validation_feed = self.__get_input_feeds(self.validation_files)
+
+        init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
+        with tf.Session() as sess:
+            sess.run(init)
+            profiler = Profiler(sess.graph)
+
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+            summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
+
+            iteration_number = 0
+
+            print("Starting iterations")
+            run_ops = [graph_temp, graph_loss, graph_optmiser, graph_summary, graph_accuracy, graph_prediction]
+            while iteration_number < 1000:
+                inputs_train = sess.run(list(inputs_feed))
+
+                inputs_train_dict = {
+                    placeholders[0]: inputs_train[0],
+                    placeholders[1]: inputs_train[1],
+                    placeholders[2]: inputs_train[2],
+                    placeholders[3]: inputs_train[3],
+                    placeholders[4]: inputs_train[4]
+                }
+
+                if iteration_number % 100 == 0:
+                    run_meta = tf.RunMetadata()
+
+                    sess.run(run_ops, feed_dict=inputs_train_dict,
+                                 options=tf.RunOptions(
+                                     trace_level=tf.RunOptions.FULL_TRACE),
+                                 run_metadata=run_meta)
+
+                    profiler.add_step(iteration_number, run_meta)
+
+                    # Profile the parameters of your model.
+                    profiler.profile_name_scope(options=(option_builder.ProfileOptionBuilder
+                                                         .trainable_variables_parameter()))
+
+                    # Or profile the timing of your model operations.
+                    opts = option_builder.ProfileOptionBuilder.time_and_memory()
+                    profiler.profile_operations(options=opts)
+
+                    # Or you can generate a timeline:
+                    opts = (option_builder.ProfileOptionBuilder(
+                        option_builder.ProfileOptionBuilder.time_and_memory())
+                            .with_step(iteration_number)
+                            .with_timeline_output(self.config['profiler_output_file_name']).build())
+                    profiler.profile_graph(options=opts)
+
+                else:
+                    sess.run(run_ops, feed_dict=inputs_train_dict)
+
+                print("Profiling - Iteration %4d" % iteration_number)
+                iteration_number += 1
+
+            # Stop the threads
+            coord.request_stop()
+
+            # Wait for threads to stop
+            coord.join(threads)
 
     def train(self):
         self.initialize()
