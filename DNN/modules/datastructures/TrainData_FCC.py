@@ -65,7 +65,13 @@ class TrainData_FCC(TrainData):
         tree = rfile.Get("events")
         self.nsamples=tree.GetEntries()
         
-        self.nsamples=100
+        from DeepJetCore.stopwatch import stopwatch
+        checktime= stopwatch()
+        
+        #just for testing
+        #self.remove=False
+        #self.nsamples=200
+        #end just for testing
         
         import math
         
@@ -87,13 +93,13 @@ class TrainData_FCC(TrainData):
         
         
         ## add pileup from
-        pufiles = ['/eos/experiment/fcc/hh/simulation/samples/v03/physics/MinBias/bFieldOn/etaFull/ntupPU200/positions/output_174816513.root']
+        
         # pass to random seed eta = 0.36 or -0.3 and random phi binned in 2*math.pi/704
         # with random starting point in event number with loop from last back to first event
         # make chain out of input samples and return ECal and HCal structure
         # Add switch to add PU event N times to get N*200 PU
         
-        self.remove=False
+        from pu_files import pufiles
         
         import random
         pu_x_chmapecal=None
@@ -188,6 +194,7 @@ class TrainData_FCC(TrainData):
             energytruth=energytruth[notremoves>0]
         
         print('reduced to '+str(len(x_chmapecal))+' of '+ str(before))
+        print('took '+ str(checktime.getAndContinue())+ ' for '+ str(before)+ ' events')
         self.nsamples=len(x_chmapecal)
         
         self.w=[weights,weights]
