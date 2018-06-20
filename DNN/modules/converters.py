@@ -53,9 +53,25 @@ def simple3Dstructure(Filename_in,nevents,
                                           xbins,xwidth,
                                           ybins,ywidth,
                                           maxlayer,minlayer,sumenergy)
-   
+
+    return array
+
+def simpleRandom3Dstructure(infile_list,nevents,
+                    xbins,xwidth,
+                    ybins,ywidth,
+                    maxlayer,minlayer,seed):
     
-   
+    import numpy as np
+    import c_createRecHitMap
+    
+    array = np.zeros((nevents,xbins,ybins,maxlayer-minlayer,2) , dtype='float32')
+    
+    
+    c_createRecHitMap.simpleRandom3Dstructure(array,infile_list,
+                                          xbins,xwidth,
+                                          ybins,ywidth,
+                                          maxlayer,minlayer,seed)
+
     return array
 
 def setTreeName(name):

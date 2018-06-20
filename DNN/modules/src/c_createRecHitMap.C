@@ -25,6 +25,10 @@
 #include "pythonToSTL.h"
 #include "helper.h"
 #include <cmath>
+#include "TRandom3.h"
+#include "TChain.h"
+#include <algorithm>
+#include <random>
 
 using namespace boost::python; //for some reason....
 
@@ -250,8 +254,12 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
 		bool sumenergy
 ){
 
+
+	//make this a chain
     TFile* tfile= new TFile(filename.c_str(), "READ");
     TTree* tree = (TTree*) tfile->Get(treename);
+
+
 
     int layer_offset=0;
 
@@ -327,12 +335,8 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
         }
         double newphi=phisum/energysum;
         double neweta=etasum/energysum;
-
-        //std::cout << "phicorr " << newphi - seedphi << std::endl;
-        //std::cout << "etacorr " << neweta - seedeta << '\n' << std::endl;
-
-        newphi=seedphi;
-        neweta=seedeta;
+        seedphi = newphi;
+        seedeta = neweta;
 
         for(size_t hit=0; hit < nrechits; hit++) {
             double bincentrephi,bincentreeta;
@@ -389,6 +393,136 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
     }
     tfile->Close();
     delete tfile;
+}
+
+void checkBranchSetReturn(int ret, TString branchname_ ){
+	if(ret == -2 || ret == -1){
+		std::cout << "tBranchHandler: Class type given for branch " << branchname_
+				<< " does not match class type in tree. (root CheckBranchAddressType returned " << ret << ")" <<std::endl;
+		throw std::runtime_error("tBranchHandler: Class type does not match class type in branch");
+	}
+	else if(ret == -4 || ret == -3){
+		std::cout << "tBranchHandler: Internal error in branch " << branchname_
+				<< " (root CheckBranchAddressType returned " << ret << ")" <<std::endl;
+		throw std::runtime_error("tBranchHandler: Internal error in branch");
+	}
+	else if( ret == -5){
+		std::cout << "tBranchHandler: branch " << branchname_ << " does not exists!" << std::endl;
+		throw std::runtime_error("tBranchHandler: branch does not exists!");
+
+	}
+}
+void simpleRandom3Dstructure(boost::python::numeric::array numpyarray,
+		const boost::python::list infiles,
+        int xbins, float xwidth,
+		int ybins, float ywidth,
+		int maxlayer, int minlayer,
+		int seed
+){
+
+	const bool sumenergy=true;
+	std::vector<TString>  allfiles = toSTLVector<TString>(infiles);
+	const double seedeta=0.36;
+
+	TChain * tree = new TChain();
+
+
+	TRandom3 rand(seed);
+
+	for(size_t i=0;i<allfiles.size();i++){
+		tree->Add(allfiles.at(i)+"/"+treename);
+	}
+
+
+
+    int layer_offset=0;
+
+    int branchset=0;
+
+    std::vector<int> * rechit_layer=0;
+    auto rechit_layer_branch=tree->GetBranch("rechit_layer");
+    rechit_layer_branch->SetAddress(&rechit_layer);
+
+    std::vector<float> * rechit_eta=0;
+    auto rechit_eta_branch=tree->GetBranch("rechit_eta");
+    rechit_eta_branch->SetAddress(&rechit_eta);
+
+    std::vector<float> * rechit_phi=0;
+    auto rechit_phi_branch=tree->GetBranch("rechit_phi");
+    rechit_phi_branch->SetAddress(&rechit_phi);
+
+    std::vector<float> * rechit_energy=0;
+    auto rechit_energy_branch=tree->GetBranch("rechit_energy");
+    rechit_energy_branch->SetAddress(&rechit_energy);
+
+
+
+
+    const int ntreeevents=tree->GetEntries();
+    const int noutputevents=boost::python::len(numpyarray);
+    int doneoutputevents=0;
+
+    int it=(int)rand.Uniform(0,ntreeevents-1);//starting event
+
+    // event loop
+    while(doneoutputevents<noutputevents){
+
+    	it++;
+    	if(it>=ntreeevents) it=0;
+
+    	tree->LoadTree(it);
+    	rechit_layer_branch->GetEntry(it);
+    	rechit_eta_branch->GetEntry(it);
+    	rechit_phi_branch->GetEntry(it);
+    	rechit_energy_branch->GetEntry(it);
+
+    	//rechit_layer_branch->GetEntry(it);
+
+        const float signs[]={-1,1};
+        float etamult=signs[rand.Integer(2)];
+        double seedphi=2.*3.1415926536/704.*(int)rand.Uniform(0,704.5);
+
+        size_t nrechits = rechit_layer->size();//rechit_layer.size();
+
+        if(!nrechits || nrechits>1e9)continue;
+
+        for(size_t hit=0; hit < nrechits; hit++) {
+
+            int layer=rechit_layer->at(hit);
+            if(layer>=maxlayer)
+                continue;
+            if(layer<minlayer)
+                continue;
+            layer-=minlayer;
+
+            double bincentrephi,bincentreeta;
+            const float& rechitphi=rechit_phi->at(hit);
+            if(fabs(deltaPhi(rechitphi,seedphi))>xwidth) continue;
+
+            const double rechiteta=etamult*rechit_eta->at(hit);
+            if(fabs(seedeta-rechiteta)>ywidth)continue;
+
+            int phibin = square_bins(rechitphi, seedphi, xbins, xwidth,true,bincentrephi);
+            int etabin = square_bins(rechiteta, seedeta-0.0001, ybins, ywidth,false,bincentreeta);
+
+
+            if(phibin == -1 || etabin == -1) continue;
+
+
+            float drbinseed=deltaR(bincentrephi,bincentreeta,seedphi,seedeta);
+
+            float energy=1000*rechit_energy->at(hit);
+            float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
+            float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
+
+            numpyarray[doneoutputevents][phibin][etabin][layer][0]=layer+minlayer;
+            numpyarray[doneoutputevents][phibin][etabin][layer][1]  +=energy;
+
+        }
+
+        doneoutputevents++;
+    }
+    //delete tree;
 }
 
 void fillRecHitMap(boost::python::numeric::array numpyarray,std::string filename,
@@ -548,4 +682,5 @@ BOOST_PYTHON_MODULE(c_createRecHitMap) {
     def("fillRecHitListNoTime", &fillRecHitListNoTime);
     def("setTreeName", &setTreeName);
     def("simple3Dstructure", &simple3Dstructure);
+    def("simpleRandom3Dstructure", &simpleRandom3Dstructure);
 }

@@ -5,6 +5,48 @@ import keras.backend as K
 from keras.engine import InputSpec
 import copy
 import numpy as np
+from keras.layers import Flatten
+
+
+class Sum3DFeatureOne(Layer):
+    def __init__(self,featindex=1, **kwargs):
+        super(Sum3DFeatureOne, self).__init__(**kwargs)
+        self.featindex = featindex
+        
+    def compute_output_shape(self, input_shape):
+        return tuple([input_shape[0],1])
+
+    def call(self, inputs):
+        permtolist=Flatten()(inputs[:,:,:,:,self.featindex])
+        out= K.sum(permtolist, axis=-1, keepdims=True)/1000
+        return out
+
+    def get_config(self):
+        config = {'featindex': self.featindex}
+        base_config = super(Sum3DFeatureOne, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
+
+
+class Sum3DFeaturePerLayer(Layer):
+    def __init__(self,layerindex,featindex=1, **kwargs):
+        super(Sum3DFeaturePerLayer, self).__init__(**kwargs)
+        self.featindex = featindex
+        self.layerindex=layerindex
+        
+    def compute_output_shape(self, input_shape):
+        return tuple([input_shape[0],1])
+
+    def call(self, inputs):
+        permtolist=Flatten()(inputs[:,:,:,self.layerindex,self.featindex])
+        out= K.sum(permtolist, axis=-1, keepdims=True)/1000
+        return out
+
+    def get_config(self):
+        config = {'layerindex': self.layerindex,'featindex': self.featindex}
+        base_config = super(Sum3DFeaturePerLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
+
+
 
 
 class PermuteBatch(Layer):
@@ -95,5 +137,8 @@ class ReshapeBatch(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 global_layers_list = {}
+global_layers_list['Sum3DFeatureOne'] = Sum3DFeatureOne
+global_layers_list['Sum3DFeaturePerLayer'] = Sum3DFeaturePerLayer
 global_layers_list['ReshapeBatch'] = ReshapeBatch
 global_layers_list['PermuteBatch'] = PermuteBatch
+

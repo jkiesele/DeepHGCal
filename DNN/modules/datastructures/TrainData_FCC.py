@@ -13,6 +13,8 @@ class TrainData_FCC(TrainData):
         
         self.treename="events"
         
+        self.pu_multi=1
+        
         self.undefTruth=['']
     
         self.truthclasses=['isGamma',
@@ -53,7 +55,7 @@ class TrainData_FCC(TrainData):
     def readFromRootFile(self,filename,TupleMeanStd, weighter):
         
         #the first part is standard, no changes needed
-        from converters import simple3Dstructure, setTreeName
+        from converters import simple3Dstructure, setTreeName, simpleRandom3Dstructure
         setTreeName("events")
         import numpy
         import ROOT
@@ -62,6 +64,8 @@ class TrainData_FCC(TrainData):
         rfile = ROOT.TFile(filename)
         tree = rfile.Get("events")
         self.nsamples=tree.GetEntries()
+        
+        self.nsamples=100
         
         import math
         
@@ -82,22 +86,68 @@ class TrainData_FCC(TrainData):
                                     maxlayer=18, minlayer=8,sumenergy=True)
         
         
-        #from plotting import plot4d
-        #
-        #
-        #for i in range(10):
-        #    plot4d(x_chmapecal[i],"ecal"+str(i)+".pdf")
-        #    
-        #    plot4d(x_chmaphcal[i],"hcal"+str(i)+".pdf")
-        #    print('printed '+str(i))
-        #
-        #exit()
+        ## add pileup from
+        pufiles = ['/eos/experiment/fcc/hh/simulation/samples/v03/physics/MinBias/bFieldOn/etaFull/ntupPU200/positions/output_174816513.root']
+        # pass to random seed eta = 0.36 or -0.3 and random phi binned in 2*math.pi/704
+        # with random starting point in event number with loop from last back to first event
+        # make chain out of input samples and return ECal and HCal structure
+        # Add switch to add PU event N times to get N*200 PU
+        
+        self.remove=False
+        
+        import random
+        pu_x_chmapecal=None
+        pu_x_chmaphcal=None
+        for i in range(self.pu_multi):
+            print('adding PU '+str((i+1)*200))
+            seed = random.randint(0, 1e7)
+            #create PU only once - VERY SLOW
+            if not i:
+                pu_x_chmapecal=simpleRandom3Dstructure(pufiles,self.nsamples,
+                                            xbins=34,
+                                            xwidth=2*math.pi/704*34/2,
+                                            ybins=34,
+                                            ywidth=0.17,
+                                            maxlayer=8, minlayer=0, seed=seed)
+                
+                pu_x_chmaphcal=simpleRandom3Dstructure(pufiles,self.nsamples,
+                                            xbins=17,
+                                            xwidth=2*math.pi/256*17/2,
+                                            ybins=17,
+                                            ywidth=0.2125,
+                                            maxlayer=18, minlayer=8,seed=seed)
+            else:
+                #just re-use PU and random shuffle to other events
+                from sklearn.utils import shuffle
+                pu_x_chmapecal=shuffle(pu_x_chmapecal, random_state=seed)
+                pu_x_chmaphcal=shuffle(pu_x_chmaphcal, random_state=seed)
+            
+            x_chmapecal = numpy.add(x_chmapecal,pu_x_chmapecal)
+            x_chmaphcal = numpy.add(x_chmaphcal,pu_x_chmaphcal)
+        
+        makeplots=False
+        if makeplots:
+            from plotting import plot4d
+            
+            
+            for i in range(10):
+                plot4d(x_chmapecal[i],"ecal"+str(i)+".pdf")
+                
+                plot4d(x_chmaphcal[i],"hcal"+str(i)+".pdf")
+                print('printed '+str(i))
+            
+            exit()
         
         
         Tuple = self.readTreeFromRootToTuple(filename)  
         
         idtruthtuple =  self.reduceTruth(Tuple[self.truthclasses])
+        
         energytruth  =  numpy.array(Tuple[self.regtruth])
+        
+        
+        removemuons=False
+        
         #simple by-hand scaling to around 0 with a width of max about 1
         
         
@@ -105,6 +155,12 @@ class TrainData_FCC(TrainData):
         
         notremoves=numpy.zeros(energytruth.shape[0])
         notremoves+=1
+        
+        #remove muons
+        if removemuons:
+            ismuon=Tuple['isMuon']
+            notremoves[ismuon>0] = 0
+            
         
         #no augmentation so far
         #if False and self.remove:

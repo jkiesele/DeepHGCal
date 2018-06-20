@@ -14,35 +14,60 @@ import mpl_toolkits.mplot3d.art3d as a3d
 
 td=TrainData()
 td.readIn(args.inputFile)
-x_chmap=td.x[1]
-del td
-nentries=x_chmap.shape[0]
-ncolors=x_chmap[0].shape[3]
 
-xcenter=x_chmap[0].shape[0]/2
-xmax=x_chmap[0].shape[0]
-ycenter=x_chmap[0].shape[1]/2
-ymax=x_chmap[0].shape[1]
-zcenter=x_chmap[0].shape[2]/2
+nentries=td.x[0].shape[0]
 
-print(ncolors)
+print('data read. making plots')
 
 for i in range(nentries):
-    print(x_chmap[i].shape)
-    for j in [0]: #range(ncolors):
-        ax,plot,x,y,z,c=plot4d(x_chmap[i][:,:,:,j:j+1],'','etabin','layer','phibin')
+    
+    
+    
+    for k in range(2): #ecal hcal
+        recmap=td.x[k]
+        nentries=recmap.shape[0]
+        ncolors=recmap[0].shape[3]
         
-        l = a3d.Line3D((xcenter,xcenter),(0,0),(0,ymax),c = 'k', ls = '--')
-        ax.add_line(l)
-        l2 = a3d.Line3D((0,xmax),(0,0),(ycenter,ycenter),c = 'k', ls = '--')
-        ax.add_line(l2)
-        #ax.view_init(0,90)
+        xcenter=recmap[0].shape[0]/2
+        xmax=recmap[0].shape[0]
+        ycenter=recmap[0].shape[1]/2
+        ymax=recmap[0].shape[1]
+        zcenter=recmap[0].shape[2]/2
         
-        #ax.plot(x, y, 'r+', zdir='y')#, zs=1.5)
-        #ax.plot(z, y, 'g+', zdir='x')#, zs=-0.5)
-        #ax.plot(x, z, 'b+', zdir='z')#, zs=-1.5)
+        xyrange=34
+        zrange=8
+        if k:
+            print('hcal')
+            xyrange=17
+            zrange=10
+        else:
+            print('ecal')
+            
+        print('true energy: ', td.y[1][i])
+        print('true ID [isGamma, isElectron, isPionCharged, isNeutralPion, isMuon]', td.y[0][i])
 
-        plot.show()
-        #input("Press [enter] to continue.")
-        plot.close()
+        for j in [1]: #range(ncolors): only the energy entry
+            
+            
+            ax,plot,x,y,z,c=plot4d(recmap[i][:,:,:,j:j+1],'','phi-bin','layer','eta-bin')
+            
+            ax.set_ylim3d(0,zrange)
+            ax.set_zlim3d(0,xyrange)
+            ax.set_xlim3d(0,xyrange)
+            
+            l = a3d.Line3D((xcenter,xcenter),(0,0),(0,ymax),c = 'k', ls = '--')
+            #ax.add_line(l)
+            l2 = a3d.Line3D((0,xmax),(0,0),(ycenter,ycenter),c = 'k', ls = '--')
+            #ax.add_line(l2)
+            
+            
+            #ax.view_init(0,90)
+            
+            #ax.plot(x, y, 'r+', zdir='y')#, zs=1.5)
+            #ax.plot(z, y, 'g+', zdir='x')#, zs=-0.5)
+            #ax.plot(x, z, 'b+', zdir='z')#, zs=-1.5)
+        
+            plot.show()
+            #input("Press [enter] to continue.")
+            #plot.close()
     

@@ -127,17 +127,20 @@ def plot4d(inputarray, outname, xlabel='', ylabel='', zlabel='', project=1):
     x, y, z, _ = inputarray.nonzero()
     c = inputarray.flatten()
     c = c[c != 0]
-    c = log
+    #c = log
 
     # c=c/c.max()
     # c*=100
-    s = c / c.max()
-    s *= 100
+    c = c / c.max()
+    #print(c)
+    s = np.array(c)
+    s *= 50
     from math import log10
     #s = s + 0.01
     for i in range(len(s)):
-        s[i]=log10(s[i]+11)
-        c[i]=log10(c[i]+10)
+        #s[i]=log10(s[i]+11)
+        #c[i]=log10(c[i]+10)
+        pass
         
     
     #sarr=c>0.06914700
@@ -150,7 +153,7 @@ def plot4d(inputarray, outname, xlabel='', ylabel='', zlabel='', project=1):
     #colmap.set_array(c)
     
     #s=s+1
-    ax.scatter(x, z, y, c=cm.gist_yarg(c),s=s)
+    ax.scatter(x, z, y, c=cm.hot(c),s=s)
     
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)

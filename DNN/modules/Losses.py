@@ -2,6 +2,88 @@ from keras import backend as K
 
 global_loss_list = {}
 
+def huber(x):
+    clip_delta=10.
+    import tensorflow as tf
+    
+    cond  = tf.abs(x) < clip_delta
+    
+    squared_loss = tf.square(x)
+    linear_loss  = 2* clip_delta * (tf.abs(x) - 0.5 * clip_delta)
+    
+    return tf.where(cond, squared_loss, linear_loss)
+
+def huber_loss(y_true, y_pred):
+    return huber(y_true-y_pred)
+    
+
+global_loss_list['huber_loss']=huber_loss
+
+def huber_loss_calo(y_true, y_pred):
+    '''
+    calo-like huber loss with quadratic until around 10% relative difference for inputs around 100
+    '''
+    import tensorflow as tf
+    scaleddiff=(y_true-y_pred)/tf.sqrt(y_true+0.1)
+    return huber(scaleddiff)
+    
+
+global_loss_list['huber_loss_calo']=huber_loss_calo
+
+
+def acc_calo_relative_rms(y_true, y_pred):
+    import tensorflow as tf
+    return tf.sqrt(K.mean( tf.square((y_true-y_pred)/( y_true+0.1)) , axis=-1)) * 100
+    
+global_loss_list['acc_calo_relative_rms']=acc_calo_relative_rms
+
+def loss_logcoshClipped(y_true, y_pred):
+    """
+    scaled log cosh with nan detection
+    scale set to 100, after which it becomes linearish
+    """
+    
+    scaler=30
+    #from tensorflow import where, greater, abs, zeros_like, exp
+    import tensorflow as tf
+    
+    def cosh(x):
+        return (tf.exp(x) + tf.exp(-x)) / 2
+    
+    def scaledlogcoshdiff(x,y,scale):
+        return tf.log(cosh(x/scale - y/scale))
+                     
+    def cleaned_scaledlogcoshdiff(x,y,scale):
+        logcosh=scaledlogcoshdiff(x,y,scale)
+        return tf.where(tf.is_nan(logcosh), tf.zeros_like(logcosh)+scaler*scaler*tf.abs(x-y), logcosh)
+    
+    
+    return K.mean(2*scaler*scaler*cleaned_scaledlogcoshdiff(y_true,y_pred,scaler) , axis=-1)
+    
+global_loss_list['loss_logcoshClipped']=loss_logcoshClipped
+
+
+def loss_Calo_logcoshClipped(y_true, y_pred):
+    
+    scaler=.1 #get linear after 10% resolution
+
+    import tensorflow as tf
+    
+    def cosh(x):
+        calccosh=(tf.exp(x) + tf.exp(-x)) / 2
+        return tf.where(tf.is_nan(calccosh), tf.square(x) , calccosh)
+    
+    def scaledrellogcoshdiff(x,y,scale):
+        out = tf.log(cosh( (x - y)/(scale* tf.sqrt(tf.abs(x)+1) ) ))
+        out = tf.where(tf.is_nan(out), tf.square(x - y) , out)
+        return tf.where(tf.is_inf(out), tf.square(x - y) , out)
+
+    return K.mean(scaledrellogcoshdiff(y_true,y_pred,scaler) , axis=-1)
+    
+
+global_loss_list['loss_Calo_logcoshClipped']=loss_Calo_logcoshClipped
+
+
 
 def mean_squared_mixed_logarithmic_error(y_true, y_pred):
     from tensorflow import where, greater
@@ -75,7 +157,7 @@ def loss_modRelMeanSquaredError(y_true, x_pred):
     testing - name is also wrong depending on commit..
     """
 
-    res = K.square((x_pred - y_true)) / (y_true + .05)
+    res = K.square((x_pred - y_true)) / (y_true + 3.)
     # res=where(greater(y_true,0.0001),res,zeros_like(y_true))
 
     return K.mean(res, axis=-1)

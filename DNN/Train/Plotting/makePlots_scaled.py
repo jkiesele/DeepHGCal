@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser('Apply a model to a (test) sample and create friend trees to inject it inthe original ntuple')
 parser.add_argument('inputDir')
+parser.add_argument('select',default='')
 args = parser.parse_args()
 
 
@@ -28,47 +29,66 @@ for i in range(len(truthclasses)):
     cuts.append(energyrange+'&&'+truthclasses[i])
 
 
-makePlots_async(infile, #input file or file list
-                truthclasses, #legend names [as list]
-                'reg_E/true_energy:true_energy', #variable to plot --> yaxis:xaxis
-                cuts, #list of cuts to apply
-                'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
-                outdir+'/resolution_ClassProfile.pdf', #output file (pdf)
-                'E_{true} [GeV]', #xaxisname
-                'E_{pred}/E_{true}', #yaxisname
-                False, #normalize
-                True, #make a profile plot
-                0.1, #override min value of y-axis range
-                2.,
-                treename='events') #override max value of y-axis range
-
-
-makePlots_async(infile, #input file or file list
-                truthclasses, #legend names [as list]
-                '(reg_E-true_energy):true_energy', #variable to plot --> yaxis:xaxis
-                cuts, #list of cuts to apply
-                'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
-                outdir+'/abserror_ClassProfile.pdf', #output file (pdf)
-                'E_{true} [GeV]', #xaxisname
-                'E_{pred} - E_{true}', #yaxisname
-                False, #normalize
-                True, #make a profile plot
-                -100, #override min value of y-axis range
-                100,
-                treename='events') #override max value of y-axis range
-
-
-makePlots_async(infile, #input file or file list
-                truthclasses, #legend names [as list]
-                'reg_E', #variable to plot --> yaxis:xaxis
-                cuts, #list of cuts to apply
-                'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
-                outdir+'/pred_ClassProfile.pdf', #output file (pdf)
-                'pred energy [GeV]', #xaxisname
-                'E_{pred}', #yaxisname
-                True, #normalize
-                False, #make a profile plot
-                treename='events') #override max value of y-axis range
+if args.select != 'idonly':
+    makePlots_async(infile, #input file or file list
+                    truthclasses, #legend names [as list]
+                    'reg_E/true_energy:true_energy', #variable to plot --> yaxis:xaxis
+                    cuts, #list of cuts to apply
+                    'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
+                    outdir+'/resolution_ClassProfile.pdf', #output file (pdf)
+                    'E_{true} [GeV]', #xaxisname
+                    'E_{pred}/E_{true}', #yaxisname
+                    False, #normalize
+                    True, #make a profile plot
+                    0.8, #override min value of y-axis range
+                    1.2,
+                    treename='events') #override max value of y-axis range
+    
+    makePlots_async(infile, #input file or file list
+                    truthclasses, #legend names [as list]
+                    'reg_E/true_energy:true_energy', #variable to plot --> yaxis:xaxis
+                    cuts, #list of cuts to apply
+                    'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
+                    outdir+'/resolutionwidth_ClassProfile.pdf', #output file (pdf)
+                    'E_{true} [GeV]', #xaxisname
+                    'E_{pred}/E_{true}', #yaxisname
+                    False, #normalize
+                    True, #make a profile plot
+                    0.1, #override min value of y-axis range
+                    2.,
+                    treename='events',
+                    widthprofile=True) #override max value of y-axis range
+    
+    
+    #widthprofile
+    
+    
+    makePlots_async(infile, #input file or file list
+                    truthclasses, #legend names [as list]
+                    '(reg_E-true_energy):true_energy', #variable to plot --> yaxis:xaxis
+                    cuts, #list of cuts to apply
+                    'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
+                    outdir+'/abserror_ClassProfile.pdf', #output file (pdf)
+                    'E_{true} [GeV]', #xaxisname
+                    'E_{pred} - E_{true}', #yaxisname
+                    False, #normalize
+                    True, #make a profile plot
+                    -100, #override min value of y-axis range
+                    100,
+                    treename='events') #override max value of y-axis range
+    
+    
+    makePlots_async(infile, #input file or file list
+                    truthclasses, #legend names [as list]
+                    'reg_E', #variable to plot --> yaxis:xaxis
+                    cuts, #list of cuts to apply
+                    'auto,dashed', #list of color and style, e.g. ['red,dashed', ...]
+                    outdir+'/pred_ClassProfile.pdf', #output file (pdf)
+                    'pred energy [GeV]', #xaxisname
+                    'E_{pred}', #yaxisname
+                    True, #normalize
+                    False, #make a profile plot
+                    treename='events') #override max value of y-axis range
 
 
 
@@ -79,7 +99,8 @@ for part in truthclasses:
         if part==compare:continue
         cpmclasses.append(compare)
     
-    makeROCs_async(intextfile=infile, 
+    if args.select != 'enonly':
+        makeROCs_async(intextfile=infile, 
                        name_list=          cpmclasses, 
                        probabilities_list= 'prob_'+part, 
                        truths_list=        part, 
@@ -89,19 +110,68 @@ for part in truthclasses:
                        cuts='',
                        treename='events')
     
-    for compare in truthclasses:
-        if part==compare:continue
+    if args.select != 'idonly':
+    ##energy resolution plot
+        xrange=0.5
+        if part == 'isMuon':
+            xrange=0.8
+        elif part == 'isElectron' or part == 'isGamma':
+            xrange = 0.06
+        makePlots_async(infile, #input file or file list
+                ['E < 75 GeV',
+                 'E = [75,150] GeV',
+                 'E = [150,400] GeV',
+                 'E >400 GeV'], #legend names [as list]
+                
+                4*['reg_E/true_energy - 1'], #variable to plot --> yaxis:xaxis
+                [part+'&& true_energy<75',
+                 part+'&& true_energy>75 && true_energy<150',
+                 part+'&& true_energy>150 && true_energy<400',
+                 part+'&& true_energy>400'], #list of cuts to apply
+                'auto', #list of color and style, e.g. ['red,dashed', ...]
+                outdir+'/resolution_'+ part+'.pdf', #output file (pdf)
+                'E_{pred}/E_{true}-1', #xaxisname
+                'A.U.', #yaxisname
+                normalized=True,
+                nbins=37,
+                xmin=-xrange,xmax=xrange,
+                treename='events') #override max value of y-axis range
+        makePlots_async(infile,
+                ['E = 100 GeV',
+                 'E = 200 GeV',
+                 'E = 500 GeV',
+                 'E = 1000 GeV'], #legend names [as list]
+                
+                4*['reg_E/true_energy - 1'], #variable to plot --> yaxis:xaxis
+                [part+'&& abs(true_energy - 100)<20',
+                 part+'&& abs(true_energy - 200)<20',
+                 part+'&& abs(true_energy - 500)<50',
+                 part+'&& abs(true_energy - 1000)<100'], #list of cuts to apply
+                'auto', #list of color and style, e.g. ['red,dashed', ...]
+                outdir+'/resolution_fixeden_'+ part+'.pdf', #output file (pdf)
+                'E_{pred}/E_{true}-1', #xaxisname
+                'A.U.', #yaxisname
+                normalized=True,
+                nbins=37,
+                xmin=-xrange,xmax=xrange,
+                treename='events') 
+        
+    
+    if args.select != 'enonly':
+        for compare in truthclasses:
+            if part==compare:continue
         
         
         
-        makeROCs_async(intextfile=infile, 
-                       name_list=          ['<500 GeV','>500 GeV'], 
+            makeROCs_async(intextfile=infile, 
+                       name_list=          ['<200 GeV','200-500 GeV','>500 GeV'], 
                        probabilities_list= 'prob_'+part, 
                        truths_list=        part, 
                        vetos_list=         compare, 
                        colors_list='auto,dashed', 
                        outpdffile=outdir+'ROC_'+part+ '_vs_'+compare+'.pdf', 
-                       cuts=['true_energy<500',
+                       cuts=['true_energy<200',
+                             'true_energy>=200 && true_energy< 500',
                              'true_energy>=500'
                              ],
                        treename='events')
