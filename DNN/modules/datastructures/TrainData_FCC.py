@@ -70,8 +70,11 @@ class TrainData_FCC(TrainData):
         
         #just for testing
         #self.remove=False
-        #self.nsamples=200
+        #self.nsamples=10
         #end just for testing
+        
+        removemuons=False
+        makeplots=False
         
         import math
         
@@ -94,12 +97,14 @@ class TrainData_FCC(TrainData):
         
         ## add pileup from
         
-        # pass to random seed eta = 0.36 or -0.3 and random phi binned in 2*math.pi/704
+        # pass to random seed eta = 0.36 or -0.36 and random phi binned in 2*math.pi/704
         # with random starting point in event number with loop from last back to first event
         # make chain out of input samples and return ECal and HCal structure
         # Add switch to add PU event N times to get N*200 PU
-        
-        from pu_files import pufiles
+        import glob
+        pufiles = glob.glob("/eos/experiment/fcc/hh/simulation/samples/v03/physics/MinBias/bFieldOn/etaFull/ntupPU200/positions/*.root")
+        #pufiles=pufiles[1:2]
+        #pufiles=['/eos/experiment/fcc/hh/simulation/samples/v03/physics/MinBias/bFieldOn/etaFull/ntupPU200/positions/*.root']
         
         import random
         pu_x_chmapecal=None
@@ -131,7 +136,7 @@ class TrainData_FCC(TrainData):
             x_chmapecal = numpy.add(x_chmapecal,pu_x_chmapecal)
             x_chmaphcal = numpy.add(x_chmaphcal,pu_x_chmaphcal)
         
-        makeplots=False
+        
         if makeplots:
             from plotting import plot4d
             
@@ -152,7 +157,7 @@ class TrainData_FCC(TrainData):
         energytruth  =  numpy.array(Tuple[self.regtruth])
         
         
-        removemuons=False
+        
         
         #simple by-hand scaling to around 0 with a width of max about 1
         

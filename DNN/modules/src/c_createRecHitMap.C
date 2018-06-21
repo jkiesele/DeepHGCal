@@ -423,104 +423,126 @@ void simpleRandom3Dstructure(boost::python::numeric::array numpyarray,
 	const bool sumenergy=true;
 	std::vector<TString>  allfiles = toSTLVector<TString>(infiles);
 	const double seedeta=0.36;
+    const int noutputevents=boost::python::len(numpyarray);
+    int doneoutputevents=0;
 
-	TChain * tree = new TChain();
+	int layer_offset=0;
+	int branchset=0;
+
 
 
 	TRandom3 rand(seed);
 
-	for(size_t i=0;i<allfiles.size();i++){
-		tree->Add(allfiles.at(i)+"/"+treename);
-	}
+	std::cout << "PU_mixer: adding PU rechits.." << std::endl;
 
-
-
-    int layer_offset=0;
-
-    int branchset=0;
-
-    std::vector<int> * rechit_layer=0;
-    auto rechit_layer_branch=tree->GetBranch("rechit_layer");
-    rechit_layer_branch->SetAddress(&rechit_layer);
-
-    std::vector<float> * rechit_eta=0;
-    auto rechit_eta_branch=tree->GetBranch("rechit_eta");
-    rechit_eta_branch->SetAddress(&rechit_eta);
-
-    std::vector<float> * rechit_phi=0;
-    auto rechit_phi_branch=tree->GetBranch("rechit_phi");
-    rechit_phi_branch->SetAddress(&rechit_phi);
-
-    std::vector<float> * rechit_energy=0;
-    auto rechit_energy_branch=tree->GetBranch("rechit_energy");
-    rechit_energy_branch->SetAddress(&rechit_energy);
-
-
-
-
-    const int ntreeevents=tree->GetEntries();
-    const int noutputevents=boost::python::len(numpyarray);
-    int doneoutputevents=0;
-
-    int it=(int)rand.Uniform(0,ntreeevents-1);//starting event
-
-    // event loop
+	int readfile=(int)rand.Uniform(0,allfiles.size()-1);
+    size_t addedfiles=0;
     while(doneoutputevents<noutputevents){
 
-    	it++;
-    	if(it>=ntreeevents) it=0;
+    	if(readfile>=allfiles.size())
+    		readfile=0;
 
-    	tree->LoadTree(it);
-    	rechit_layer_branch->GetEntry(it);
-    	rechit_eta_branch->GetEntry(it);
-    	rechit_phi_branch->GetEntry(it);
-    	rechit_energy_branch->GetEntry(it);
+    	TFile * tfile=new TFile(allfiles.at(readfile), "READ");
+    	TTree * tree = (TTree*) tfile->Get(treename);
+    	if(!tree || tree->IsZombie()){
+    		delete tfile;
+    		continue;
+    	}
+    	std::cout << "PU_mixer: using file " << allfiles.at(readfile) << std::endl;
+    	readfile++;
 
-    	//rechit_layer_branch->GetEntry(it);
+    	std::vector<int> * rechit_layer=0;
+    	auto rechit_layer_branch=tree->GetBranch("rechit_layer");
+    	rechit_layer_branch->SetAddress(&rechit_layer);
 
-        const float signs[]={-1,1};
-        float etamult=signs[rand.Integer(2)];
-        double seedphi=2.*3.1415926536/704.*(int)rand.Uniform(0,704.5);
+    	std::vector<float> * rechit_eta=0;
+    	auto rechit_eta_branch=tree->GetBranch("rechit_eta");
+    	rechit_eta_branch->SetAddress(&rechit_eta);
 
-        size_t nrechits = rechit_layer->size();//rechit_layer.size();
+    	std::vector<float> * rechit_phi=0;
+    	auto rechit_phi_branch=tree->GetBranch("rechit_phi");
+    	rechit_phi_branch->SetAddress(&rechit_phi);
 
-        if(!nrechits || nrechits>1e9)continue;
-
-        for(size_t hit=0; hit < nrechits; hit++) {
-
-            int layer=rechit_layer->at(hit);
-            if(layer>=maxlayer)
-                continue;
-            if(layer<minlayer)
-                continue;
-            layer-=minlayer;
-
-            double bincentrephi,bincentreeta;
-            const float& rechitphi=rechit_phi->at(hit);
-            if(fabs(deltaPhi(rechitphi,seedphi))>xwidth) continue;
-
-            const double rechiteta=etamult*rechit_eta->at(hit);
-            if(fabs(seedeta-rechiteta)>ywidth)continue;
-
-            int phibin = square_bins(rechitphi, seedphi, xbins, xwidth,true,bincentrephi);
-            int etabin = square_bins(rechiteta, seedeta-0.0001, ybins, ywidth,false,bincentreeta);
+    	std::vector<float> * rechit_energy=0;
+    	auto rechit_energy_branch=tree->GetBranch("rechit_energy");
+    	rechit_energy_branch->SetAddress(&rechit_energy);
 
 
-            if(phibin == -1 || etabin == -1) continue;
+    	tree->SetBranchStatus("*",0);  // disable all branches
+    	tree->SetBranchStatus("rechit_eta",1);
+    	tree->SetBranchStatus("rechit_phi",1);
+    	tree->SetBranchStatus("rechit_layer",1);
+    	tree->SetBranchStatus("rechit_energy",1);
 
 
-            float drbinseed=deltaR(bincentrephi,bincentreeta,seedphi,seedeta);
+    	const int ntreeevents=tree->GetEntries();
 
-            float energy=1000*rechit_energy->at(hit);
-            float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
-            float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
+    	int it=0;//(int)rand.Uniform(0,ntreeevents-1);//starting event
 
-            numpyarray[doneoutputevents][phibin][etabin][layer][0]=layer+minlayer;
-            numpyarray[doneoutputevents][phibin][etabin][layer][1]  +=energy;
+    	// event loop
+    	for(int it=0;it<ntreeevents;it++){
+    		if(doneoutputevents>=noutputevents) break;
+    		tree->GetEntry(it);
 
-        }
+    		size_t nrechits = rechit_layer->size();//rechit_layer.size();
 
-        doneoutputevents++;
+    		if(!nrechits || nrechits>1e9)continue;
+
+    		const float signs[]={-1,1};
+
+    		double seedphi=2.*3.1415926536/704.*(int)rand.Uniform(0,704.5);
+
+    		//use the same event a few times first to reduce IO
+
+    		for(size_t etasignselect=0;etasignselect<2;etasignselect++){
+    			double etamult=signs[etasignselect];
+    			if(doneoutputevents>=noutputevents) break;
+    			for(float phiadd=0;phiadd<2.*3.1415926536;phiadd+=0.2){
+    				if(doneoutputevents>=noutputevents) break;
+    				seedphi+=phiadd;
+    				if(seedphi>=2.*3.1415926536)seedphi-=2.*3.1415926536;
+
+    				for(size_t hit=0; hit < nrechits; hit++) {
+
+    					int layer=rechit_layer->at(hit);
+    					if(layer>=maxlayer)
+    						continue;
+    					if(layer<minlayer)
+    						continue;
+    					layer-=minlayer;
+
+    					double bincentrephi,bincentreeta;
+    					const float& rechitphi=rechit_phi->at(hit);
+    					if(fabs(deltaPhi(rechitphi,seedphi))>xwidth) continue;
+
+    					const double rechiteta=etamult*rechit_eta->at(hit);
+    					if(fabs(seedeta-rechiteta)>ywidth)continue;
+
+    					int phibin = square_bins(rechitphi, seedphi, xbins, xwidth,true,bincentrephi);
+    					int etabin = square_bins(rechiteta, seedeta-0.0001, ybins, ywidth,false,bincentreeta);
+
+
+    					if(phibin == -1 || etabin == -1) continue;
+
+
+    					float drbinseed=deltaR(bincentrephi,bincentreeta,seedphi,seedeta);
+
+    					float energy=1000*rechit_energy->at(hit);
+    					float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
+    					float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
+
+    					numpyarray[doneoutputevents][phibin][etabin][layer][0]=layer+minlayer;
+    					numpyarray[doneoutputevents][phibin][etabin][layer][1]  +=energy;
+
+    				}
+    				//std::cout <<  "PU_mixer: added PU event: "<< doneoutputevents<<"/" <<noutputevents<<std::endl;
+    				doneoutputevents++;
+    			}
+    		}
+    	}
+    	if(rechit_layer)
+    		delete rechit_layer, rechit_energy, rechit_eta, rechit_phi;
+    	delete tfile;
     }
     //delete tree;
 }
