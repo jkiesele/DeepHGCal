@@ -1,6 +1,6 @@
 import tensorflow as tf
 from .neighbors import indexing_tensor, sort_last_dim_tensor
-
+from ops.nn import *
 
 def gauss_activation(x, name=None):
     return tf.exp(-x * x / 4, name)
@@ -185,7 +185,7 @@ def sparse_max_pool(sparse_dict, num_entries_result):
     # Neighbor matrix should be int as it should be used for indexing
     assert all_features.dtype == tf.float64 or all_features.dtype == tf.float32
 
-    _, I = tf.nn.top_k(tf.reduce_sum(all_features, axis=2), num_entries_result)
+    _, I = tf.nn.top_k(tf.reduce_max(all_features, axis=2), num_entries_result)
     I = tf.expand_dims(I, axis=2)
 
     batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1), axis=1)
@@ -225,7 +225,7 @@ def sparse_max_pool_factored(sparse_dict, factor):
 
     result_max_entires = int(n_max_entries / factor)
 
-    _, I = tf.nn.top_k(tf.reduce_sum(all_features, axis=2), result_max_entires)
+    _, I = tf.nn.top_k(tf.reduce_max(all_features, axis=2), result_max_entires)
     I = tf.expand_dims(I, axis=2)
 
     batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1), axis=1)
@@ -365,24 +365,36 @@ def sparse_conv_2(sparse_dict, num_neighbors=10, num_filters=15, n_prespace_cond
                                           activation=tf.nn.relu)  # [B, E, N, F*M]
     space_condition = tf.reshape(space_condition, [n_batch, n_max_entries, num_neighbors, num_filters, -1])
 
-    filter_outputs = []
-    for i in range(num_filters):
-        filter_input = space_condition[:,:,:, i, :]
-        filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=gauss_activation)
-        tf.expand_dims(filter_output, dim=3)
-        filter_outputs.append(filter_output)
+    # filter_outputs = []
+    # for i in range(num_filters):
+    #     filter_input = space_condition[:,:,:, i, :]
+    #     filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=gauss_activation)
+    #     tf.expand_dims(filter_output, dim=3)
+    #     filter_outputs.append(filter_output)
+    # space_condition = tf.concat(filter_outputs, axis=3)
+    #
 
-    space_condition = tf.concat(filter_outputs, axis=3)
+    space_condition = filter_wise_dense(space_condition, activation=gauss_activation)
     sorting_values = tf.multiply(space_condition, sorting_condition) # [B, E, N, F]
 
-    filter_outputs = []
-    for i in range(num_filters):
-        filter_neighbor_values = sorting_values[..., i] # [B, E, N]
-        sorting_tensor = sort_last_dim_tensor(filter_neighbor_values)
-        filter_input = tf.reshape(tf.gather_nd(gathered_all, sorting_tensor), shape=[n_batch, n_max_entries, -1])
-        filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=tf.nn.relu)
-        filter_outputs.append(filter_output)
+    sorting_tensor_2 = sort_last_dim_tensor(tf.transpose(sorting_values, perm=[0, 1, 3, 2])) # Order of neighbors for every filter
+    inputs = tf.tile(tf.expand_dims(gathered_all, axis=2), [1, 1, num_filters, 1, 1])
+    gathered_inputs = tf.reshape(tf.gather_nd(inputs, sorting_tensor_2), [n_batch, n_max_entries, num_filters, -1])
 
-    color_like_output = tf.concat(filter_outputs, axis=-1)
+    color_like_output = filter_wise_dense(gathered_inputs)
+
+    print(color_like_output.shape)
+
+    #
+    #
+    # filter_outputs = []
+    # for i in range(num_filters):
+    #     filter_neighbor_values = sorting_values[..., i] # [B, E, N]
+    #     sorting_tensor = sort_last_dim_tensor(filter_neighbor_values)
+    #     filter_input = tf.reshape(tf.gather_nd(gathered_all, sorting_tensor), shape=[n_batch, n_max_entries, -1])
+    #     filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=tf.nn.relu)
+    #     filter_outputs.append(filter_output)
+    #
+    # color_like_output = tf.concat(filter_outputs, axis=-1)
 
     return construct_sparse_io_dict(color_like_output , spatial_features_global, spatial_features_local, num_entries)
