@@ -306,6 +306,14 @@ def sparse_conv_bare(sparse_dict, num_neighbors=10, output_all=15, weight_init_w
     return construct_sparse_io_dict(output, spatial_features_global, spatial_features_local, num_entries)
 
 
+def find_filter_weights(x, num_outputs=10, activation=tf.nn.relu):
+    X = []
+    for j in range(num_outputs):
+        X.append(tf.expand_dims(filter_wise_dense(x), axis=-1))
+
+    return tf.concat(X, axis=-1)
+
+
 def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_conditions=4,
                   transform_global_space=None, transform_local_space=None):
     """
@@ -413,6 +421,12 @@ def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_condi
     
     weight_values = tf.reshape(weight_values, [n_batch, n_max_entries, num_neighbors, 
                                                        num_filters, n_features_input_all])
+
+    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
+    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
+    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
+    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
+
     weight_values = tf.transpose(weight_values, perm=[0, 1, 3, 2, 4]) # [B, E, F, N, C]
     
     print('weight_values shape ', weight_values.shape)
