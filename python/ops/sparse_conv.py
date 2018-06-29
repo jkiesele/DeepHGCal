@@ -431,15 +431,7 @@ def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_condi
     
     print('weight_values shape ', weight_values.shape)
     
-    
-    #
-    # Please check if this is right.
-    #
-    # gathered_inputs: [B, E, N, C] -> [B, E, F, N, C]
     inputs=tf.expand_dims(gathered_all, axis=2)
-    print('inputs shape a ', inputs.shape)
-    inputs = tf.tile(inputs, [1, 1, num_filters, 1, 1])
-    print('inputs shape b ', inputs.shape)
     
 
     color_like_output = tf.multiply(inputs, weight_values)
