@@ -1,5 +1,6 @@
 from trainers.sparse_conv import SparseConvTrainer
 import argparse
+from trainers.sparse_conv_multiple_optimizers import SparseConvTrainerMulti
 
 
 parser = argparse.ArgumentParser(description='Run training for recurrent cal')
@@ -7,10 +8,11 @@ parser.add_argument('input', help="Path to config file")
 parser.add_argument('config', help="Config section within the config file")
 parser.add_argument('--test', default=False, help="Whether to run evaluation on test set")
 parser.add_argument('--profile', default=False, help="Whether to run evaluation on test set")
+parser.add_argument('--multiple', default=False, help="Whether to run the multi-optimizer trainer")
 args = parser.parse_args()
 
 
-trainer = SparseConvTrainer(args.input, args.config)
+trainer = SparseConvTrainer(args.input, args.config) if not args.multiple else SparseConvTrainerMulti(args.input, args.config)
 
 if args.test:
     trainer.test()

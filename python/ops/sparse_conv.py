@@ -1,5 +1,5 @@
 import tensorflow as tf
-from .neighbors import indexing_tensor, sort_last_dim_tensor
+from .neighbors import indexing_tensor, indexing_tensor_2, sort_last_dim_tensor
 from ops.nn import *
 
 #small width
@@ -49,6 +49,17 @@ def gradient_scale_up(x):
   def grad(dy):
     return dy * 100
   return tf.identity(x), grad
+
+
+@tf.custom_gradient
+def gradient_off(x):
+
+    def grad(dy):
+        return dy * 0
+
+    return tf.identity(x), grad
+
+
 
 
 def sparse_conv(sparse_dict, num_neighbors=10, output_all=15):
@@ -402,11 +413,6 @@ def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_condi
     
     weight_values = tf.reshape(weight_values, [n_batch, n_max_entries, num_neighbors, 
                                                        num_filters, n_features_input_all])
-
-    
-    
-    
-    weight_values = continuous_weights_input
     weight_values = tf.transpose(weight_values, perm=[0, 1, 3, 2, 4]) # [B, E, F, N, C]
     
     print('weight_values shape ', weight_values.shape)
@@ -460,3 +466,61 @@ def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_condi
     return construct_sparse_io_dict(color_like_output , spatial_features_global, spatial_features_local, num_entries)
 
 
+
+
+def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, weight_init_width=1e-4, control_switches = None):
+    """
+    Defines sparse convolutional layer
+
+    :param sparse_dict: Dictionary containing input
+    :param num_neighbors: An integer containing number of neighbors to pick + 1 (+1 is for yourself)
+    :param output_all: Number of output features for color like outputs
+    :param weight_init_width: TODO: Fill this
+    :return: Dictionary containing output which can be made input to the next layer
+    """
+
+    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
+                                                                                 sparse_dict['spatial_features_global'], \
+                                                                                 sparse_dict['spatial_features_local'], \
+                                                                                 sparse_dict['num_entries']
+
+    _indexing_tensor = indexing_tensor(spatial_features_global, num_neighbors)
+
+    shape_space_features = spatial_features_global.get_shape().as_list()
+    shape_space_features_local = spatial_features_local.get_shape().as_list()
+    shape_all_features = all_features.get_shape().as_list()
+    shape_indexing_tensor = _indexing_tensor.get_shape().as_list()
+
+    n_batch = shape_space_features[0]
+    n_max_entries = shape_space_features[1]
+    n_features_input_all = shape_all_features[2]
+    n_features_input_space = shape_space_features[2]
+    n_max_neighbors = shape_indexing_tensor[2]
+
+    # All of these tensors should be 3-dimensional
+    # TODO: Add assert for indexing_tensor shape
+    assert len(shape_space_features) == 3 and len(shape_all_features) == 3 and len(shape_indexing_tensor) == 4
+
+    # First dimension is batch, second is number of entries, hence these two should be same for all
+    assert shape_space_features[0] == shape_all_features[0]
+    assert shape_space_features[1] == shape_all_features[1]
+
+    # Neighbor matrix should be int as it should be used for indexing
+    assert _indexing_tensor.dtype == tf.int64
+
+    transformed_space_features = tf.concat([spatial_features_local, all_features], axis=2)
+    transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
+    transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
+    transformed_space_features = tf.cond(tf.equal(control_switches[0],1), lambda: transformed_space_features, lambda: gradient_off(transformed_space_features))
+
+    _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors)
+
+    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.nn.softmax(0.5 + tf.expand_dims(distance, axis=3)) # [B,E,5,F]
+
+    pre_output = tf.layers.dense(gathered_all, output_all, activation=tf.nn.relu)
+    output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
+    output = tf.cond(tf.equal(control_switches[1],1), lambda: output, lambda: gradient_off(output))
+
+    # TODO: Check if you have to place gradient switch up or down!
+
+    return construct_sparse_io_dict(output, spatial_features_global, spatial_features_local, num_entries)
