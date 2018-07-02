@@ -48,6 +48,26 @@ def nearest_neighbor_matrix(spatial_features, k=10):
     return N
 
 
+def nearest_neighbor_matrix_2(spatial_features, k=10):
+    """
+    Nearest neighbors matrix given spatial features.
+
+    :param spatial_features: Spatial features of shape [B, N, S] where B = batch size, N = max examples in batch,
+                             S = spatial features
+    :param k: Max neighbors
+    :return:
+    """
+
+    shape = spatial_features.get_shape().as_list()
+
+    assert spatial_features.dtype == tf.float32 or spatial_features.dtype == tf.float64
+    assert len(shape) == 3
+
+    D = euclidean_squared(spatial_features, spatial_features)
+    D, N = tf.nn.top_k(-D, k)
+    return N, D
+
+
 def indexing_tensor(spatial_features, k=10):
 
     shape_spatial_features = spatial_features.get_shape().as_list()
@@ -72,6 +92,30 @@ def indexing_tensor(spatial_features, k=10):
     return tf.cast(_indexing_tensor, tf.int64)
 
 
+def indexing_tensor_2(spatial_features, k=10):
+
+    shape_spatial_features = spatial_features.get_shape().as_list()
+
+    n_batch = shape_spatial_features[0]
+    n_max_entries = shape_spatial_features[1]
+
+    # All of these tensors should be 3-dimensional
+    assert len(shape_spatial_features) == 3
+
+    # Neighbor matrix should be int as it should be used for indexing
+    assert spatial_features.dtype == tf.float64 or spatial_features.dtype == tf.float32
+
+    neighbor_matrix, distance_matrix = nearest_neighbor_matrix_2(spatial_features, k)
+
+    batch_range = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1),axis=1), axis=1)
+    batch_range = tf.tile(batch_range, [1,n_max_entries,k,1])
+    expanded_neighbor_matrix = tf.expand_dims(neighbor_matrix, axis=3)
+
+    _indexing_tensor = tf.concat([batch_range, expanded_neighbor_matrix], axis=3)
+
+    return tf.cast(_indexing_tensor, tf.int64), distance_matrix
+
+
 def n_range_tensor(dims):
     assert type(dims) is list
     assert len(dims) != 0
@@ -93,10 +137,33 @@ def n_range_tensor(dims):
 
 def sort_last_dim_tensor(x):
     shape = x.shape.as_list()
-    v, ind = tf.nn.top_k(x, shape[-1])
+    v, ind = tf.nn.top_k(x, shape[-1], sorted=False)
 
     ind = tf.expand_dims(ind, axis=-1)
     tensor_combine_with = n_range_tensor(shape)
     tensor_combine_with = tensor_combine_with[...,0:-1]
+    _indexing_tensor = tf.concat([tensor_combine_with, ind], axis=-1)
+    return _indexing_tensor
+
+
+global saved_nd_range
+if not ('saved_nd_range' in globals()):
+    saved_nd_range = dict()
+
+
+def sort_last_dim_tensor_save(x):
+    global saved_nd_range
+    shape = x.shape.as_list()
+    v, ind = tf.nn.top_k(x, shape[-1])
+
+    ind = tf.expand_dims(ind, axis=-1)
+
+    # hash_value = hash(tuple(shape))
+    # if hash_value in saved_nd_range:
+    #     tensor_combine_with = saved_nd_range[hash_value]
+    # else:
+    tensor_combine_with = n_range_tensor(shape)
+    tensor_combine_with = tensor_combine_with[...,0:-1]
+
     _indexing_tensor = tf.concat([tensor_combine_with, ind], axis=-1)
     return _indexing_tensor
