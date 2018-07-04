@@ -4,7 +4,7 @@ from ops.nn import *
 
 #small width
 def gauss_activation(x, name=None):
-    return tf.exp(-x * x / 100, name)
+    return tf.exp(-x * x / 4, name)
 
 
 def sparse_conv_delta(A, B):
@@ -314,8 +314,49 @@ def find_filter_weights(x, num_outputs=10, activation=tf.nn.relu):
     return tf.concat(X, axis=-1)
 
 
+# input [n_batch, n_max_entries, num_neighbors, n_space_feat]
+def apply_space_transformations(x, depth, num_filters, n_outputs, nodes_relu=5, nodes_gauss=7):
+    n_batch = x.get_shape().as_list()[0]
+    n_max_entries = x.get_shape().as_list()[1]
+    num_neighbors =  x.get_shape().as_list()[2]
+    
+    weight_values = tf.layers.dense(inputs=x,
+                                          units=num_filters*(nodes_relu+nodes_gauss),
+                                          activation=None,
+                                     kernel_initializer=tf.random_normal_initializer(0.02, 0.02))   # [B, E, N, F*C]
+    weight_values=tf.nn.leaky_relu(weight_values,alpha=0.01)
+    
+    weight_values = tf.reshape(weight_values, [n_batch, n_max_entries, num_neighbors, 
+                                                       num_filters, (nodes_relu+nodes_gauss)])
+    
+    X = []
+    for f in range(num_filters):
+        this_input=weight_values[:,:,:,f,:]
+        filter_network=[]
+        for j in range(depth):
+            x_local_relu = tf.layers.dense(this_input, units=nodes_relu,activation=None)
+            x_local_relu=tf.nn.leaky_relu(x_local_relu,alpha=0.01)
+            x_local_gauss = tf.layers.dense(this_input, units=nodes_gauss,activation=gauss_activation)
+            x_local = tf.concat([x_local_relu,x_local_gauss], axis=-1)
+            #print('x_local shape filter', f,'depth', j , x_local.shape)
+            this_input=x_local
+        filter_out = tf.layers.dense(inputs=this_input, units=n_outputs,activation=None,
+                                     kernel_initializer=tf.random_normal_initializer(0.02, 0.02))
+        #filter_out=tf.nn.softsign(filter_out)#,alpha=0.01)
+        #print('filter_out shape filter', f , filter_out.shape)
+        X.append(filter_out)
+    allout = tf.concat(X,axis=-1)
+    #print('allout shape', allout.shape)
+    allout = tf.reshape(allout, [n_batch, n_max_entries, num_neighbors, 
+                                                       num_filters, n_outputs])
+    
+    #print('allout shape b', allout.shape)
+    return allout
+    
+    
+
 def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_conditions=4,
-                  transform_global_space=None, transform_local_space=None):
+                  pre_space_relu=6, pre_space_gauss=3):
     """
     Defines sparse convolutional layer
 
@@ -414,18 +455,9 @@ def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_condi
     # In the end, they are combined in filter and colour (C) wise output of 
     # [B, E, N, F, C], where F and C are dimentions with non shared weights
     #
-    weight_values = tf.layers.dense(inputs=weight_values,
-                                          units=num_filters*n_features_input_all,
-                                          activation=tf.nn.softsign)   # [B, E, N, F*C]
     
-    
-    weight_values = tf.reshape(weight_values, [n_batch, n_max_entries, num_neighbors, 
-                                                       num_filters, n_features_input_all])
-
-    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
-    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
-    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
-    weight_values = find_filter_weights(weight_values, num_outputs=n_features_input_all)
+    weight_values = apply_space_transformations(spatial_features_concatenated, n_prespace_conditions,
+                                                 num_filters,n_features_input_all,nodes_relu=pre_space_relu,nodes_gauss=pre_space_gauss)
 
     weight_values = tf.transpose(weight_values, perm=[0, 1, 3, 2, 4]) # [B, E, F, N, C]
     
@@ -433,42 +465,17 @@ def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_condi
     
     inputs=tf.expand_dims(gathered_all, axis=2)
     
-
+    print('inputs shape ',inputs.shape)
     color_like_output = tf.multiply(inputs, weight_values)
+    print('color_like_output shape ',color_like_output.shape)
     #sum: [B, E, F, N, C] -> [B, E, F]
     # colour_reduced could be interesting input for the space transformation!
     colour_reduced = tf.reduce_sum(color_like_output, axis=-1)
     color_like_output = tf.reduce_sum(colour_reduced, axis=-1)
-    color_like_output = tf.nn.relu(color_like_output)
+    color_like_output = tf.nn.leaky_relu(color_like_output,alpha=0.01)
 
-    print('color_like_output.shape ', color_like_output.shape)
+    print('color_like_output.shape b ', color_like_output.shape)
     
-    #
-    #
-    # This is the same problem with this part not receiving any useful gradient.
-    # But we should think of making this hard-coded as it was for the weights in the very 
-    # first approach.. Maybe use a max of colour-wise weights?
-    # I'll leave it here as a reminder
-    #
-    if False and transform_global_space:
-        add_spatial_features_global=spatial_features_global
-        for i in range(transform_global_space):
-            add_spatial_features_global = tf.layers.dense(inputs=add_spatial_features_global,
-                                                  units=n_features_input_space,
-                                                  kernel_initializer=tf.random_normal_initializer(0, 0.001),
-                                                  activation=tf.nn.relu)
-        spatial_features_global = tf.add(spatial_features_global, add_spatial_features_global)
-        
-    if False and transform_local_space:
-        add_spatial_features_local=spatial_features_local
-        for i in range(transform_global_space):
-            add_spatial_features_local = tf.layers.dense(inputs=add_spatial_features_local,
-                                                 units=n_features_input_space_local,
-                                                 kernel_initializer=tf.random_normal_initializer(0, 0.001),
-                                                 activation=tf.nn.relu)
-        spatial_features_local = tf.add(spatial_features_local, add_spatial_features_local)
-
-
     return construct_sparse_io_dict(color_like_output , spatial_features_global, spatial_features_local, num_entries)
 
 
