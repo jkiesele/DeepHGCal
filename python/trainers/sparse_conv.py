@@ -4,6 +4,7 @@ from models.sparse_conv_3 import SparseConv3
 from models.sparse_conv_4 import SparseConv4
 from models.sparse_conv_5 import SparseConv5
 from models.sparse_conv_6 import SparseConv6
+from models.sparse_conv_7 import SparseConv7
 from models.sparse_conv_bare import SparseConvBare
 import numpy as np
 import os
@@ -69,7 +70,7 @@ class SparseConvTrainer:
             except Exception as e:
                 print(e)
 
-    def __get_input_feeds(self, files_list, repeat=True, shuffle_size=None):
+    def _get_input_feeds(self, files_list, repeat=True, shuffle_size=None):
         def _parse_function(example_proto):
             keys_to_features = {
                 'spatial_features': tf.FixedLenFeature((self.num_max_entries, self.num_spatial_features), tf.float32),
@@ -108,8 +109,8 @@ class SparseConvTrainer:
         graph_logits, graph_prediction = self.model.get_compute_graphs()
         graph_temp = self.model.get_temp()
 
-        inputs_feed = self.__get_input_feeds(self.training_files)
-        inputs_validation_feed = self.__get_input_feeds(self.validation_files)
+        inputs_feed = self._get_input_feeds(self.training_files)
+        inputs_validation_feed = self._get_input_feeds(self.validation_files)
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
         with tf.Session() as sess:
@@ -188,8 +189,8 @@ class SparseConvTrainer:
         if self.from_scratch:
             self.clean_summary_dir()
 
-        inputs_feed = self.__get_input_feeds(self.training_files)
-        inputs_validation_feed = self.__get_input_feeds(self.validation_files)
+        inputs_feed = self._get_input_feeds(self.training_files)
+        inputs_validation_feed = self._get_input_feeds(self.validation_files)
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
         with tf.Session() as sess:
@@ -268,7 +269,7 @@ class SparseConvTrainer:
         graph_logits, graph_prediction = self.model.get_compute_graphs()
         graph_temp = self.model.get_temp()
 
-        inputs_feed = self.__get_input_feeds(self.test_files, repeat=True)
+        inputs_feed = self._get_input_feeds(self.test_files, repeat=True)
 
         accuracy_sum = 0
         num_examples = 0
