@@ -32,12 +32,8 @@ class SparseConv8(SparseConv):
                                           tf.squeeze(self._placeholder_num_entries))
 
         net = _input
-        net = sparse_max_pool(net, 2000)
-        net = sparse_conv_2(net, num_neighbors=4,  num_filters=2,  n_prespace_conditions=2,pre_space_relu=4,pre_space_gauss=3)
-        net = sparse_max_pool(net, 250)
-        net = sparse_conv_2(net, num_neighbors=48, num_filters=16, n_prespace_conditions=6,pre_space_relu=4,pre_space_gauss=8)
-        net = sparse_max_pool(net, 32)
-        net = sparse_conv_2(net, num_neighbors=32, num_filters=32, n_prespace_conditions=6,pre_space_relu=4,pre_space_gauss=8)
+        #net = sparse_max_pool(net, 2000)
+        net = sparse_conv_loop(net, num_neighbors=100,  num_filters=32,  space_depth=2, space_relu=4, space_gauss=3)
         net = sparse_max_pool(net, 1)
 
         flattened_features = sparse_merge_flat(net, combine_three=False)
