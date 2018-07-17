@@ -5,6 +5,10 @@ import numpy as np
 from tensorflow.python.ops.init_ops import Initializer
 from tensorflow.python.ops import random_ops
 
+
+def sprint(tensor,pstr):
+    return tf.Print(tensor,[tensor],pstr)
+
 #small width
 def gauss_activation(x, name=None):
     return tf.exp(-x * x / 4, name)
@@ -584,3 +588,173 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, wei
     # TODO: Check if you have to place gradient switch up or down!
 
     return construct_sparse_io_dict(output, spatial_features_global, spatial_features_local, num_entries)
+
+
+
+
+
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+# loop implementations down here...
+
+def check_inputs(colours_in, space_global, space_local, num_entries, indexing_tensor):
+    
+    assert len(space_global.get_shape().as_list()) == 3 and len(colours_in.get_shape().as_list()) == 3 and len(indexing_tensor.get_shape().as_list()) == 4
+
+    # First dimension is batch, second is number of entries, hence these two should be same for all
+    assert space_global.get_shape().as_list()[0] == space_global.get_shape().as_list()[0]
+    assert space_global.get_shape().as_list()[1] == space_local.get_shape().as_list()[1]
+
+    # Neighbor matrix should be int as it should be used for indexing
+    assert indexing_tensor.dtype == tf.int64
+
+
+
+def apply_space_transformations_loop(x, depth, num_filters, n_outputs, nodes_relu=5, nodes_gauss=7):
+    n_batch = x.get_shape().as_list()[0]
+    n_max_entries = x.get_shape().as_list()[1]
+    
+    # x is: B x E x S
+    
+    weight_values = tf.layers.dense(inputs=x,
+                                          units=num_filters*(nodes_relu+nodes_gauss),
+                                          activation=None,
+                                     kernel_initializer=tf.random_normal_initializer(0.02, 0.02))   # [B, E, N, F*C]
+    weight_values=tf.nn.leaky_relu(weight_values,alpha=0.01)
+    
+    weight_values = tf.reshape(weight_values, [n_batch, n_max_entries, 
+                                                       num_filters, (nodes_relu+nodes_gauss)])
+    
+    X = []
+    for f in range(num_filters):
+        this_input=weight_values[:,:,f,:]
+        filter_network=[]
+        for j in range(depth):
+            x_local_relu = tf.layers.dense(this_input, units=nodes_relu,activation=None)
+            x_local_relu=tf.nn.leaky_relu(x_local_relu,alpha=0.01)
+            x_local_gauss = tf.layers.dense(this_input, units=nodes_gauss,activation=gauss_activation)
+            x_local = tf.concat([x_local_relu,x_local_gauss], axis=-1)
+            #print('x_local shape filter', f,'depth', j , x_local.shape)
+            this_input=x_local
+        filter_out = tf.layers.dense(inputs=this_input, units=n_outputs,activation=None,
+                                     kernel_initializer=tf.random_normal_initializer(0.02, 0.02))
+        #filter_out=tf.nn.softsign(filter_out)#,alpha=0.01)
+        #print('filter_out shape filter', f , filter_out.shape)
+        X.append(filter_out)
+    allout = tf.concat(X,axis=-1)
+    #print('allout shape', allout.shape)
+    allout = tf.reshape(allout, [n_batch, n_max_entries,num_filters, n_outputs])
+    
+    #print('allout shape b', allout.shape)
+    return allout
+
+
+def neighbour_loop(colours_in,space_global,space_local,neighbour_indexing,iterator_index,filters_output, depth, nodes_relu=5, nodes_gauss=7):
+    
+    # selected_index: neighbour that is being processed
+    # neighbour_indexing: indexing tensor
+    # iterator_index iterator index of indexing tensor
+
+
+    n_batch = space_global.get_shape().as_list()[0]
+    n_max_entries = space_global.get_shape().as_list()[1]
+    
+    n_colours_in = colours_in.get_shape().as_list()[2]
+    n_space_global = space_global.get_shape().as_list()[2]
+    n_space_local = space_local.get_shape().as_list()[2]
+    n_neighbours = neighbour_indexing.get_shape().as_list()[2]
+    
+    num_filters=filters_output.get_shape().as_list()[2]
+    #tested
+    its=neighbour_indexing[:,:,iterator_index+1]
+    
+    
+    #change this to include more space features, just for testing
+    #FIXME
+    selected_neighbour_space=tf.gather_nd(space_local, its)
+    
+    neighbour_weight=apply_space_transformations_loop(selected_neighbour_space, depth, num_filters, n_colours_in,nodes_relu,nodes_gauss)
+    print('neighbour_weight.shape',neighbour_weight.shape)
+    
+    # filter: B X E X F , neighbour_weight: B X E X F X C , colours_in: B X E X C
+    colours_in = tf.expand_dims(colours_in, axis=2)
+    to_be_added = neighbour_weight*colours_in
+    print('to_be_added.shape',to_be_added.shape)
+    
+    to_be_added = tf.reduce_sum(to_be_added,axis=-1)
+    print('to_be_added.shape b',to_be_added.shape)
+    print('filters_output.shape',filters_output.shape)
+    filters_output += to_be_added
+    # output = weight*colour
+    # add to filter output
+    iterator_index=tf.add(iterator_index,1)
+    
+    #iterator_index=sprint(iterator_index,'it')
+    
+    return [iterator_index,filters_output]
+
+
+
+
+def sparse_conv_loop(sparse_dict, num_neighbors=8, num_filters=16, space_depth=4,
+                  space_relu=6, space_gauss=3):
+    """
+    Defines sparse convolutional layer
+
+    :param sparse_dict: Dictionary containing input
+    :param num_neighbors: An integer containing number of neighbors to pick + 1 (+1 is for yourself)
+    :param num_filters: Number of output features for color like outputs
+    :return: Dictionary containing output which can be made input to the next layer
+    """
+
+    colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
+                                                                                 sparse_dict['spatial_features_global'], \
+                                                                                 sparse_dict['spatial_features_local'], \
+                                                                                 sparse_dict['num_entries']
+
+    neighbour_indexing = indexing_tensor(space_global, num_neighbors)
+
+    check_inputs(colours_in, space_global, space_local, num_entries, neighbour_indexing)
+
+    n_batch = space_global.get_shape().as_list()[0]
+    n_max_entries = space_global.get_shape().as_list()[1]
+    
+    n_colours_in = colours_in.get_shape().as_list()[2]
+    n_space_global = space_global.get_shape().as_list()[2]
+    n_space_local = space_local.get_shape().as_list()[2]
+    n_neighbours = neighbour_indexing.get_shape().as_list()[2]
+
+
+    #create calculation with placeholders and then pass it to the neighbour loop?
+    
+
+
+    #apply to each of the neighbours same thing
+    # colours_in,space_global,space_local,neighbour_indexing,iterator_index
+    filter_output = tf.zeros([n_batch,n_max_entries,num_filters])
+    iterator_index = tf.constant(0)
+    c = lambda i,fo: tf.less(i, n_neighbours-1)
+    b = lambda i,fo: neighbour_loop(colours_in,space_global,space_local,neighbour_indexing,i,fo, space_depth, space_relu, space_gauss)
+    iterator_index,filter_output=tf.while_loop(c, b, [iterator_index,filter_output],parallel_iterations=1,swap_memory=True)
+
+
+    
+    return construct_sparse_io_dict(filter_output , space_global, space_local, num_entries)
+
+
+
+
+
+
+
+
+
+
