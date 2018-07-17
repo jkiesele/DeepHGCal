@@ -1,6 +1,9 @@
 import tensorflow as tf
 from .neighbors import indexing_tensor, indexing_tensor_2, sort_last_dim_tensor
 from ops.nn import *
+import numpy as np
+from tensorflow.python.ops.init_ops import Initializer
+from tensorflow.python.ops import random_ops
 
 #small width
 def gauss_activation(x, name=None):
@@ -479,6 +482,50 @@ def sparse_conv_2(sparse_dict, num_neighbors=8, num_filters=16, n_prespace_condi
     return construct_sparse_io_dict(color_like_output , spatial_features_global, spatial_features_local, num_entries)
 
 
+class NoisyEyeInitializer(Initializer):
+  """Initializer that generates tensors with a normal distribution.
+
+  Args:
+    mean: a python scalar or a scalar tensor. Mean of the random values
+      to generate.
+    stddev: a python scalar or a scalar tensor. Standard deviation of the
+      random values to generate.
+    seed: A Python integer. Used to create random seeds. See
+      @{tf.set_random_seed}
+      for behavior.
+    dtype: The data type. Only floating point types are supported.
+  """
+
+  def __init__(self, low=0.0, up=1.0, seed=None, dtype=tf.float32):
+    self.low = low
+    self.high = up
+    self.seed = seed
+    self.dtype = dtype
+
+  def __call__(self, shape, dtype=None, partition_info=None):
+    if dtype is None:
+      dtype = self.dtype
+    assert len(shape) == 2
+    return tf.eye(shape[0], shape[1]) + random_ops.random_uniform(
+        shape, self.low, self.high, dtype, seed=self.seed)
+
+  def get_config(self):
+    return {
+        "low": self.low,
+        "high": self.high,
+        "seed": self.seed,
+        "dtype": self.dtype.name
+    }
+
+def noisy_eye_initializer():
+    def _initializer(shape, dtype=tf.float32):
+        if len(shape) == 2:
+            eye = np.eye(shape[0], shape[1])+np.random.uniform(0,0.1, size=(shape[0], shape[1]))
+            eye = eye.astype(dtype=dtype)
+            return tf.constant_op.constant(eye)
+        else:
+            raise ValueError('Invalid shape')
+    return _initializer
 
 
 def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, weight_init_width=1e-4, control_switches = None):
@@ -521,14 +568,14 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, wei
     # Neighbor matrix should be int as it should be used for indexing
     assert _indexing_tensor.dtype == tf.int64
 
-    transformed_space_features = tf.concat([spatial_features_local, all_features], axis=2)
-    transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
-    transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
+    transformed_space_features = tf.concat([spatial_features_global], axis=2)
+    transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=None, kernel_initializer=NoisyEyeInitializer)
+    # transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
     transformed_space_features = tf.cond(tf.equal(control_switches[0],1), lambda: transformed_space_features, lambda: gradient_off(transformed_space_features))
 
     _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors)
 
-    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.nn.softmax(0.5 + tf.expand_dims(distance, axis=3)) # [B,E,5,F]
+    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.nn.softmax(0.1 + tf.expand_dims(distance, axis=3)) # [B,E,5,F]
 
     pre_output = tf.layers.dense(gathered_all, output_all, activation=tf.nn.relu)
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
