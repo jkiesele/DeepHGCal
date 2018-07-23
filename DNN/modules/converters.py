@@ -46,7 +46,7 @@ def simple3Dstructure(Filename_in,nevents,
     import numpy as np
     import c_createRecHitMap
     
-    array = np.zeros((nevents,xbins,ybins,maxlayer-minlayer,2) , dtype='float32')
+    array = np.zeros((nevents,xbins,ybins,maxlayer-minlayer,1) , dtype='float32')
     
     
     c_createRecHitMap.simple3Dstructure(array,Filename_in,
@@ -64,7 +64,7 @@ def simpleRandom3Dstructure(infile_list,nevents,
     import numpy as np
     import c_createRecHitMap
     
-    array = np.zeros((nevents,xbins,ybins,maxlayer-minlayer,2) , dtype='float32')
+    array = np.zeros((nevents,xbins,ybins,maxlayer-minlayer,1) , dtype='float32')
     
     
     c_createRecHitMap.simpleRandom3Dstructure(array,infile_list,

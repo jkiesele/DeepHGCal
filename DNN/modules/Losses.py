@@ -2,6 +2,10 @@ from keras import backend as K
 
 global_loss_list = {}
 
+def TBI_huber_loss(y_true, y_pred):
+    import tensorflow as tf
+    return tf.losses.huber_loss(y_true,y_pred,delta=10)
+
 def huber(x):
     clip_delta=10.
     import tensorflow as tf
@@ -10,32 +14,110 @@ def huber(x):
     
     squared_loss = tf.square(x)
     linear_loss  = 2* clip_delta * (tf.abs(x) - 0.5 * clip_delta)
-    
-    return tf.where(cond, squared_loss, linear_loss)
+    ret = tf.sqrt(tf.abs(tf.where(cond, squared_loss, linear_loss))+K.epsilon())
+    ret = tf.where(tf.is_nan(ret), tf.abs(x),ret)
+    ret = tf.where(tf.is_inf(ret), tf.abs(x),ret)
+    return ret
 
 def huber_loss(y_true, y_pred):
-    return huber(y_true-y_pred)
+    ret = K.mean(huber(y_true-y_pred), axis=-1)
+    ret = tf.clip_by_value(ret,-1e6,1e6)
+    return ret
     
 
 global_loss_list['huber_loss']=huber_loss
+
+
+def low_value_msq(y_true, y_pred):
+    return K.mean(K.square(y_true-y_pred)*(1120-y_true)/120, axis=-1)
+    
+global_loss_list['low_value_msq']=low_value_msq
 
 def huber_loss_calo(y_true, y_pred):
     '''
     calo-like huber loss with quadratic until around 10% relative difference for inputs around 100
     '''
     import tensorflow as tf
-    scaleddiff=(y_true-y_pred)/tf.sqrt(y_true+0.1)
-    return huber(scaleddiff)
-    
+    scaleddiff=(y_true-y_pred)/(tf.sqrt(tf.abs(y_true)+K.epsilon())+K.epsilon())
+    ret = huber(scaleddiff)
+    ret = tf.where(tf.is_nan(ret), y_true*1000, ret)
+    ret = tf.clip_by_value(ret, 0 ,1e6)
+    ret = tf.reshape(ret, [-1])
+    ret = K.mean(ret,axis=-1)
+    return ret
 
 global_loss_list['huber_loss_calo']=huber_loss_calo
+
+def huber_loss_relative(y_true, y_pred):
+    '''
+    calo-like huber loss with quadratic until around 10% relative difference for inputs around 100
+    '''
+    import tensorflow as tf
+    scaleddiff=(y_true-y_pred)/(tf.abs(y_true)+K.epsilon())
+    scaleddiff = tf.clip_by_value(scaleddiff, -100, 100)
+    ret = huber(scaleddiff)
+    ret = tf.where(tf.is_nan(ret), y_true*1000, ret)
+    ret = tf.where(tf.is_inf(ret), y_true*1000, ret)
+    ret = tf.clip_by_value(ret,-2,2)
+    return K.mean(ret,axis=-1)*100
+  
+
+global_loss_list['huber_loss_relative']=huber_loss_relative
 
 
 def acc_calo_relative_rms(y_true, y_pred):
     import tensorflow as tf
-    return tf.sqrt(K.mean( tf.square((y_true-y_pred)/( y_true+0.1)) , axis=-1)) * 100
+    ret=tf.square((y_true-y_pred)/( tf.abs(y_true)+K.epsilon()))
+    #ret = tf.where(tf.is_nan(ret), tf.abs(y_true-y_pred)*1000, ret)
+    #ret = tf.where(tf.is_inf(ret), tf.abs(y_true-y_pred)*1000, ret)
+    #ret = tf.where(tf.is_nan(ret), y_true*1000, ret)
+    #ret = tf.where(tf.is_inf(ret), y_true*1000, ret)
+    #ret = tf.clip_by_value(ret,-2000,2000)
+    ret = tf.reshape(ret, [-1])
+    return tf.sqrt(K.mean(ret  , axis=-1)) * 100
     
 global_loss_list['acc_calo_relative_rms']=acc_calo_relative_rms
+
+
+
+def acc_rel_rms(y_true, y_pred, point):
+    import tensorflow as tf
+    point=float(point)
+    calculate = tf.square((y_true-y_pred)/( tf.abs(y_true)+K.epsilon()))
+    
+    mask = tf.where(tf.abs(y_true-point)<point/5., 
+                         tf.zeros_like(y_true)+1, 
+                         tf.zeros_like(y_true))
+    
+    non_zero=tf.count_nonzero(mask,dtype='float32')
+    calculate *= mask
+    
+    calculate = tf.reshape(calculate, [-1])
+    calculate = K.sum(calculate,axis=-1)
+    non_zero = tf.reshape(non_zero, [-1])
+    ret = tf.sqrt(tf.abs(calculate/(non_zero+K.epsilon()))+K.epsilon())*100
+    ret = tf.where(tf.is_inf(ret), tf.zeros_like(ret), ret)
+    return ret
+
+
+def acc_calo_relative_rms_50(y_true, y_pred):
+    return acc_rel_rms(y_true, y_pred,50)
+global_loss_list['acc_calo_relative_rms_50']=acc_calo_relative_rms_50
+
+def acc_calo_relative_rms_100(y_true, y_pred):
+    return acc_rel_rms(y_true, y_pred,100)
+global_loss_list['acc_calo_relative_rms_100']=acc_calo_relative_rms_100
+
+def acc_calo_relative_rms_500(y_true, y_pred):
+    return acc_rel_rms(y_true, y_pred,500)
+global_loss_list['acc_calo_relative_rms_500']=acc_calo_relative_rms_500
+
+def acc_calo_relative_rms_1000(y_true, y_pred):
+    return acc_rel_rms(y_true, y_pred,1000)
+global_loss_list['acc_calo_relative_rms_1000']=acc_calo_relative_rms_1000
+
+
+
 
 def loss_logcoshClipped(y_true, y_pred):
     """

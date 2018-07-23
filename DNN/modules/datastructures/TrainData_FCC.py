@@ -59,6 +59,9 @@ class TrainData_FCC(TrainData):
         setTreeName("events")
         import numpy
         import ROOT
+        from augmentation import duplicate_mirror_x,duplicate2
+        
+        print('adding PU '+str(self.pu_multi*200))
         
         fileTimeOut(filename,120) #give eos 2 minutes to recover
         rfile = ROOT.TFile(filename)
@@ -75,6 +78,7 @@ class TrainData_FCC(TrainData):
         
         removemuons=False
         makeplots=False
+        onlypions=False
         
         import math
         
@@ -93,6 +97,13 @@ class TrainData_FCC(TrainData):
                                     ybins=17,
                                     ywidth=0.2125,
                                     maxlayer=18, minlayer=8,sumenergy=True)
+        
+        
+        if self.remove:
+            x_chmapecal = duplicate_mirror_x(x_chmapecal)
+            x_chmaphcal = duplicate_mirror_x(x_chmaphcal)
+            self.nsamples = x_chmapecal.shape[0]
+            # do this before adding PU to have diffferent PU on each
         
         
         ## add pileup from
@@ -137,14 +148,27 @@ class TrainData_FCC(TrainData):
             x_chmaphcal = numpy.add(x_chmaphcal,pu_x_chmaphcal)
         
         
+        ## add layer information
+        #layerstemplate = np.zeros((self.nsamples,34,34,8,1), dtype='float32')
+        ecal_layerinfo = numpy.zeros((self.nsamples,34,34,8,1), dtype='float32')
+        for i in range(0,8):
+            ecal_layerinfo[:,:,:,i,:]=i
+        x_chmapecal = numpy.concatenate([ecal_layerinfo,x_chmapecal],axis=-1)
+        
+        hcal_layerinfo = numpy.zeros((self.nsamples,17,17,10,1), dtype='float32')
+        for i in range(0,10):
+            hcal_layerinfo[:,:,:,i,:]=i
+        x_chmaphcal = numpy.concatenate([hcal_layerinfo,x_chmaphcal],axis=-1)
+        
+        
         if makeplots:
             from plotting import plot4d
             
             
             for i in range(10):
-                plot4d(x_chmapecal[i],"ecal"+str(i)+".pdf")
+                plot4d(x_chmapecal[i,:,:,:,1:2],"ecal"+str(i)+".pdf")
                 
-                plot4d(x_chmaphcal[i],"hcal"+str(i)+".pdf")
+                plot4d(x_chmaphcal[i,:,:,:,1:2],"hcal"+str(i)+".pdf")
                 print('printed '+str(i))
             
             exit()
@@ -166,27 +190,23 @@ class TrainData_FCC(TrainData):
         
         notremoves=numpy.zeros(energytruth.shape[0])
         notremoves+=1
+            
         
         #remove muons
         if removemuons:
             ismuon=Tuple['isMuon']
             notremoves[ismuon>0] = 0
             
+        if onlypions:
+            ispioncharged=Tuple['isPionCharged']
+            notremoves[ispioncharged<0.5] = 0
         
-        #no augmentation so far
-        #if False and self.remove:
-        #    from augmentation import mirrorInPhi,duplicateImage,evaluateTwice
-        #    
-        #    x_chmapecal= mirrorInPhi(x_chmapecal)
-        #    x_chmaphcal= mirrorInPhi(x_chmaphcal)
-        #    
-        #    notremoves=evaluateTwice(weighter.createNotRemoveIndices,Tuple)
-        #    
-        #    weights=duplicateImage(weighter.getJetWeights(Tuple))
-        #    energytruth   =duplicateImage(energytruth)
-        #    idtruthtuple  =duplicateImage(idtruthtuple)
-        #    
-            #notremoves -= energytruth<50
+        
+        if self.remove:
+            idtruthtuple = duplicate2(idtruthtuple)
+            energytruth = duplicate2(energytruth)
+            notremoves = duplicate2(notremoves)
+            weights = duplicate2(weights)
             
         
         before=len(x_chmapecal)

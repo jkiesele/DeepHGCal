@@ -5,8 +5,141 @@ import keras.backend as K
 from keras.engine import InputSpec
 import copy
 import numpy as np
+import keras
 from keras.layers import Flatten
+from symbol import factor
+from matplotlib.pyplot import axis
 
+
+class Clip(Layer):
+    def __init__(self, min, max , **kwargs):
+        super(Clip, self).__init__(**kwargs)
+        self.min=min
+        self.max=max
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape
+    
+    def call(self, inputs):
+        return tf.clip_by_value(inputs, self.min, self.max)
+    
+    def get_config(self):
+        config = {'min': self.min, 'max': self.max}
+        base_config = super(Clip, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
+    
+
+
+class Print(Layer):
+    def __init__(self, message, **kwargs):
+        super(Print, self).__init__(**kwargs)
+        self.message=message
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape
+    
+    def call(self, inputs):
+        return tf.Print(inputs,[inputs],self.message,summarize=300)
+    
+    def get_config(self):
+        config = {'message': self.message}
+        base_config = super(Print, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
+
+class Multiply(Layer):
+    def __init__(self, factor, **kwargs):
+        super(Multiply, self).__init__(**kwargs)
+        self.factor=factor
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape
+    
+    def call(self, inputs):
+        return inputs*self.factor
+    
+    def get_config(self):
+        config = {'factor': self.factor}
+        base_config = super(Multiply, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
+    
+class Multiply_feature(Layer):
+    def __init__(self, feat, factor, **kwargs):
+        super(Multiply_feature, self).__init__(**kwargs)
+        self.factor=factor
+        self.feat=feat
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape
+    
+    #not very generic!
+    def call(self, inputs):
+        feat_input = inputs[:,:,:,:,self.feat] 
+        feat_input = tf.expand_dims(feat_input, axis=4)
+        other_input_a = inputs[:,:,:,:,0:self.feat] 
+        other_input_b = inputs[:,:,:,:,self.feat+1:] 
+        feat_input *= self.factor
+        
+        return tf.concat([other_input_a,feat_input,other_input_b],axis=-1)
+    
+    def get_config(self):
+        config = {'feat': self.feat, 'factor': self.factor}
+        base_config = super(Multiply_feature, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
+
+class Log_plus_one(Layer):
+    def __init__(self, **kwargs):
+        super(Log_plus_one, self).__init__(**kwargs)
+        
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape
+    
+    def call(self, inputs):
+        return tf.log(inputs+1)
+    
+    def get_config(self):
+        base_config = super(Log_plus_one, self).get_config()
+        return dict(list(base_config.items()))
+    
+
+class SelectEnergyOnly(Layer):
+    def __init__(self, **kwargs):
+        super(SelectEnergyOnly, self).__init__(**kwargs)
+    
+    def compute_output_shape(self, input_shape):
+        outshape=[]
+        for i in range(len(input_shape)-1):
+            outshape.append(input_shape[i])
+        outshape.append(1)
+        return tuple(outshape)
+    
+    def call(self, inputs):
+        return K.expand_dims(inputs[:,:,:,:,1], axis = 4)
+        
+    
+    def get_config(self):
+        base_config = super(SelectEnergyOnly, self).get_config()
+        return dict(list(base_config.items()))
+
+class SelectFeatureOnly(Layer):
+    def __init__(self, feat, **kwargs):
+        super(SelectFeatureOnly, self).__init__(**kwargs)
+        self.feat=feat
+    
+    def compute_output_shape(self, input_shape):
+        outshape=[]
+        for i in range(len(input_shape)-1):
+            outshape.append(input_shape[i])
+        outshape.append(1)
+        return tuple(outshape)
+    
+    def call(self, inputs):
+        return K.expand_dims(inputs[:,:,:,:,self.feat], axis = 4)
+    
+    def get_config(self):
+        config = {'feat': self.feat}
+        base_config = super(SelectFeatureOnly, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
 
 class Sum3DFeatureOne(Layer):
     def __init__(self,featindex=1, **kwargs):
@@ -129,7 +262,10 @@ class ReshapeBatch(Layer):
         return self.target_shape
 
     def call(self, inputs):
-        return K.reshape(inputs, self.target_shape)
+        if not self.target_shape[0]:
+            return K.reshape(inputs, tuple([-1]+list(self.target_shape[1:])))
+        else:
+            return K.reshape(inputs, self.target_shape)
 
     def get_config(self):
         config = {'target_shape': self.target_shape}
@@ -137,6 +273,13 @@ class ReshapeBatch(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 global_layers_list = {}
+global_layers_list['SelectFeatureOnly']=SelectFeatureOnly
+global_layers_list['Multiply_feature']=Multiply_feature
+global_layers_list['Print']=Print
+global_layers_list['Clip'] = Clip
+global_layers_list['Multiply'] = Multiply
+global_layers_list['Log_plus_one'] = Log_plus_one
+global_layers_list['SelectEnergyOnly'] = SelectEnergyOnly
 global_layers_list['Sum3DFeatureOne'] = Sum3DFeatureOne
 global_layers_list['Sum3DFeaturePerLayer'] = Sum3DFeaturePerLayer
 global_layers_list['ReshapeBatch'] = ReshapeBatch

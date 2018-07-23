@@ -379,8 +379,8 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
             }
 
             //numpyarray[it][phibin][etabin][layer][0]=drbinseed;
-            numpyarray[it][phibin][etabin][layer][0]=layer+minlayer;
-            numpyarray[it][phibin][etabin][layer][1]  +=energy;
+            //numpyarray[it][phibin][etabin][layer][0]=layer+minlayer;
+            numpyarray[it][phibin][etabin][layer][0]  +=energy;
 
 
             if(entriesperpixel.at(phibin).at(etabin).at(layer)<maxhitsperpixel){
@@ -531,8 +531,8 @@ void simpleRandom3Dstructure(boost::python::numeric::array numpyarray,
     					float dphihitbincentre=deltaPhi(rechitphi,bincentrephi);
     					float detahitbincentre=deltaPhi(rechiteta,bincentreeta);
 
-    					numpyarray[doneoutputevents][phibin][etabin][layer][0]=layer+minlayer;
-    					numpyarray[doneoutputevents][phibin][etabin][layer][1]  +=energy;
+    					//numpyarray[doneoutputevents][phibin][etabin][layer][0]=layer+minlayer;
+    					numpyarray[doneoutputevents][phibin][etabin][layer][0]  +=energy;
 
     				}
     				//std::cout <<  "PU_mixer: added PU event: "<< doneoutputevents<<"/" <<noutputevents<<std::endl;

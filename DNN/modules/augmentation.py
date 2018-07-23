@@ -37,6 +37,13 @@ def augmentRotationalSymmetry8(a):
     
     return np.concatenate((a,b,c,d,ma,mb,mc,md))
 
+def duplicate_mirror_x(a):
+    return np.concatenate((a,np.flip(a,1)))
+
+def duplicate2(a):
+    return np.concatenate((a,a))
+    
+
 def duplicate8(a):
     return np.concatenate((a,a,a,a,a,a,a,a))
 

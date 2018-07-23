@@ -21,7 +21,10 @@
 #include <stdio.h>
 #include <iostream>
 
-
+inline bool file_exists (const TString& name) {
+  struct stat buffer;
+  return (stat (name.Data(), &buffer) == 0);
+}
 
 static bool debug=true;
 
@@ -136,9 +139,17 @@ std::vector<TChain* > MergeDescriptor::createChains(
         for(const auto& f:infiles.at(i)){
             TString xrootdedpath=f;
             if(! f.EndsWith(".root")) continue;
-            if(usexrootd)
-                xrootdedpath=prependXRootD(xrootdedpath);
+            int waitcounter=0;
+            while(! file_exists(xrootdedpath)){
+            	waitcounter++;
+            	sleep(1);
+            	if(waitcounter>120){
+            		std::cout <<"could not find file "<< xrootdedpath << " exit "<<std::endl;
+            		throw std::runtime_error("mergeDescriptor: could not find file ");
+            	}
+            }
             chains.at(i)->Add(xrootdedpath+"/events");
+
         }
         for(auto& bi:branchinfos){
             bi->setIsRead(true);

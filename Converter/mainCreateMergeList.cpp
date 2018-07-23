@@ -52,6 +52,10 @@
 
 
 
+inline bool file_exists (const TString& name) {
+  struct stat buffer;
+  return (stat (name.Data(), &buffer) == 0);
+}
 
 
 std::vector<TString> readSampleFile(const TString& file, const TString& addpath){
@@ -60,12 +64,16 @@ std::vector<TString> readSampleFile(const TString& file, const TString& addpath)
     std::ifstream myfile (file.Data());
     if (myfile.is_open()){
         while ( getline (myfile,line) ){
-            out.push_back(addpath+"/"+(TString)line);
+        	TString fullfile=addpath+"/"+(TString)line;
+        	if( file_exists(fullfile) )
+        		out.push_back(fullfile);
+        	else
+        		std::cout << "readSampleFile: file " << fullfile << " does not exists/is not reachable. Removing from input"<<std::endl;
         }
         myfile.close();
     }
     else
-        throw std::runtime_error("could not read file");
+        throw std::runtime_error(("could not read file "+file).Data());
     return out;
 }
 
