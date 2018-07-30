@@ -17,7 +17,7 @@ import keras.backend as K
 
 import tensorflow as tf
 
-from Layers import Sum3DFeatureOne,Sum3DFeaturePerLayer, SelectEnergyOnly, ReshapeBatch, Multiply, Log_plus_one, Clip, Print
+from Layers import Sum3DFeatureOne,Sum3DFeaturePerLayer, SelectEnergyOnly, ReshapeBatch, Multiply, Log_plus_one, Clip, Print, Reduce_sum, Sum_difference_squared
 ############# just a placeholder
 
 from keras.layers import LeakyReLU
@@ -32,297 +32,129 @@ def freeze_all_batchnorms(model):
            layer.trainable = False
            print('frozen batch norm ',layer.name)
 
-def ultra_simple_model_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, nodemulti=32, l2_lambda=0.0001):
-    
-    fullcaloimage = create_full_calo_image(Inputs, dropoutRate=0.0001, momentum=momentum)
-    
-    x = fullcaloimage
 
-    x = Conv3D(1*nodemulti,kernel_size=(2, 2, 1),strides=(2,2,1), name='conv1',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.05),
-                      bias_initializer=keras.initializers.random_normal(0.01, 0.01),
-                      kernel_regularizer=l2(l2_lambda),
-                      border_mode='valid')(x)
-    x = LeakyReLU(alpha=leaky_relu_alpha)(x)                      
-    x = Dropout(dropoutRate)(x)  
-    x = Conv3D(2*nodemulti,kernel_size=(4, 4, 1),strides=(4,4,1), name='conv2',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.05),
-                      bias_initializer=keras.initializers.random_normal(0.01, 0.01),
-                      kernel_regularizer=l2(l2_lambda),
-                      border_mode='valid')(x)
-    x = LeakyReLU(alpha=leaky_relu_alpha)(x)   
-    x = Dropout(dropoutRate)(x) 
-    x = Conv3D(2*nodemulti,kernel_size=(1, 1, 4),strides=(1,1,4), name='conv3',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.05),
-                      bias_initializer=keras.initializers.random_normal(0.01, 0.01),
-                      kernel_regularizer=l2(l2_lambda),
-                      border_mode='valid')(x)
-    x = LeakyReLU(alpha=leaky_relu_alpha)(x)   
-    x = Dropout(dropoutRate)(x) 
-    x = Conv3D(2*nodemulti,kernel_size=(2, 2, 2),strides=(2,2,2), name='conv6',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.05),
-                      bias_initializer=keras.initializers.random_normal(0.01, 0.01),
-                      kernel_regularizer=l2(l2_lambda),
-                      border_mode='valid')(x)
-    x = LeakyReLU(alpha=leaky_relu_alpha)(x)   
-    x = BatchNormalization(momentum=momentum,name="norm_after_conv_block",epsilon=0.1,
-                                       center=True,scale=True)(x)
-    x = Dropout(dropoutRate)(x) 
+def resnet_like_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, nodemulti=32, l2_lambda=0.0001, use_dumb_bias=False):
+    
+    fullcaloimage = create_full_calo_image(Inputs, dropoutRate=0.02, momentum=-1,trainable=True)
     
     
-    ## now a more id like part
-    idx = fullcaloimage
-    idx = Conv3D(nodemulti,kernel_size=(4, 4, 1),strides=(1,1,1), name='conv2a',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.005),
-                      kernel_regularizer=l2(10*l2_lambda),
-                      border_mode='valid')(idx)
-    idx = LeakyReLU(alpha=leaky_relu_alpha)(idx)   
-    idx = Dropout(0.05)(idx) 
-    idx = Conv3D(nodemulti,kernel_size=(1, 1, 4),strides=(1,1,1), name='conv3a',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.005),
-                      kernel_regularizer=l2(10*l2_lambda),
-                      border_mode='valid')(idx)
-    idx = LeakyReLU(alpha=leaky_relu_alpha)(idx)   
-    idx = Dropout(0.05)(idx) 
-    idx = Conv3D(nodemulti,kernel_size=(2, 2, 2),strides=(2,2,2), name='conv6a',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.005),
-                      kernel_regularizer=l2(10*l2_lambda),
-                      border_mode='valid')(idx)
-    idx = LeakyReLU(alpha=leaky_relu_alpha)(idx)                     
-    idx = Dropout(0.05)(idx)
-    idx = Conv3D(nodemulti/2,kernel_size=(2, 2, 2),strides=(2,2,2), name='conv7a',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.005),
-                      kernel_regularizer=l2(10*l2_lambda),
-                      border_mode='valid')(idx)
-    idx = LeakyReLU(alpha=leaky_relu_alpha)(idx)                     
-    idx = BatchNormalization(momentum=momentum,name="norm_after_conv_blocka",epsilon=0.1,
-                                       center=True,scale=True)(idx)
-    idx = Dropout(dropoutRate)(idx)
-    
-    idx=Flatten()(idx)
-    x = Flatten()(x)
-    x = Concatenate()([x,idx])
-    
-    #x = Dropout(dropoutRate)(x)
-    
-    x = Dense(32, kernel_initializer='lecun_uniform',name='dense3',activation='relu')(x)
-    x = Dropout(dropoutRate)(x) 
-    x = Dense(32, kernel_initializer='lecun_uniform',name='dense4',activation='relu')(x)
-    
-    predictE=Dense(1, activation='linear',kernel_initializer='lecun_uniform',name='pre_pred_E')(x)
-    predictE = Clip(0.001,2.1)(predictE)
-    predictE=Multiply(500,name='pred_E')(predictE)
-    predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
-    predictions = [predictID,predictE]
-    
-    model = Model(inputs=Inputs, outputs=predictions)
-    return model
-    
-
-def resnet_like_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, nodemulti=32, l2_lambda=0.0001):
-    
-    fullcaloimage = create_full_calo_image(Inputs, dropoutRate=0.001, momentum=momentum,trainable=True)
     allayers = create_per_layer_energies(Inputs)
     
+    print(allayers.shape)
+    
     x = fullcaloimage
 
-    allayerenergies= RepeatVector(17*17)(allayers)
-    allayerenergies = Reshape((17,17,18,1))(allayerenergies)
-    allayerenergies = Multiply(1./(17.*17.))(allayerenergies)
-    
-    x = Concatenate()([allayerenergies,x])
     #make the really dumb part that gets corrections
     
     
     x = create_conv_resnet(x, name='conv_block_1',
-                       nodes_dumb=16, kernel_dumb=(2,2,1), strides_dumb=(2,2,1),
-                       nodes_lin=4,
-                       nodes_nonlin=32, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
-                       leaky_relu_alpha=0.01,
-                       dropout=dropoutRate)
-    x = Dropout(0.1*dropoutRate)(x)
-    
-    x = create_conv_resnet(x, name='conv_block_2',
-                       nodes_dumb=16, kernel_dumb=(4,4,1), strides_dumb=(4,4,1),
-                       nodes_lin=4,
-                       nodes_nonlin=32, kernel_nonlin_a=(4,4,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
-                       leaky_relu_alpha=0.01, 
-                       dropout=dropoutRate)
-    x = Dropout(0.1*dropoutRate)(x)
-    
-    x = create_conv_resnet(x, name='conv_block_3',
-                       nodes_dumb=16, kernel_dumb=(1,1,4), strides_dumb=(1,1,4),
-                       nodes_lin=4,
-                       nodes_nonlin=32, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,4), lambda_reg=l2_lambda,
-                       leaky_relu_alpha=0.01,
-                       dropout=dropoutRate)
-    x = Dropout(0.1*dropoutRate)(x)
-    
-    x = create_conv_resnet(x, name='conv_block_4',
-                       nodes_dumb=16, kernel_dumb=(2,2,2), strides_dumb=(2,2,2),
-                       nodes_lin=4,
-                       nodes_nonlin=24, kernel_nonlin_a=(3,3,3), kernel_nonlin_b=(3,3,3), lambda_reg=l2_lambda,
+                       kernel_dumb=(2,2,1), strides_dumb=(2,2,1),
+                       nodes_lin=16,
+                       nodes_nonlin=24, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
                        leaky_relu_alpha=0.01,
                        dropout=dropoutRate,
-                       normalize_dumb=True)
+                       lin_trainable=True,
+                       use_dumb_bias=use_dumb_bias)
+    
+    diffA = Sum_difference_squared()([allayers,x])
+    #diffA=Print("diffA")(diffA)
+    
+    #x = Dropout(0.1*dropoutRate)(x)
+    
+    x = create_conv_resnet(x, name='conv_block_2',
+                       kernel_dumb=(4,4,1), strides_dumb=(4,4,1),
+                       nodes_lin=16,
+                       nodes_nonlin=16, kernel_nonlin_a=(4,4,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
+                       leaky_relu_alpha=0.01, 
+                       dropout=dropoutRate,
+                       lin_trainable=True,
+                       use_dumb_bias=use_dumb_bias)
+    
+    diffB = Sum_difference_squared()([allayers,x])
+    #x = Dropout(0.1*dropoutRate)(x)
+    
+    x = create_conv_resnet(x, name='conv_block_3',
+                       kernel_dumb=(1,1,3), strides_dumb=(1,1,3),
+                       nodes_lin=16,
+                       nodes_nonlin=16, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,4), lambda_reg=l2_lambda,
+                       leaky_relu_alpha=0.01,
+                       dropout=dropoutRate,
+                       lin_trainable=True,
+                       use_dumb_bias=use_dumb_bias)
+    diffC = Sum_difference_squared()([allayers,x])
+    
+    #x = Dropout(0.1*dropoutRate)(x)
     
     
-    x = Dropout(0.1*dropoutRate)(x)
+    x = create_conv_resnet(x, name='conv_block_4',
+                       kernel_dumb=(2,2,3), strides_dumb=(2,2,3),
+                       nodes_lin=16,
+                       nodes_nonlin=16, kernel_nonlin_a=(3,3,3), kernel_nonlin_b=(3,3,3), lambda_reg=l2_lambda,
+                       leaky_relu_alpha=0.01,
+                       dropout=dropoutRate,
+                       lin_trainable=True,
+                       normalize_dumb=False,
+                       nodes_dumb=1,dumb_trainable=False,
+                       use_dumb_bias=use_dumb_bias)
+    
+    
+    diffD = Sum_difference_squared()([allayers,x])
+    
+    xsum = Sum3DFeatureOne(0)(x)
+    #x = Dropout(0.1*dropoutRate)(x)
+    #x = Print("x")(x)
     x = Flatten()(x)
     
-    # x = Concatenate()([allayers,x])
     
-    x_lin = Dense(15, kernel_initializer=keras.initializers.random_normal(0.0, 1e-6),name='dense1_lin', trainable=False)(x)
-    x_lin = LeakyReLU(alpha=leaky_relu_alpha)(x_lin)
-    x_dumb = Dense(24, kernel_initializer='lecun_uniform',name='dense1_dumb', use_bias=False)(x)
-    x_dumb = LeakyReLU(alpha=0.001)(x_dumb)
-    x_dumb = Dense(16, kernel_initializer='lecun_uniform',name='dense2_dumb', use_bias=False)(x_dumb)
-    x_dumb = LeakyReLU(alpha=0.001)(x_dumb)
-    x = Concatenate()([x_lin,x_dumb])
-    
-    predictE=Dense(1, activation='linear',kernel_initializer='lecun_uniform',name='pre_pred_E', use_bias=False)(x)
-    predictE = Clip(0.01,2.1)(predictE)
-    predictE=Multiply(250,name='pred_E')(predictE)
-    predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
-    predictions = [predictID,predictE]
-    
-    model = Model(inputs=Inputs, outputs=predictions)
-    return model
-
-
-
-def resnet_like_3D_2(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.9, nodemulti=32, l2_lambda=0.0001):
-    
-    fullcaloimage = create_full_calo_image(Inputs, dropoutRate=0.0001, momentum=momentum)
-    allayerenergies = create_per_layer_energies(Inputs)
-    
-    x = fullcaloimage
+    alldiff = Add()([diffA,diffB,diffC,diffD])
     
     
-    
-    #
-    #repeat-vector can be concated at any per-layer step
-
-    x_conv1 = Conv3D(int(0.5*nodemulti),kernel_size=(2, 2, 1),strides=(2,2,1), name='conv1_lin',
-                      kernel_initializer='lecun_uniform',
-                      kernel_regularizer=l2(0.2*l2_lambda),
-                      border_mode='valid')(x)
-    x_conv1 = LeakyReLU(alpha=leaky_relu_alpha)(x_conv1)   
-    
-    x_conv1_rn = Conv3D(nodemulti,kernel_size=(1, 1, 5),strides=(1,1,1), name='conv1_resnet_a',
-                      kernel_initializer='lecun_uniform',
-                      kernel_regularizer=l2(5*l2_lambda),
-                      activation='relu',
-                      trainable=False,
-                      border_mode='same')(x)
-    x_conv1_rn = Dropout(dropoutRate)(x_conv1_rn)  
-    x_conv1_rn = Conv3D(int(0.5*nodemulti),kernel_size=(2, 2, 1),strides=(2,2,1), name='conv1_resnet_b',
-                      kernel_initializer='zeros',
-                      kernel_regularizer=l2(5*l2_lambda),
-                      activation='relu',
-                      trainable=False,
-                      border_mode='valid')(x_conv1_rn)
-    x_conv1_rn = Dropout(dropoutRate)(x_conv1_rn)  
-    
-    x = Add()([x_conv1,x_conv1_rn])
-    
-    
-    
-    x_conv2 = Conv3D(nodemulti,kernel_size=(4, 4, 1),strides=(4,4,1), name='conv2_lin',
-                      kernel_initializer='lecun_uniform',
-                      kernel_regularizer=l2(l2_lambda),
-                      border_mode='valid')(x)
-    x_conv2 = LeakyReLU(alpha=leaky_relu_alpha)(x_conv2)   
-    
-    x_conv2_rn = Conv3D(2*nodemulti,kernel_size=(1, 1, 7),strides=(1,1,1), name='conv2_resnet_a',
-                      kernel_initializer='lecun_uniform',
-                      kernel_regularizer=l2(5*l2_lambda),
-                      activation='relu',
-                      trainable=False,
-                      border_mode='same')(x)
-    x_conv2_rn = Dropout(dropoutRate)(x_conv2_rn)  
-    x_conv2_rn = Conv3D(2*nodemulti,kernel_size=(7, 7, 1),strides=(1,1,1), name='conv2_resnet_b',
-                      kernel_initializer='lecun_uniform',
-                      kernel_regularizer=l2(5*l2_lambda),
-                      activation='relu',
-                      trainable=False,
-                      border_mode='same')(x_conv2_rn)
-    x_conv2_rn = Dropout(dropoutRate)(x_conv2_rn)  
-    x_conv2_rn = Conv3D(nodemulti,kernel_size=(4, 4, 1),strides=(4,4,1), name='conv2_resnet_c',
-                      kernel_initializer='zeros',
-                      kernel_regularizer=l2(5*l2_lambda),
-                      activation='relu',
-                      trainable=False,
-                      border_mode='valid')(x_conv2_rn)
-    x_conv2_rn = Dropout(dropoutRate)(x_conv2_rn)  
-  
-    x = Add()([x_conv2,x_conv2_rn])
-    
-    print(allayerenergies.shape)
-    allayerenergies = RepeatVector(4)(allayerenergies)
-    print(allayerenergies.shape)
-    allayerenergies = Reshape((2,2,18,1))(allayerenergies)
-    x = Concatenate()([x,allayerenergies])
-    
-    x_conv3 = Conv3D(nodemulti,kernel_size=(1, 1, 4),strides=(1,1,4), name='conv3_lin',
-                      kernel_initializer='lecun_uniform',
-                      kernel_regularizer=l2(0.05*l2_lambda),
-                      border_mode='valid')(x)
-    x_conv3 = LeakyReLU(alpha=leaky_relu_alpha)(x_conv3)   
-    
-    x_conv3_rn = Conv3D(2*nodemulti,kernel_size=(1, 1, 7),strides=(1,1,1), name='conv3_resnet_a',
-                      kernel_initializer='lecun_uniform',
-                      kernel_regularizer=l2(5*l2_lambda),
-                      activation='relu',
-                      trainable=False,
-                      border_mode='same')(x)
-    x_conv3_rn = Dropout(dropoutRate)(x_conv3_rn)  
-    x_conv3_rn = Conv3D(nodemulti,kernel_size=(1, 1, 4),strides=(1,1,4), name='conv3_resnet_b',
-                      kernel_initializer='zeros',
-                      kernel_regularizer=l2(5*l2_lambda),
-                      activation='relu',
-                      trainable=False,
-                      border_mode='valid')(x_conv3_rn)
-    x_conv3_rn = Dropout(dropoutRate)(x_conv3_rn)  
-    x = Add()([x_conv3,x_conv3_rn])
-    #up to here this is per layer
-    
-     
-    
-    x = Conv3D(2*nodemulti,kernel_size=(2, 2, 2),strides=(2,2,2), name='conv4_lin',
-                      kernel_initializer=keras.initializers.random_normal(0, 0.1),
-                      kernel_regularizer=l2(0.05*l2_lambda),
-                      border_mode='valid')(x)
-    x = LeakyReLU(alpha=leaky_relu_alpha)(x)   
-    #x = BatchNormalization(momentum=momentum,name="norm_after_conv_block",
-    #                                   center=True,scale=True)(x)
-    x = Dropout(0.1*dropoutRate)(x) 
+    x = Dense(32, kernel_initializer=keras.initializers.random_normal(1./32., 1./32.),name='dense1', trainable=True)(x)
+    x = LeakyReLU(alpha=0.001)(x)
+    x = Dense(12, kernel_initializer=keras.initializers.random_normal(1./(32.*120.), 1./(32.*120.)),name='dense2', trainable=True)(x)
     
     
    
-    x = Flatten()(x)
+    predictE=Dense(1, activation='linear',kernel_initializer=keras.initializers.random_normal(1./12., 1./12.),name='pre_pred_E')(x)
     
-    #x = Dropout(dropoutRate)(x)
+    predictE=Multiply(200.)(predictE)
+    #predictE=Print("predictE")(predictE)
+    predictE = Clip(-1000,2000,name='pred_E')(predictE)
+    #predictE=Print("predictE")(predictE)
     
-    x = Dense(32, kernel_initializer='lecun_uniform',name='dense3',activation='relu')(x)
-    x = Dropout(0.1*dropoutRate)(x) 
-    x = Dense(32, kernel_initializer='lecun_uniform',name='dense4',activation='relu')(x)
-    
-    predictE=Dense(1, activation='linear',kernel_initializer='lecun_uniform',name='pre_pred_E')(x)
-    predictE = Clip(0.001,2.1)(predictE)
-    predictE=Multiply(500,name='pred_E')(predictE)
-    predictID=Dense(nclasses, activation='softmax',kernel_initializer='lecun_uniform',name='ID_pred')(x)
+    #alldiff=Multiply(1e5)(alldiff)
+    #alldiff=Print("alldiff")(alldiff)
+    predictID=RepeatVector(nclasses)(alldiff)
+    predictID=Reshape([nclasses],name="ID_pred")(predictID)
     predictions = [predictID,predictE]
     
     model = Model(inputs=Inputs, outputs=predictions)
     return model
+
+
 
 
 #also dows all the parsing
 train=training_base(testrun=False,resumeSilently=False,renewtokens=True)
+from DeepJetCore.DataCollection import DataCollection
+orig=DataCollection.generator
+def _adapted_generator(self):
+    for t in orig(self):
+        x=t[0]
+        y=t[1]
+        y[0]*=0
+        yield (x,y)
+DataCollection.generator=_adapted_generator
 
+#orig2=train.val_data.generator
+#def _adapted_generator2(self):
+#    for t in orig2(self):
+#        x=t[0]
+#        y=t[1]
+#        y[0]*=0
+#        yield (x,y)
+#train.val_data.generator=_adapted_generator2
 
-verbose=1
 additionalplots=['pred_E_acc_calo_relative_rms',
                  'val_pred_E_acc_calo_relative_rms',
                  'pred_E_acc_calo_relative_rms_50',
@@ -346,38 +178,33 @@ usefinetuneloss=huber_loss_calo #huber_loss_calo #low_value_msq #'mean_squared_e
 
 
 batchsize=800
-clipnorm=None
+clipnorm=1
 
 if not train.modelSet():
     
     nodemulti=16
 
-    train.setModel(resnet_like_3D,dropoutRate=0.05,momentum=0.3,nodemulti=nodemulti,l2_lambda=1e-6)
+    train.setModel(resnet_like_3D,dropoutRate=0.1,momentum=0.3,nodemulti=nodemulti,l2_lambda=1e-4)
     
     train.compileModel(learningrate=0.01,#will be overwritten anyway
                        clipnorm=1,
-                   loss=['categorical_crossentropy','mean_squared_error'],metrics=usemetrics,
-                   loss_weights=[0., 1.])
+                   loss=['mean_absolute_error','mean_squared_error'],metrics=usemetrics,
+                   loss_weights=[1., 1e-7]) #ID, en
 
-print(train.keras_model.summary())
+#print(train.keras_model.summary())
 #exit()
 
 
-def open_resnet(train):
-    print('un-freezing non-linear corrections, freezing dumb parts')
-    #unfreeze etc
-    for layer in train.keras_model.layers:
-        if "res" in layer.name:
-            layer.trainable=True
-        if "dumb" in layer.name:
-            layer.trainable=False
-    freeze_all_batchnorms(train.keras_model)
-    train.compileModel(learningrate=0.01, #anyway overwritten
-               clipnorm=clipnorm,
-               loss=['categorical_crossentropy',usefinetuneloss],#'mean_squared_error'],#'mean_squared_error'],#huber_loss],#mean_squared_logarithmic_error],
-               metrics=usemetrics,
-               loss_weights=[0., 1.])
-    print(train.keras_model.summary())
+    
+def open_en_training(train):
+    print('open energy loss and dense layers')
+    for l in train.keras_model.layers:
+        if "dense" in l.name:
+            l.trainable=True
+            l.use_bias=True
+        if "pred_E" == l.name: #clip layer
+            l.min=-1000
+                    
     
 def open_conv_lin(train):
     print('un-freezing linear corrections')
@@ -385,25 +212,9 @@ def open_conv_lin(train):
     for layer in train.keras_model.layers:
         if "lin" in layer.name:
             layer.trainable=True
-    train.compileModel(learningrate=0.01, #anyway overwritten
-               clipnorm=clipnorm,
-               loss=['categorical_crossentropy',usefinetuneloss],#'mean_squared_error'],#'mean_squared_error'],#huber_loss],#mean_squared_logarithmic_error],
-               metrics=usemetrics,
-               loss_weights=[0., 1.])
-    print(train.keras_model.summary())
+        if "pred_E" == layer.name: #clip layer
+            layer.min=1
     
-def open_conv_lsum(train):
-    print('un-freezing lsum')
-    #unfreeze etc
-    for layer in train.keras_model.layers:
-        if "lsum" in layer.name:
-            layer.trainable=True
-    train.compileModel(learningrate=0.01, #anyway overwritten
-               clipnorm=1,
-               loss=['categorical_crossentropy','mean_squared_error'],#'mean_squared_error'],#'mean_squared_error'],#huber_loss],#mean_squared_logarithmic_error],
-               metrics=usemetrics,
-               loss_weights=[0., 1.])
-    print(train.keras_model.summary())
     
 def open_pre(train):
     print('un-freezing pre')
@@ -411,12 +222,6 @@ def open_pre(train):
     for layer in train.keras_model.layers:
         if "pre_" in layer.name:
             layer.trainable=True
-    train.compileModel(learningrate=0.01, #anyway overwritten
-               clipnorm=1,
-               loss=['categorical_crossentropy','mean_squared_error'],#'mean_squared_error'],#'mean_squared_error'],#huber_loss],#mean_squared_logarithmic_error],
-               metrics=usemetrics,
-               loss_weights=[0., 1.])
-    print(train.keras_model.summary())
     
 
 def freeze_batchnorm(train):
@@ -424,20 +229,47 @@ def freeze_batchnorm(train):
     freeze_all_batchnorms(train.keras_model)   
     
 def exit_func(train):
+    train.saveModel("pretrained.h5")
+    print('exit pre-training')
     exit()
+    
+    
+    
+def open_resnet(train):
+    print('un-freezing non-linear corrections, freezing dumb parts')
+    #unfreeze etc
+    for layer in train.keras_model.layers:
+        if "res" in layer.name:
+            layer.trainable=True
+        if "dumb" in layer.name:
+            layer.trainable=True
+        if "pred_E" == layer.name: #clip layer
+            layer.min=1
+    print(train.keras_model.summary())
 
 import collections
-Learning_sched = collections.namedtuple('Learning_sched', 'lr nepochs batchmulti funccall')
+Learning_sched = collections.namedtuple('Learning_sched', 'lr nepochs batchmulti funccall loss_weights en_loss')
 learn=[]
 
+train.trainedepoches=0
 #K.set_value(train.keras_model.optimizer.lr, lrs.lr)
-learnmulti=1
-learn.append(Learning_sched(lr=learnmulti*1e-3,     nepochs=1, batchmulti=0.25,  funccall=None))
-learn.append(Learning_sched(lr=learnmulti*5e-5,     nepochs=10, batchmulti=0.5,    funccall=None))
-learn.append(Learning_sched(lr=learnmulti*1e-5,     nepochs=20, batchmulti=1,  funccall=open_conv_lin))
-learn.append(Learning_sched(lr=learnmulti*1e-5 ,    nepochs=20,  batchmulti=1, funccall=open_conv_lin))
-learn.append(Learning_sched(lr=learnmulti*1e-5,     nepochs=60,  batchmulti=1,   funccall=open_resnet))
-#learn.append(Learning_sched(lr=learnmulti*1e-5,     nepochs=1,  batchmulti=1,   funccall=freeze_batchnorm))
+
+
+verbose=1
+
+#pre-train the first layers
+#learn.append(Learning_sched(lr=1e-3,     nepochs=3,   batchmulti=0.5,  funccall=None,         loss_weights=[1e-7, 1], en_loss='mean_squared_error'))
+#learn.append(Learning_sched(lr=1e-4,     nepochs=4,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
+#learn.append(Learning_sched(lr=1e-6,     nepochs=4,   batchmulti=1,    funccall=None,         loss_weights=[1e-7, 100.], en_loss=huber_loss_calo))
+#learn.append(Learning_sched(lr=1e-6,     nepochs=15,   batchmulti=1,   funccall=open_resnet,  loss_weights=[1e-7, 100.], en_loss=huber_loss_calo))
+#learn.append(Learning_sched(lr=1e-7,     nepochs=25,   batchmulti=1,   funccall=None,         loss_weights=None, en_loss=None))
+
+
+learn.append(Learning_sched(lr=1e-3,     nepochs=3,   batchmulti=0.5,  funccall=open_resnet,         loss_weights=[1e-7, 100], en_loss=huber_loss_calo))
+learn.append(Learning_sched(lr=1e-4,     nepochs=4,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
+learn.append(Learning_sched(lr=1e-5,     nepochs=4,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
+learn.append(Learning_sched(lr=1e-6,     nepochs=15,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
+learn.append(Learning_sched(lr=1e-7,     nepochs=25,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
 
 totalepochs=0
 import keras.backend as K
@@ -446,6 +278,18 @@ for lrs in learn:
     if train.trainedepoches<=totalepochs:
         if lrs.funccall:
             lrs.funccall(train)
+        if lrs.loss_weights:
+            train.compileModel(learningrate=0.01, #anyway overwritten
+               clipnorm=clipnorm,
+               loss=['mean_absolute_error',lrs.en_loss],#'mean_squared_error'],#'mean_squared_error'],#huber_loss],#mean_squared_logarithmic_error],
+               metrics=usemetrics,
+               loss_weights=lrs.loss_weights)
+            print(train.keras_model.summary())
+        
+        for l in train.keras_model.layers:
+            if l.trainable and l.weights and len(l.weights):
+                print('trainable '+l.name)
+                
         K.set_value(train.keras_model.optimizer.lr, lrs.lr)
         print('set learning rate to '+str(lrs.lr))
         model,history = train.trainModel(nepochs=totalepochs+lrs.nepochs, 

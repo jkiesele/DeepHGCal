@@ -4,3 +4,4 @@
 # But not these files...
 !.gitignore
 !*.py
+prepretrained_fcchh_enmodel.h5

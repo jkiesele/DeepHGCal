@@ -9,7 +9,143 @@ import keras
 from keras.layers import Flatten
 from symbol import factor
 from matplotlib.pyplot import axis
+#from keras.layers.merge import _Merge
 
+
+
+class Print(Layer):
+    def __init__(self, message, **kwargs):
+        super(Print, self).__init__(**kwargs)
+        self.message=message
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape
+    
+    def call(self, inputs):
+        return tf.Print(inputs,[inputs],self.message,summarize=300)
+    
+    def get_config(self):
+        config = {'message': self.message}
+        base_config = super(Print, self).get_config()
+        return dict(list(base_config.items()) + list(config.items() ))
+
+
+#class Simple_Sum3D(Layer):
+#    def __init__(self, outshape, **kwargs):
+#        super(Simple_Sum3D, outshape).__init__(**kwargs)
+#        self.message=message
+#    
+#    def compute_output_shape(self, input_shape):
+#        return input_shape
+#    
+#    def call(self, inputs):
+#        return tf.Print(inputs,[inputs],self.message,summarize=300)
+#    
+#    def get_config(self):
+#        config = {'message': self.message}
+#        base_config = super(Simple_Sum3D, self).get_config()
+#        return dict(list(base_config.items()) + list(config.items() ))
+#
+#
+
+
+class Create_per_layer_energies(Layer):
+    def __init__(self, **kwargs):
+        super(Create_per_layer_energies, self).__init__(**kwargs)
+        
+    
+    def compute_output_shape(self, input_shape):
+        return tuple([input_shape[0],input_shape[3]])
+    
+    def call(self, inputs):
+        enonly = inputs[:,:,:,:,1]
+        enonly= K.sum(enonly, axis=1, keepdims=False)
+        enonly= K.sum(enonly, axis=1, keepdims=False)
+        enonly *= 1./1000.
+        return enonly
+    
+    def get_config(self):
+        base_config = super(Create_per_layer_energies, self).get_config()
+        return dict(list(base_config.items()))
+
+
+class Sum_difference_squared(Layer):
+    def __init__(self, **kwargs):
+        super(Sum_difference_squared, self).__init__(**kwargs)
+        
+        
+    def compute_output_shape(self, input_shape):
+        print(input_shape)
+        if int(input_shape[0][1]) % int(input_shape[1][3]):
+            raise Exception("Sum_difference_squared shapes don't match: "+str(input_shape[0][3])+" "+str(int(input_shape[1][3])))
+        
+        if input_shape[0][0]>0:
+            return tuple(input_shape[0][0]+[1])
+        else:
+            return tuple([None,1])
+    
+    def call(self, inputs):
+        
+        if inputs[0].get_shape()[0]>0:
+            nbatch=int(inputs[0].shape[0])
+        else:
+            nbatch=-1
+            
+        nlayers=int(inputs[0].shape[1])
+        perlayerenergies=inputs[0]
+        print('perlayerenergies ',perlayerenergies.shape)
+        pred_energies=inputs[1][:,:,:,:,0]
+        pred_energies=tf.reduce_sum(pred_energies, axis=1, keep_dims=False)
+        pred_energies=tf.reduce_sum(pred_energies, axis=1, keep_dims=False)
+        print('pred_energies ',pred_energies.shape)
+        
+        ncombinedlayers=int(pred_energies.shape[1])
+        strides = nlayers/ncombinedlayers
+        print('ncombinedlayers',ncombinedlayers)
+        print('strides',strides)
+        print('nbatch',nbatch)
+        
+        perlayerenergies = tf.reshape(perlayerenergies, shape=[nbatch, ncombinedlayers, strides])
+        print('perlayerenergies a',perlayerenergies.shape)
+        perlayerenergies = tf.reduce_sum(perlayerenergies,axis=-1)
+        print('perlayerenergies b',perlayerenergies.shape)
+        
+        
+        #perlayerenergies=tf.Print(perlayerenergies,[perlayerenergies],"perlayerenergies_"+self.name)
+        #pred_energies=tf.Print(pred_energies,[pred_energies],"pred_energies_"+self.name)
+        
+        diff = perlayerenergies - pred_energies
+        
+        #diff=tf.Print(diff,[diff],"diff"+self.name)
+        
+        diff *= diff
+        
+        diff=tf.reduce_sum(diff, axis=-1, keep_dims=False)
+        diff=tf.expand_dims(diff, axis=1)
+        return diff
+    
+    def get_config(self):
+        base_config = super(Sum_difference_squared, self).get_config()
+        return dict(list(base_config.items()))
+
+
+class Reduce_sum(Layer):
+    def __init__(self, **kwargs):
+        super(Log_plus_one, self).__init__(**kwargs)
+        
+    def compute_output_shape(self, input_shape):
+        outshape=[]
+        for i in range(len(input_shape)-1):
+            outshape.append(input_shape[i])
+        return tuple(outshape)
+    
+    def call(self, inputs):
+        return tf.reduce_sum(inputs, axis=-1, keep_dims=False)
+    
+    def get_config(self):
+        base_config = super(Log_plus_one, self).get_config()
+        return dict(list(base_config.items()))
+    
 
 class Clip(Layer):
     def __init__(self, min, max , **kwargs):
@@ -30,21 +166,6 @@ class Clip(Layer):
     
 
 
-class Print(Layer):
-    def __init__(self, message, **kwargs):
-        super(Print, self).__init__(**kwargs)
-        self.message=message
-    
-    def compute_output_shape(self, input_shape):
-        return input_shape
-    
-    def call(self, inputs):
-        return tf.Print(inputs,[inputs],self.message,summarize=300)
-    
-    def get_config(self):
-        config = {'message': self.message}
-        base_config = super(Print, self).get_config()
-        return dict(list(base_config.items()) + list(config.items() ))
 
 class Multiply(Layer):
     def __init__(self, factor, **kwargs):
@@ -151,7 +272,7 @@ class Sum3DFeatureOne(Layer):
 
     def call(self, inputs):
         permtolist=Flatten()(inputs[:,:,:,:,self.featindex])
-        out= K.sum(permtolist, axis=-1, keepdims=True)/1000
+        out= K.sum(permtolist, axis=-1, keepdims=True)
         return out
 
     def get_config(self):
@@ -273,6 +394,9 @@ class ReshapeBatch(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 global_layers_list = {}
+global_layers_list['Create_per_layer_energies']=Create_per_layer_energies
+global_layers_list['Sum_difference_squared']=Sum_difference_squared
+global_layers_list['Reduce_sum']=Reduce_sum
 global_layers_list['SelectFeatureOnly']=SelectFeatureOnly
 global_layers_list['Multiply_feature']=Multiply_feature
 global_layers_list['Print']=Print

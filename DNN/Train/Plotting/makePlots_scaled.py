@@ -137,17 +137,19 @@ for part in truthclasses:
                 xmin=-xrange,xmax=xrange,
                 treename='events') #override max value of y-axis range
         makePlots_async(infile,
-                ['E = 50 GeV',
+                ['E = 20 GeV',
+                 'E = 50 GeV',
                  'E = 100 GeV',
                  'E = 200 GeV',
                  'E = 500 GeV',
                  'E = 1000 GeV'], #legend names [as list]
                 
-                5*['reg_E/true_energy - 1'], #variable to plot --> yaxis:xaxis
-                [part+'&& abs(true_energy - 50)<5',
-                 part+'&& abs(true_energy - 100)<10',
-                 part+'&& abs(true_energy - 200)<20',
-                 part+'&& abs(true_energy - 500)<50',
+                6*['reg_E/true_energy - 1'], #variable to plot --> yaxis:xaxis
+                [part+'&& abs(true_energy - 20)<2.5',
+                 part+'&& abs(true_energy - 50)<5',
+                 part+'&& abs(true_energy - 100)<5',
+                 part+'&& abs(true_energy - 200)<10',
+                 part+'&& abs(true_energy - 500)<25',
                  part+'&& abs(true_energy - 1000)<100'], #list of cuts to apply
                 'auto', #list of color and style, e.g. ['red,dashed', ...]
                 outdir+'/resolution_fixeden_'+ part+'.pdf', #output file (pdf)
