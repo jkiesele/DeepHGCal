@@ -25,6 +25,16 @@ class SparseConvT(unittest.TestCase):
             result = sess.run(op)
             assert (np.allclose(result, should_be_equal_to))
 
+    def test_sorting(self):
+        random_tensor = tf.placeholder(shape=[10, 10], dtype=tf.float32)
+
+        sort_it = sort_last_dim_tensor(random_tensor)
+        sort_it = tf.gather_nd(random_tensor, sort_it)
+        with tf.Session() as sess:
+            input_rand = np.random.random((10,10))
+            result = sess.run(sort_it, feed_dict={random_tensor:input_rand})
+            print(result)
+
 
 if __name__ == '__main__':
     unittest.main()

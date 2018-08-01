@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 import sparse_hgcal
 from numba import jit
+import time
 
 
 DIM_1 = 20
@@ -19,9 +20,9 @@ BIN_WIDTH_X = 2 * HALF_X / DIM_1
 BIN_WIDTH_Y = 2 * HALF_Y / DIM_2
 
 
-@jit
-def find_indices(histo, eta_bins, phi_bins, layers):
-    n = np.size(eta_bins)
+@jit(nopython=True)
+def find_indices(n, histo, eta_bins, phi_bins, layers):
+    # n = np.size(eta_bins)
     indices = np.zeros(n, dtype=np.int32)
     for i in range(n):
         if eta_bins[i] >= 0 and eta_bins[i] < DIM_1 and phi_bins[i] >= 0 and phi_bins[i] < DIM_2 and layers[i] >= 0 and \
@@ -34,7 +35,7 @@ def find_indices(histo, eta_bins, phi_bins, layers):
     indices[indices >= 6] = -1
     return indices
 
-
+@jit
 def process(rechit_layer, rechit_x, rechit_y, rechit_z, rechit_energy, rechit_vxy, rechit_vz, seed_x=0, seed_y=0, seed_z=0):
     x_low_edge = seed_x - HALF_X
     x_diff = rechit_x - seed_x
@@ -47,9 +48,10 @@ def process(rechit_layer, rechit_x, rechit_y, rechit_z, rechit_energy, rechit_vx
     layers = np.minimum(np.floor(rechit_layer), DIM_3).astype(np.int32)
 
     histogram = np.zeros((DIM_1,DIM_2,DIM_3))
-    indices = find_indices(histogram, x_bins, y_bins, layers)
+    indices = find_indices(np.size(x_bins), histogram, x_bins, y_bins, layers)
 
     indices_valid = np.where(indices!=-1)
+    bins = indices[indices_valid]
     store_energy = rechit_energy[indices_valid]
     store_x = x_diff[indices_valid]
     store_y = y_diff[indices_valid]
@@ -62,13 +64,13 @@ def process(rechit_layer, rechit_x, rechit_y, rechit_z, rechit_energy, rechit_vx
     store_vz = rechit_vz[indices_valid]
 
     data_x = np.zeros((DIM_1, DIM_2, DIM_3, 7 * MAX_ELEMENTS))
-    data_x[store_x_bins, store_y_bins, store_layers, indices[indices_valid]*7+0] = store_energy
-    data_x[store_x_bins, store_y_bins, store_layers, indices[indices_valid]*7+1] = store_layers
-    data_x[store_x_bins, store_y_bins, store_layers, indices[indices_valid]*7+2] = store_x
-    data_x[store_x_bins, store_y_bins, store_layers, indices[indices_valid]*7+3] = store_y
-    data_x[store_x_bins, store_y_bins, store_layers, indices[indices_valid]*7+4] = store_z
-    data_x[store_x_bins, store_y_bins, store_layers, indices[indices_valid]*7+5] = store_vxy
-    data_x[store_x_bins, store_y_bins, store_layers, indices[indices_valid]*7+6] = store_vz
+    data_x[store_x_bins, store_y_bins, store_layers, bins*7+0] = store_energy
+    data_x[store_x_bins, store_y_bins, store_layers, bins*7+1] = store_layers
+    data_x[store_x_bins, store_y_bins, store_layers, bins*7+2] = store_x
+    data_x[store_x_bins, store_y_bins, store_layers, bins*7+3] = store_y
+    data_x[store_x_bins, store_y_bins, store_layers, bins*7+4] = store_z
+    data_x[store_x_bins, store_y_bins, store_layers, bins*7+5] = store_vxy
+    data_x[store_x_bins, store_y_bins, store_layers, bins*7+6] = store_vz
 
     return data_x
 
@@ -94,15 +96,27 @@ def _write_entry(x, labels_one_hot, writer):
     writer.write(example.SerializeToString())
 
 
-def write_to_tf_records(rechit_x,rechit_y,rechit_z,rechit_vxy,rechit_xz, rechit_layer,rechit_energy, H,I,i, output_file_prefix):
+def write_to_tf_records(rechit_x,rechit_y,rechit_z,rechit_vxy,rechit_xz, rechit_energy, rechit_layer, H, I, i, output_file_prefix):
     writer = tf.python_io.TFRecordWriter(output_file_prefix + '.tfrecords',
                                          options=tf.python_io.TFRecordOptions(
                                              tf.python_io.TFRecordCompressionType.GZIP))
 
     for i in range(len(rechit_x)):
+        start = time.time()
+
+        # print(rechit_layer[i, 0:I[i]])
+        temp = rechit_layer[i, 0:I[i]]
         x = process(rechit_layer[i, 0:I[i]], rechit_x[i, 0:I[i]], rechit_y[i, 0:I[i]], rechit_z[i, 0:I[i]],
                     rechit_energy[i, 0:I[i]], rechit_vxy[i, 0:I[i]], rechit_xz[i, 0:I[i]])
+        # x = rechit_layer[i,0:I[i]]
+        end = time.time()
+        print("\tFirst", end - start)
+
+        start = time.time()
         _write_entry(x, H[i], writer)
+        end = time.time()
+        print("\t\tSecond", end - start)
+
         print("Written", i)
 
     writer.close()

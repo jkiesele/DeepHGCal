@@ -1,6 +1,7 @@
 import tensorflow as tf
 from models.hgcal_conv_conv_3d import HgCal3d
 from models.hgcal_conv_3d_2 import HgCal3d2
+from models.hgcal_conv_3d_ener import HgCal3dEnergy
 import numpy as np
 import os
 import configparser as cp

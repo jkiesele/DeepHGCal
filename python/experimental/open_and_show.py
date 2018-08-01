@@ -6,7 +6,6 @@ import matplotlib.cm as cmx
 from mpl_toolkits.mplot3d import Axes3D
 import os
 
-
 def plot_rechits(x,y, z, energy, text):
     fig = plt.figure(0)
     ax = Axes3D(fig)

@@ -5,7 +5,7 @@ import numpy as np
 from tensorflow.python.ops.init_ops import Initializer
 from tensorflow.python.ops import random_ops
 from ops.sparse_conv import *
-from ops.sparse_cell_jan import JanSparseCell
+from ops.sparse_cell_jan_2 import JanSparseCell2
 
 
 _sparse_global_lstm_index = 0
@@ -67,7 +67,7 @@ def sparse_conv_rec(sparse_dict, num_neighbors=10, output_all=15):
     _sparse_global_lstm_index += 1
 
     output = tf.reshape(state.h, shape=(n_batch, n_max_entries, -1))
-
+    output = tf.layers.dense(output, units=output_all)
 
     return construct_sparse_io_dict(output, spatial_features_global, spatial_features_local, num_entries)
 
@@ -181,10 +181,12 @@ def sparse_conv_jan(sparse_dict, num_neighbors=10, output_all=15):
     data_in = tf.concat((gathered_all, gathered_space_1), axis=3)
     gathered_flattenned_temporal = tf.reshape(data_in, (n_batch * n_max_entries, n_max_neighbors, -1))
 
-    lstm_cell = JanSparseCell(n_features_input_space, [5, 5, n_features_input_all], num_output=5, initializer=tf.random_normal_initializer(0.002, 0.002))
+    # lstm_cell = JanSparseCell2(n_features_input_space, [5, 5, n_features_input_all], num_output=5, initializer=tf.random_normal_initializer(0.002, 0.002))
+    lstm_cell = JanSparseCell2(n_features_input_space,
+                               initializer=tf.random_normal_initializer(0.002, 0.002))
     x, state = tf.nn.dynamic_rnn(lstm_cell, gathered_flattenned_temporal,
                                  sequence_length=tf.ones(n_max_entries * n_batch, dtype=tf.int32) * n_max_neighbors,
-                                 dtype=tf.float32, time_major=False, scope=('sparse_%d' % _sparse_global_lstm_index))
+                                 dtype=tf.float32, time_major=False, scope=('sparse_%d' % _sparse_global_lstm_index), swap_memory=True)
     _sparse_global_lstm_index += 1
 
     output = tf.reduce_sum(x, axis=1)

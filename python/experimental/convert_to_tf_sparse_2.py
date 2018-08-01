@@ -72,14 +72,29 @@ def run_conversion_multi_threaded(input_file):
 
     file_path = input_file
     location = 'B4'
-    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer'
+    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer',
                 'isElectron', 'isMuon', 'isPionCharged', 'isPionNeutral', 'isK0Long', 'isK0Short']
     types = ['float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64',
-             'int32', 'int32', 'int32', 'int32', 'int32']
+             'int32', 'int32', 'int32', 'int32', 'int32', 'int32']
     max_size = [3000, 3000, 3000, 3000, 3000, 3000, 3000, 1, 1, 1, 1, 1, 1]
 
-    all_features, spatial, spatial_local, labels_one_hot, num_entries = sparse_hgcal.read_sparse_data(input_file, 3000)
-    total_events = len(num_entries)
+    data, sizes = sparse_hgcal.read_np_array(file_path, location, branches, types, max_size)
+
+    ex_data = [np.expand_dims(group, axis=2) for group in [data[0], data[1], data[2], data[3], data[4], data[5], data[6]]]
+    ex_data_lables = [np.expand_dims(group, axis=2) for group in [data[7], data[8], data[9], data[10], data[11], data[12]]]
+
+    all_features = np.concatenate((ex_data[0], ex_data[1], ex_data[2], ex_data[5], ex_data[6]), axis=2)
+    spatial = np.concatenate((ex_data[0], ex_data[1], ex_data[2]), axis=2)
+    spatial_local = np.concatenate((ex_data[3], ex_data[4]), axis=2)
+
+    labels_one_hot = np.concatenate(tuple(ex_data_lables), axis=1)
+    num_entries = sizes[0]
+
+    assert int(np.mean(np.sum(labels_one_hot, axis=1))) == 1
+    total_events = len(sizes[0])
+    assert np.array_equal(np.shape(all_features), [total_events, 3000, 5])
+    assert np.array_equal(np.shape(spatial), [total_events, 3000, 3])
+    assert np.array_equal(np.shape(spatial_local), [total_events, 3000, 2])
 
     events_per_jobs = int(total_events/jobs)
     for i in range(jobs):

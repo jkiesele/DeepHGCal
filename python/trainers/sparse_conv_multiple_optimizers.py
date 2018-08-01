@@ -59,6 +59,7 @@ class SparseConvTrainerMulti(SparseConvTrainer):
                 number = int(iteration_number / self.switch_after) % 2
                 switch_value = np.zeros((2), dtype=np.int64)
                 switch_value[number] = 1
+                switch_value = [1, 1] # TODO: Remove this later
 
                 inputs_train = sess.run(list(inputs_feed))
 

@@ -4,11 +4,11 @@ from ops.sparse_conv import *
 from ops.sparse_conv_rec import *
 
 
-class SparseConv11(SparseConv):
+class SparseConv9(SparseConv):
 
     def __init__(self, n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries, num_classes,
                  learning_rate=0.0001):
-        super(SparseConv11, self).__init__(n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries,
+        super(SparseConv9, self).__init__(n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries,
                                           num_classes, learning_rate)
         self.weight_weights = []
 
@@ -29,21 +29,21 @@ class SparseConv11(SparseConv):
 
         net = _input
 
-        net = sparse_conv_jan(_input, num_neighbors=9, output_all=10)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=10)
+        net = sparse_conv_rec(_input, num_neighbors=9, output_all=30)
+        net = sparse_conv_rec(net, num_neighbors=9, output_all=30)
+        net = sparse_conv_rec(net, num_neighbors=9, output_all=30)
+        net = sparse_conv_rec(net, num_neighbors=9, output_all=30)
         net = sparse_max_pool(net, 600)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_rec(net, num_neighbors=9, output_all=30)
         net = sparse_max_pool(net, 150)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_rec(net, num_neighbors=9, output_all=40)
         net = sparse_max_pool(net, 20)
         flattened_features = sparse_merge_flat(net, combine_three=False)
 
         self._graph_temp = flattened_features[:,0:10]
 
-        fc_1 = tf.layers.dense(flattened_features, units=30, activation=tf.nn.relu)
-        fc_2 = tf.layers.dense(fc_1, units=30, activation=tf.nn.relu)
+        fc_1 = tf.layers.dense(flattened_features, units=200, activation=tf.nn.relu)
+        fc_2 = tf.layers.dense(fc_1, units=150, activation=tf.nn.relu)
         fc_3 = tf.layers.dense(fc_2, units=self.num_classes, activation=None)
 
         return fc_3

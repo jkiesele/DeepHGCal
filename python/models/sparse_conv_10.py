@@ -1,45 +1,45 @@
 import tensorflow as tf
 from models.sparse_conv import SparseConv
 from ops.sparse_conv import *
+from ops.sparse_conv_rec import *
 
 
-class SparseConv8(SparseConv):
+class SparseConv10(SparseConv):
 
     def __init__(self, n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries, num_classes,
                  learning_rate=0.0001):
-        super(SparseConv8, self).__init__(n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries,
+        super(SparseConv10, self).__init__(n_space, n_space_local, n_all, n_max_neighbors, batch_size, max_entries,
                                           num_classes, learning_rate)
         self.weight_weights = []
 
 
     def _find_logits(self):
+
+
         # # nl_all = tf.layers.dense(tf.scalar_mul(0.001, self._placeholder_all_features), units=8, activation=tf.nn.relu)
         # # nl_all = tf.layers.dense(nl_all, units=8, activation=tf.nn.relu)
         # # nl_all = tf.layers.dense(nl_all, units=8, activation=tf.nn.relu)
         #
         # # TODO: Remove it later after regenerating the data, this only picks energy (or do something similar)
-        #net = self._placeholder_all_features
-        net = self._placeholder_all_features[:, :, 3]/1000
-        net = tf.expand_dims(net, axis=2)
-        
-        layers = self._placeholder_all_features[:, :, 4]
-        layers = tf.expand_dims(layers, axis=2)
-        space = self._placeholder_space_features[:,:,:2]
-        
-        space = tf.concat([space,layers], axis=-1)
+        # net = self._placeholder_all_features
+        # net = tf.concat((net, self._placeholder_space_features_local), axis=2)
 
-        _input = construct_sparse_io_dict(net, space, self._placeholder_space_features_local,
+        _input = construct_sparse_io_dict(self._placeholder_all_features, self._placeholder_space_features, self._placeholder_space_features_local,
                                           tf.squeeze(self._placeholder_num_entries))
 
         net = _input
-        #net = sparse_max_pool(net, 2000)
-        net = sparse_conv_loop(net, num_neighbors=27,  num_filters=32,  space_depth=2, space_relu=4, space_gauss=3)
-        net = sparse_conv_loop(net, num_neighbors=27,  num_filters=32,  space_depth=2, space_relu=4, space_gauss=3)
-        net = sparse_conv_loop(net, num_neighbors=27,  num_filters=32,  space_depth=2, space_relu=4, space_gauss=3)
-        net = sparse_conv_loop(net, num_neighbors=27,  num_filters=32,  space_depth=2, space_relu=4, space_gauss=3)
-        net = sparse_max_pool(net, 10)
 
+        net = sparse_conv_add(_input, num_neighbors=9, output_all=20)
+        net = sparse_conv_add(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_add(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_add(net, num_neighbors=9, output_all=20)
+        net = sparse_max_pool(net, 600)
+        net = sparse_conv_add(net, num_neighbors=9, output_all=20)
+        net = sparse_max_pool(net, 150)
+        net = sparse_conv_add(net, num_neighbors=9, output_all=20)
+        net = sparse_max_pool(net, 20)
         flattened_features = sparse_merge_flat(net, combine_three=False)
+
         self._graph_temp = flattened_features[:,0:10]
 
         fc_1 = tf.layers.dense(flattened_features, units=30, activation=tf.nn.relu)
@@ -49,4 +49,4 @@ class SparseConv8(SparseConv):
         return fc_3
 
     def get_variable_scope(self):
-        return 'sparse_conv_v8'
+        return 'sparse_conv_v4'
