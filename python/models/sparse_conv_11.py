@@ -29,14 +29,14 @@ class SparseConv11(SparseConv):
 
         net = _input
 
-        net = sparse_conv_jan(_input, num_neighbors=9, output_all=10)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=10)
+        net = sparse_conv_jan_with_conv(_input, num_neighbors=9, output_all=10)
+        net = sparse_conv_jan_with_conv(net, num_neighbors=9, output_all=10)
         net = sparse_max_pool(net, 600)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_jan_with_conv(net, num_neighbors=9, output_all=20)
         net = sparse_max_pool(net, 150)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
-        net = sparse_conv_jan(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_jan_with_conv(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_jan_with_conv(net, num_neighbors=9, output_all=20)
+        net = sparse_conv_jan_with_conv(net, num_neighbors=9, output_all=20)
         net = sparse_max_pool(net, 20)
         flattened_features = sparse_merge_flat(net, combine_three=False)
 
