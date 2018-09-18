@@ -4,9 +4,11 @@ import os
 import configparser as cp
 from libs.helpers import get_num_parameters
 from experiment.classification_model_test_result import ClassificationModelTestResult
+from tensorflow.python.profiler import option_builder
+from tensorflow.python.profiler.model_analyzer import Profiler
 
 
-class H3dConvTrainer:
+class SparseConvTrainer2:
     def read_config(self, config_file_path, config_name):
         config_file = cp.ConfigParser()
         config_file.read(config_file_path)
@@ -23,13 +25,18 @@ class H3dConvTrainer:
         self.save_after_iterations = int(self.config['save_after_iterations'])
 
         self.num_batch = int(self.config['batch_size'])
+        self.num_all_features = int(self.config['num_all_features'])
 
-        self.num_dim_x = int(self.config['input_dim_x'])
-        self.num_dim_y = int(self.config['input_dim_y'])
-        self.num_dim_z = int(self.config['input_dim_z'])
-        self.num_input_features = int(self.config['input_features'])
+        self.spatial_features = tuple([int(x) for x in (self.config['input_spatial_features']).split(',')])
+        self.spatial_features_local = tuple([int(x) for x in (self.config['input_spatial_features_local']).split(',')])
+        self.non_spatial_features = tuple([int(x) for x in (self.config['input_non_spatial']).split(',')])
 
+        self.num_spatial_features = len(self.spatial_features)
+        self.num_spatial_features_local = len(self.spatial_features_local)
+
+        self.num_max_entries = int(self.config['max_entries'])
         self.num_classes = int(self.config['num_classes'])
+        self.num_max_neighbors = int(self.config['max_neighbors'])
         self.learning_rate = float(self.config['learning_rate'])
         self.training_files = self.config['training_files_list']
         self.validation_files = self.config['validation_files_list']
@@ -39,15 +46,15 @@ class H3dConvTrainer:
     def initialize(self):
         model_type = self.config['model_type']
         self.model = globals()[model_type](
-            self.num_dim_x,
-            self.num_dim_y,
-            self.num_dim_z,
-            self.num_input_features,
+            self.num_spatial_features,
+            self.num_spatial_features_local,
+            self.num_all_features,
+            self.num_max_neighbors,
             self.num_batch,
+            self.num_max_entries,
             self.num_classes,
             self.learning_rate
         )
-
         self.model.initialize()
         self.saver_sparse = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.model.get_variable_scope()))
 
@@ -61,14 +68,15 @@ class H3dConvTrainer:
             except Exception as e:
                 print(e)
 
-    def __get_input_feeds(self, files_list, repeat=True, shuffle_size=None):
+    def _get_input_feeds(self, files_list, repeat=True, shuffle_size=None):
         def _parse_function(example_proto):
             keys_to_features = {
-                'x': tf.FixedLenFeature((self.num_dim_x, self.num_dim_y, self.num_dim_z, self.num_input_features), tf.float32),
-                'labels_one_hot': tf.FixedLenFeature((self.num_classes,), tf.int64)
+                'all_features': tf.FixedLenFeature((self.num_max_entries, self.num_all_features), tf.float32),
+                'labels_one_hot': tf.FixedLenFeature((self.num_classes,), tf.int64),
+                'num_entries': tf.FixedLenFeature(1, tf.int64)
             }
             parsed_features = tf.parse_single_example(example_proto, keys_to_features)
-            return parsed_features['x'], parsed_features['labels_one_hot']
+            return parsed_features['all_features'], parsed_features['labels_one_hot'], parsed_features['num_entries']
 
         with open(files_list) as f:
             content = f.readlines()
@@ -83,10 +91,86 @@ class H3dConvTrainer:
 
         return inputs
 
+    def profile(self):
+        self.initialize()
+        print("Beginning to profile network with parameters", get_num_parameters(self.model.get_variable_scope()))
+        placeholders = self. model.get_placeholders()
+        graph_loss = self.model.get_losses()
+        graph_optmiser = self.model.get_optimizer()
+        graph_summary = self.model.get_summary()
+        graph_summary_validation = self.model.get_summary_validation()
+        graph_accuracy = self.model.get_accuracy()
+        graph_logits, graph_prediction = self.model.get_compute_graphs()
+        graph_temp = self.model.get_temp()
+
+        inputs_feed = self._get_input_feeds(self.training_files)
+        inputs_validation_feed = self._get_input_feeds(self.validation_files)
+
+        init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
+        with tf.Session() as sess:
+            sess.run(init)
+            profiler = Profiler(sess.graph)
+
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+            summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
+
+            iteration_number = 0
+
+            print("Starting iterations")
+            run_ops = [graph_temp, graph_loss, graph_optmiser, graph_summary, graph_accuracy, graph_prediction]
+            while iteration_number < 1000:
+                inputs_train = sess.run(list(inputs_feed))
+
+                inputs_train_dict = {
+                    placeholders[0]: inputs_train[0][:, :, self.spatial_features],
+                    placeholders[1]: inputs_train[0][:, :, self.spatial_features_local],
+                    placeholders[2]: inputs_train[0],
+                    placeholders[3]: inputs_train[1],
+                    placeholders[4]: inputs_train[2]
+                }
+
+                if iteration_number % 100 == 0:
+                    run_meta = tf.RunMetadata()
+
+                    sess.run(run_ops, feed_dict=inputs_train_dict,
+                                 options=tf.RunOptions(
+                                     trace_level=tf.RunOptions.FULL_TRACE),
+                                 run_metadata=run_meta)
+
+                    profiler.add_step(iteration_number, run_meta)
+
+                    # Profile the parameters of your model.
+                    profiler.profile_name_scope(options=(option_builder.ProfileOptionBuilder
+                                                         .trainable_variables_parameter()))
+
+                    # Or profile the timing of your model operations.
+                    opts = option_builder.ProfileOptionBuilder.time_and_memory()
+                    profiler.profile_operations(options=opts)
+
+                    # Or you can generate a timeline:
+                    opts = (option_builder.ProfileOptionBuilder(
+                        option_builder.ProfileOptionBuilder.time_and_memory())
+                            .with_step(iteration_number)
+                            .with_timeline_output(self.config['profiler_output_file_name']).build())
+                    profiler.profile_graph(options=opts)
+
+                else:
+                    sess.run(run_ops, feed_dict=inputs_train_dict)
+
+                print("Profiling - Iteration %4d" % iteration_number)
+                iteration_number += 1
+
+            # Stop the threads
+            coord.request_stop()
+
+            # Wait for threads to stop
+            coord.join(threads)
+
     def train(self):
         self.initialize()
         print("Beginning to train network with parameters", get_num_parameters(self.model.get_variable_scope()))
-
         placeholders = self. model.get_placeholders()
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
@@ -99,8 +183,8 @@ class H3dConvTrainer:
         if self.from_scratch:
             self.clean_summary_dir()
 
-        inputs_feed = self.__get_input_feeds(self.training_files)
-        inputs_validation_feed = self.__get_input_feeds(self.validation_files)
+        inputs_feed = self._get_input_feeds(self.training_files)
+        inputs_validation_feed = self._get_input_feeds(self.validation_files)
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
         with tf.Session() as sess:
@@ -124,8 +208,11 @@ class H3dConvTrainer:
                 inputs_train = sess.run(list(inputs_feed))
 
                 inputs_train_dict = {
-                    placeholders[0]: inputs_train[0],
-                    placeholders[1]: inputs_train[1]
+                    placeholders[0]: inputs_train[0][:, :, self.spatial_features],
+                    placeholders[1]: inputs_train[0][:, :, self.spatial_features_local],
+                    placeholders[2]: inputs_train[0],
+                    placeholders[3]: inputs_train[1],
+                    placeholders[4]: inputs_train[2]
                 }
 
                 t, eval_loss, _, eval_summary, eval_accuracy, test_logits = sess.run([graph_temp, graph_loss, graph_optmiser, graph_summary,
@@ -134,8 +221,11 @@ class H3dConvTrainer:
                 if iteration_number % self.validate_after == 0:
                     inputs_validation = sess.run(list(inputs_validation_feed))
                     inputs_validation_dict = {
-                        placeholders[0]: inputs_validation[0],
-                        placeholders[1]: inputs_validation[1]
+                    placeholders[0]: inputs_validation[0][:, :, self.spatial_features],
+                    placeholders[1]: inputs_validation[0][:, :, self.spatial_features_local],
+                    placeholders[2]: inputs_validation[0],
+                    placeholders[3]: inputs_validation[1],
+                    placeholders[4]: inputs_validation[2]
                     }
 
                     eval_loss_validation, eval_summary_validation, eval_accuracy_validation = sess.run([graph_loss, graph_summary_validation, graph_accuracy], feed_dict=inputs_validation_dict)
@@ -144,8 +234,6 @@ class H3dConvTrainer:
 
                 print("Training   - Iteration %4d: loss %0.5f accuracy %03.3f" % (iteration_number, eval_loss, eval_accuracy))
                 print(t[0])
-
-                # print(inputs_train[3][0])
                 iteration_number += 1
                 summary_writer.add_summary(eval_summary, iteration_number)
                 if iteration_number % self.save_after_iterations == 0:
@@ -175,7 +263,7 @@ class H3dConvTrainer:
         graph_logits, graph_prediction = self.model.get_compute_graphs()
         graph_temp = self.model.get_temp()
 
-        inputs_feed = self.__get_input_feeds(self.test_files, repeat=False)
+        inputs_feed = self._get_input_feeds(self.test_files, repeat=True)
 
         accuracy_sum = 0
         num_examples = 0
@@ -185,7 +273,6 @@ class H3dConvTrainer:
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
         with tf.Session() as sess:
             sess.run(init)
-            print("Beginning to test network with parameters", get_num_parameters(self.model.get_variable_scope()))
 
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -204,21 +291,29 @@ class H3dConvTrainer:
                 except tf.errors.OutOfRangeError:
                     break
 
+                print(np.shape(inputs[0]), np.shape(inputs[1]), np.shape(inputs[2]), np.shape(inputs[3]), np.shape(inputs[4]))
+                print(placeholders[0].get_shape().as_list(), placeholders[1].get_shape().as_list(), placeholders[2].get_shape().as_list(),
+                      placeholders[3].get_shape().as_list(),placeholders[4].get_shape().as_list())
+
                 inputs_train_dict = {
-                    placeholders[0]: inputs[0],
-                    placeholders[1]: inputs[1]
+                    placeholders[0]: inputs[:, :, self.spatial_features],
+                    placeholders[1]: inputs[0][:, :, self.spatial_features_local],
+                    placeholders[2]: inputs[0],
+                    placeholders[3]: inputs[1],
+                    placeholders[4]: inputs[2]
                 }
-                labels[iteration_number] = np.squeeze(inputs[1])
+
+                labels[iteration_number] = np.squeeze(inputs[3])
 
                 t, eval_loss, eval_accuracy, eval_confusion, test_logits, eval_logits = sess.run(
                     [graph_temp, graph_loss, graph_accuracy, graph_confusion_matrix, graph_prediction, graph_logits],
                     feed_dict=inputs_train_dict)
 
+                scores[iteration_number] = np.squeeze(eval_logits)
+
                 confusion_matrix += eval_confusion
                 accuracy_sum += eval_accuracy * self.num_batch
                 num_examples += self.num_batch
-
-                scores[iteration_number] = np.squeeze(eval_logits)
 
                 print("Test - Batch %4d: loss %0.5f accuracy %03.3f accuracy (cumm) %03.3f" % (
                 iteration_number, eval_loss, eval_accuracy, accuracy_sum / num_examples))

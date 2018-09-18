@@ -1,14 +1,6 @@
 import tensorflow as tf
-from models.sparse_conv_2 import SparseConv2
-from models.sparse_conv_3 import SparseConv3
-from models.sparse_conv_4 import SparseConv4
-from models.sparse_conv_bare import SparseConvBare
 import numpy as np
-import os
-import configparser as cp
-import sys
-from helpers.helpers import get_num_parameters
-from experiment.classification_model_test_result import ClassificationModelTestResult
+from libs.helpers import get_num_parameters
 from trainers.sparse_conv import SparseConvTrainer
 
 

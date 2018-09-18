@@ -1,4 +1,4 @@
-from trainers.sparse_conv import SparseConvTrainer
+from trainers.sparse_conv_2 import SparseConvTrainer2
 import argparse
 from trainers.sparse_conv_multiple_optimizers import SparseConvTrainerMulti
 
@@ -12,7 +12,7 @@ parser.add_argument('--multiple', default=False, help="Whether to run the multi-
 args = parser.parse_args()
 
 
-trainer = SparseConvTrainer(args.input, args.config) if not args.multiple else SparseConvTrainerMulti(args.input, args.config)
+trainer = SparseConvTrainer2(args.input, args.config) if not args.multiple else SparseConvTrainerMulti(args.input, args.config)
 
 if args.test:
     trainer.test()

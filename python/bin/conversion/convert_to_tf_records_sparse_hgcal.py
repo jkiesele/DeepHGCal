@@ -1,4 +1,3 @@
-import sparse_hgcal
 import os
 import sys
 from queue import Queue # TODO: Write check for python3 (module name is queue in python3)
@@ -8,6 +7,7 @@ import time
 import numpy as np
 import sys
 import tensorflow as tf
+import uproot
 
 
 parser = argparse.ArgumentParser(description='Run multi-process conversion from root to tfrecords')
@@ -36,8 +36,10 @@ def write_to_tf_records(all_features, labels_one_hot, num_entries, i, output_fil
     writer = tf.python_io.TFRecordWriter(output_file_prefix + '.tfrecords',
                                          options=tf.python_io.TFRecordOptions(
                                              tf.python_io.TFRecordCompressionType.GZIP))
+
     for i in range(len(all_features)):
-        _write_entry(all_features[i], labels_one_hot[i], num_entries[i], writer)
+        if np.sum(num_entries[i]) != 0 and np.sum(labels_one_hot[i]) == 1:
+            _write_entry(all_features[i], labels_one_hot[i], num_entries[i], writer)
         print("Written", i)
 
     writer.close()
@@ -61,31 +63,55 @@ for i in range(jobs):
     t.start()
 
 
+def read_array_from_file(file_path):
+    data = []
+    sizes = []
+
+    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_eta', 'rechit_phi', 'rechit_energy', 'rechit_layer','rechit_time',
+                'isElectron', 'isGamma', 'isMuon', 'isPionCharged']
+
+    max_size = [3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 1, 1, 1, 1]
+
+
+    the_tree = uproot.open(file_path)["deepntuplizer"]["tree"]
+    data_branches = the_tree.arrays(tuple(branches), outputtype=tuple)
+
+    events = len(data_branches[0])
+
+    for i in range(8):
+        data.append(np.zeros((events, max_size[i]), dtype=np.float32))
+
+    for i in range(4):
+        data.append(np.zeros((events), dtype=np.int32))
+
+    for i in range(12):
+        sizes.append([])
+
+    event_no = 0
+    for data_in in zip(data_branches[0], data_branches[1], data_branches[2], data_branches[3]
+            , data_branches[4], data_branches[5], data_branches[6], data_branches[7]
+            , data_branches[8], data_branches[9], data_branches[10], data_branches[11]):
+
+        for i in range(8):
+            sizes[i].append(np.size(data_in[i]))
+            data[i][event_no][0:min(len(data_in[i]), max_size[i])] = data_in[i][0:min(len(data_in[i]), max_size[i])]
+
+        for i in range(4):
+            sizes[i+8].append(1)
+            data[i+8][event_no] = data_in[i+8]
+
+        event_no += 1
+
+
+    return data, sizes
+
+
 def run_conversion_multi_threaded(input_file):
     global jobs_queue
 
     just_file_name = os.path.splitext(os.path.split(input_file)[1])[0] + '_'
 
-    file_path = input_file
-    location = 'deepntuplizer/tree'
-
-
-    branches = ['rechit_x.rechit_x_', 'isPionCharged.isPionCharged_']
-    types = ['arr_float32', 'int32']
-    max_size = [3000, 1]
-
-    data, sizes = sparse_hgcal.read_np_array(file_path, location, branches, types, max_size)
-
-    print("Hello world")
-    0/0
-
-    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_eta', 'rechit_phi', 'rechit_energy', 'rechit_layer','rechit_time',
-                'isElectron', 'isGamma', 'isMuon', 'isPionCharged']
-    types = ['arr_float32', 'arr_float32', 'arr_float32', 'arr_float32', 'arr_float32', 'arr_float32', 'arr_float32', 'arr_float32',
-             'int32', 'int32', 'int32', 'int32']
-    max_size = [3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 1, 1, 1, 1]
-
-    data, sizes = sparse_hgcal.read_np_array(file_path, location, branches, types, max_size)
+    data, sizes = read_array_from_file(input_file)
 
     ex_data = [np.expand_dims(data[x], axis=2) for x in range(8)]
     ex_data_lables = [np.expand_dims(data[x+8], axis=2) for x in range(4)]
@@ -95,7 +121,6 @@ def run_conversion_multi_threaded(input_file):
     num_entries = sizes[0]
 
     print(np.sum(labels_one_hot))
-    assert int(np.mean(np.sum(labels_one_hot, axis=1))) == 1
     total_events = len(sizes[0])
     assert np.array_equal(np.shape(all_features), [total_events, 3000, 8])
 

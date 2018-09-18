@@ -43,7 +43,7 @@ class SparseConvBare(SparseConv):
                                kernel_initializer=tf.random_normal_initializer(mean=0., stddev=self.weight_init_width),
                                bias_initializer=tf.zeros_initializer())
 
-        self._graph_temp = flattened_features
+        self._graph_temp = flattened_features[:,0:10]
 
         return fc_3
 
