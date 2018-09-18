@@ -7,6 +7,7 @@
 #include "Helpers.h"
 #include <string>
 #include <TTreeReader.h>
+#include <TTreeReaderArray.h>
 #include <memory>
 #include <algorithm>
 #include <math.h>
@@ -34,24 +35,24 @@ void GenericDataReader::makeResultArrays(const size_t& maxEvents) {
         int maxSize = p::extract<int>(max_size[i]);
         bool isArray = maxSize > 1;
 
-        if (type == "float32") {
-            if (isArray) {
+        if (type == "float32" or type == "arr_float32") {
+            if (isArray or type == "arr_float32") {
                 output.push_back(np::zeros(p::make_tuple(maxEvents, maxSize), np::dtype::get_builtin<float>()));
             }
             else {
                 output.push_back(np::zeros(p::make_tuple(maxEvents), np::dtype::get_builtin<float>()));
             }
         }
-        else if (type == "float64") {
-            if (isArray) {
+        else if (type == "float64" or type == "arr_float64") {
+            if (isArray or type == "arr_float64") {
                 output.push_back(np::zeros(p::make_tuple(maxEvents, maxSize), np::dtype::get_builtin<double>()));
             }
             else {
                 output.push_back(np::zeros(p::make_tuple(maxEvents), np::dtype::get_builtin<double>()));
             }
         }
-        else if (type == "int32") {
-            if (isArray) {
+        else if (type == "int32" or type == "arr_int32") {
+            if (isArray or type == "arr_int32") {
                 output.push_back(np::zeros(p::make_tuple(maxEvents, maxSize), np::dtype::get_builtin<int32_t>()));
             }
             else {
@@ -59,8 +60,17 @@ void GenericDataReader::makeResultArrays(const size_t& maxEvents) {
             }
 
         }
-        else if (type == "int64") {
+        else if (type == "uint32") {
             if (isArray) {
+                output.push_back(np::zeros(p::make_tuple(maxEvents, maxSize), np::dtype::get_builtin<uint32_t>()));
+            }
+            else {
+                output.push_back(np::zeros(p::make_tuple(maxEvents), np::dtype::get_builtin<uint32_t>()));
+            }
+
+        }
+        else if (type == "int64" or type == "arr_int64") {
+            if (isArray or type == "arr_int64") {
                 output.push_back(np::zeros(p::make_tuple(maxEvents, maxSize), np::dtype::get_builtin<int64_t>()));
             }
             else {
@@ -117,6 +127,17 @@ void GenericDataReader::makeValueReaders(TTreeReader& reader, vector<void *> &va
             }
 
         }
+        else if (type == "uint32") {
+            if (isArray) {
+                TTreeReaderValue<std::vector<uint32_t >>* valueReader = new TTreeReaderValue<std::vector<uint32_t >>(reader, branchName.c_str());
+                valueReaders.push_back(valueReader);
+            }
+            else {
+                TTreeReaderValue<uint32_t >* valueReader = new TTreeReaderValue<uint32_t >(reader, branchName.c_str());
+                valueReaders.push_back(valueReader);
+            }
+
+        }
         else if (type == "int64") {
             if (isArray) {
                 TTreeReaderValue<std::vector<int64_t>>* valueReader = new TTreeReaderValue<std::vector<int64_t >>(reader, branchName.c_str());
@@ -126,6 +147,22 @@ void GenericDataReader::makeValueReaders(TTreeReader& reader, vector<void *> &va
                 TTreeReaderValue<int64_t>* valueReader = new TTreeReaderValue<int64_t>(reader, branchName.c_str());
                 valueReaders.push_back(valueReader);
             }
+        }
+        else if (type == "arr_float32") {
+            TTreeReaderArray<float>* valueReader = new TTreeReaderArray<float>(reader, branchName.c_str());
+            valueReaders.push_back(valueReader);
+        }
+        else if (type == "arr_float64") {
+            TTreeReaderArray<double>* valueReader = new TTreeReaderArray<double>(reader, branchName.c_str());
+            valueReaders.push_back(valueReader);
+        }
+        else if (type == "arr_int32") {
+            TTreeReaderArray<int32_t>* valueReader = new TTreeReaderArray<int32_t>(reader, branchName.c_str());
+            valueReaders.push_back(valueReader);
+        }
+        else if (type == "arr_int64") {
+            TTreeReaderArray<int64_t>* valueReader = new TTreeReaderArray<int64_t>(reader, branchName.c_str());
+            valueReaders.push_back(valueReader);
         }
     }
 }
@@ -250,6 +287,24 @@ void GenericDataReader::fillFromValueReaders(TTreeReader& reader, vector<void *>
             }
 
         }
+        else if (type == "uint32") {
+            uint32_t* __dataStart = reinterpret_cast<uint32_t*>(arrays[i].get_data());
+            uint32_t* offset = __dataStart + eventNumber * maxSize;
+            if (isArray) {
+                TTreeReaderValue<std::vector<uint32_t>>* valueReader = reinterpret_cast<TTreeReaderValue<std::vector<uint32_t>>*>(readers[i]);
+                std::vector<uint32_t>* dataRoot = valueReader->Get();
+                int n = min((int)dataRoot->size(), maxSize);
+                std::copy(dataRoot->begin(), dataRoot->begin() + n, offset);
+                __dataSizesStart[eventNumber] = n;
+            }
+            else {
+                TTreeReaderValue<uint32_t>* valueReader = reinterpret_cast<TTreeReaderValue<uint32_t>*>(readers[i]);
+                uint32_t dataRoot = *valueReader->Get();
+                *offset = dataRoot;
+                __dataSizesStart[eventNumber] = 1;
+            }
+
+        }
         else if (type == "int64") {
             int64_t* __dataStart = reinterpret_cast<int64_t*>(arrays[i].get_data());
             int64_t* offset = __dataStart + eventNumber * maxSize;
@@ -266,6 +321,41 @@ void GenericDataReader::fillFromValueReaders(TTreeReader& reader, vector<void *>
                 *offset = dataRoot;
                 __dataSizesStart[eventNumber] = 1;
             }
+        }
+        else if (type == "arr_float32") {
+            float* __dataStart = reinterpret_cast<float*>(arrays[i].get_data());
+            float* offset = __dataStart + eventNumber * maxSize;
+            TTreeReaderArray<float>* valueReader = reinterpret_cast<TTreeReaderArray<float>*>(readers[i]);
+            std::cout<<valueReader->IsValid()<<std::endl;
+//            valueReader->GetSize();
+//            int n = min((int)valueReader->GetSize(), maxSize);
+            std::copy(valueReader->begin(), valueReader->begin() + 30, offset);
+//            std::cout<<(*valueReader)[0]<<std::endl;
+            __dataSizesStart[eventNumber] = 0;
+        }
+        else if (type == "arr_float64") {
+            double* __dataStart = reinterpret_cast<double*>(arrays[i].get_data());
+            double* offset = __dataStart + eventNumber * maxSize;
+            TTreeReaderArray<double>* valueReader = reinterpret_cast<TTreeReaderArray<double>*>(readers[i]);
+            int n = min((int)valueReader->GetSize(), maxSize);
+            std::copy(valueReader->begin(), valueReader->begin() + n, offset);
+            __dataSizesStart[eventNumber] = n;
+        }
+        else if (type == "arr_int32") {
+            int32_t* __dataStart = reinterpret_cast<int32_t*>(arrays[i].get_data());
+            int32_t* offset = __dataStart + eventNumber * maxSize;
+            TTreeReaderArray<int32_t>* valueReader = reinterpret_cast<TTreeReaderArray<int32_t>*>(readers[i]);
+            int n = min((int)valueReader->GetSize(), maxSize);
+            std::copy(valueReader->begin(), valueReader->begin() + n, offset);
+            __dataSizesStart[eventNumber] = n;
+        }
+        else if (type == "arr_int64") {
+            int64_t* __dataStart = reinterpret_cast<int64_t*>(arrays[i].get_data());
+            int64_t* offset = __dataStart + eventNumber * maxSize;
+            TTreeReaderArray<int64_t>* valueReader = reinterpret_cast<TTreeReaderArray<int64_t>*>(readers[i]);
+            int n = min((int)valueReader->GetSize(), maxSize);
+            std::copy(valueReader->begin(), valueReader->begin() + n, offset);
+            __dataSizesStart[eventNumber] = n;
         }
     }
 }

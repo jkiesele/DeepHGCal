@@ -48,9 +48,9 @@ private:
     std::vector<float>* root_rechit_vxy;
     std::vector<float>* root_rechit_vz;
     TBranch *b_temp;
-
-    template <typename T>
-    std::vector<size_t> argsort(const std::vector<T> &v);
+//
+//    template <typename T>
+//    std::vector<size_t> argsort(const std::vector<T> &v);
     std::vector<std::vector<size_t>> findNeighborMatrix(std::vector<float>& rechit_x, std::vector<float>& rechit_y, const std::vector<float>& rechit_z);
 
 

@@ -9,10 +9,11 @@ find_package(ROOT REQUIRED RIO Tree MathCore Core Hist Gui Gpad TreeViewer MLP M
 
 include(${ROOT_USE_FILE})
 
+message(PYTHON INCLUDE ${PYTHON_INCLUDE_DIRS})
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-find_package(Boost 1.63.0 COMPONENTS system python numpy)
-include_directories(${Boost_INCLUDE_DIRS})
+find_package(Boost 1.63.0 COMPONENTS system python3 numpy3)
+include_directories(${Boost_INCLUDE_DIRS} .)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -23,10 +24,11 @@ endif()
 set (CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
 
 set(SOURCE_FILES main.cpp SparseDataReader.cpp SparseDataReader.h GenericDataReader.h GenericDataReader.cpp
-        Helpers.h Helpers.cpp)
+        Helpers.h Helpers.cpp RechitsMerger.cpp RechitsMerger.h)
 
 add_library(sparse_hgcal SHARED ${SOURCE_FILES})
 
+message(Boost include: ${Boost_INCLUDE_DIRS})
 message(Boost libs: ${Boost_LIBRARIES})
 message(Root libs: ${ROOT_LIBRARIES})
 message(Python libs: ${PYTHON_LIBRARY})
