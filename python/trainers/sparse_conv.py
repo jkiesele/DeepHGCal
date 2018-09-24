@@ -6,6 +6,20 @@ from libs.helpers import get_num_parameters
 from experiment.classification_model_test_result import ClassificationModelTestResult
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
+from models.sparse_conv_2 import SparseConv2
+from models.sparse_conv_3 import SparseConv3
+from models.sparse_conv_4 import SparseConv4
+from models.sparse_conv_5 import SparseConv5
+from models.sparse_conv_6 import SparseConv6
+from models.sparse_conv_7 import SparseConv7
+from models.sparse_conv_8 import SparseConv8
+from models.sparse_conv_9 import SparseConv9
+from models.sparse_conv_10 import SparseConv10
+from models.sparse_conv_11 import SparseConv11
+from models.sparse_conv_bare import SparseConvBare
+from models.sparse_conv_spatial_2 import SparseConvSpatial2
+from models.sparse_conv_spatial_3 import SparseConvSpatial3
+from models.nmp_jet_1 import NeuralMessagePassingJet1
 
 
 class SparseConvTrainer:
