@@ -7,6 +7,7 @@ import tensorflow as tf
 import sparse_hgcal
 from numba import jit
 import time
+from multiprocessing import Process
 
 
 DIM_1 = 20
@@ -105,44 +106,24 @@ def write_to_tf_records(rechit_x,rechit_y,rechit_z,rechit_vxy,rechit_xz, rechit_
         start = time.time()
 
         # print(rechit_layer[i, 0:I[i]])
-        temp = rechit_layer[i, 0:I[i]]
         x = process(rechit_layer[i, 0:I[i]], rechit_x[i, 0:I[i]], rechit_y[i, 0:I[i]], rechit_z[i, 0:I[i]],
                     rechit_energy[i, 0:I[i]], rechit_vxy[i, 0:I[i]], rechit_xz[i, 0:I[i]])
         # x = rechit_layer[i,0:I[i]]
-        end = time.time()
-        print("\tFirst", end - start)
 
-        start = time.time()
         _write_entry(x, H[i], writer)
-        end = time.time()
-        print("\t\tSecond", end - start)
 
         print("Written", i)
 
     writer.close()
 
 
-def worker():
-    global jobs_queue
-    while True:
-        A, B, C, D, E, F, G, H, I, i, output_file_prefix = jobs_queue.get()
+def worker(data):
+    A, B, C, D, E, F, G, H, I, i, output_file_prefix = data
+    write_to_tf_records(A, B, C, D, E, F, G, H, I, i, output_file_prefix)
 
-        write_to_tf_records(A, B, C, D, E, F, G, H, I, i, output_file_prefix)
-
-        jobs_queue.task_done()
-
-
-jobs_queue = Queue()
-jobs = int(args.jobs)
-for i in range(jobs):
-    t = Thread(target=worker)
-    t.daemon = True
-    t.start()
 
 
 def run_conversion_multi_threaded(input_file):
-    global jobs_queue, max_gpu_events
-
     just_file_name = os.path.splitext(os.path.split(input_file)[1])[0] + '_'
 
     file_path = input_file
@@ -163,7 +144,9 @@ def run_conversion_multi_threaded(input_file):
     assert int(np.mean(np.sum(labels_one_hot, axis=1))) == 1
     total_events = len(sizes[0])
 
+    jobs = int(args.jobs)
     events_per_jobs = int(total_events/jobs)
+    processes = []
     for i in range(jobs):
         start = i*events_per_jobs
         stop = (i+1) * events_per_jobs
@@ -180,9 +163,14 @@ def run_conversion_multi_threaded(input_file):
 
         output_file_prefix = os.path.join(args.output, just_file_name + "_" + str(i) + "_")
         data_packed = A, B, C, D, E, F, G, H, I, i, output_file_prefix
-        jobs_queue.put(data_packed)
+        processes.append(Process(target=worker, args=(data_packed,)))
 
-    jobs_queue.join()
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        p.join()
+
 
 
 for item in file_paths:

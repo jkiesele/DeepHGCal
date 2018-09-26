@@ -8,6 +8,8 @@ import numpy as np
 import sys
 import tensorflow as tf
 import sparse_hgcal
+from multiprocessing import Process
+
 
 max_gpu_events = 500
 
@@ -49,21 +51,10 @@ def write_to_tf_records(rechit_data, labels_one_hot, num_entries,
     writer.close()
 
 
-def worker():
-    global jobs_queue
-    while True:
-        rechit_data, labels_one_hot, num_entries, output_file_prefix = jobs_queue.get()
-        write_to_tf_records(rechit_data, labels_one_hot, num_entries, output_file_prefix)
+def worker(data):
+    rechit_data, labels_one_hot, num_entries, output_file_prefix = data
+    write_to_tf_records(rechit_data, labels_one_hot, num_entries, output_file_prefix)
 
-        jobs_queue.task_done()
-
-
-jobs_queue = Queue()
-jobs = int(args.jobs)
-for i in range(jobs):
-    t = Thread(target=worker)
-    t.daemon = True
-    t.start()
 
 def one_hot(a, num_classes):
   return np.squeeze(np.eye(num_classes)[a.reshape(-1)])
@@ -109,6 +100,8 @@ def run_conversion_multi_threaded(input_file):
     assert int(np.mean(np.sum(labels_one_hot, axis=1))) == 1
     assert np.array_equal(np.shape(per_rechit_data), [total_events, 3000, 7])
 
+    jobs = int(args.jobs)
+    processes = []
     events_per_jobs = int(total_events / jobs)
     for i in range(jobs):
         start = i * events_per_jobs
@@ -119,9 +112,14 @@ def run_conversion_multi_threaded(input_file):
 
         output_file_prefix = os.path.join(args.output, just_file_name + "_" + str(i) + "_")
         data_packed = per_rechit_data_job, labels_jobs, num_entries_jobs, output_file_prefix
-        jobs_queue.put(data_packed)
+        processes.append(Process(target=worker, args=(data_packed,)))
 
-    jobs_queue.join()
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        p.join()
+
 
 
 for item in file_paths:
