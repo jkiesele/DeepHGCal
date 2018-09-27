@@ -532,7 +532,7 @@ def noisy_eye_initializer():
     return _initializer
 
 
-def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spatial_degree_non_linearity=1, transformed_spatial_features=10, propagrate_ahead=False):
+def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spatial_degree_non_linearity=1, n_transformed_spatial_features=10, propagrate_ahead=False):
     """
     Defines sparse convolutional layer
 
@@ -576,14 +576,14 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spa
     transformed_space_features = tf.concat([spatial_features_global], axis=2)
 
     for i in range(spatial_degree_non_linearity - 1):
-        transformed_space_features = tf.layers.dense(transformed_space_features, transformed_spatial_features, activation=tf.nn.relu)
+        transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, activation=tf.nn.relu)
 
-    transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=None, kernel_initializer=NoisyEyeInitializer)
+    transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, activation=None, kernel_initializer=NoisyEyeInitializer)
     # transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
 
     _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors)
 
-    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.nn.softmax(tf.expand_dims(-distance, axis=3)) # [B,E,5,F]
+    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.expand_dims(tf.nn.softmax(-distance), axis=3) # [B,E,5,F]
 
     pre_output = tf.layers.dense(gathered_all, output_all, activation=tf.nn.relu)
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
