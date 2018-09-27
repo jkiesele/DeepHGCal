@@ -7,6 +7,7 @@ from experiment.classification_model_test_result import ClassificationModelTestR
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 from models.sparse_conv_cluster_spatial_1 import SparseConvClusteringSpatial1
+from models.sparse_conv_cluster_spatial_2_min_loss import SparseConvClusteringSpatialMinLoss
 
 
 class SparseConvClusteringTrainer:
