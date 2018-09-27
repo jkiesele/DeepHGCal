@@ -53,6 +53,7 @@ class SparseConvClusteringSpatialMinLoss(SparseConvClusteringBase):
         net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=2, n_transformed_spatial_features=3, propagrate_ahead=True)
 
         output = net['all_features'] * tf.cast(tf.sequence_mask(tf.squeeze(self._placeholder_num_entries, axis=1), maxlen=self.max_entries)[:,:,tf.newaxis], tf.float32)
+        output = tf.nn.softmax(output)
 
         self._graph_temp = output
 
