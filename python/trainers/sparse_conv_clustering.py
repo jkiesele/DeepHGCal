@@ -8,6 +8,7 @@ from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 from models.sparse_conv_cluster_spatial_1 import SparseConvClusteringSpatial1
 from models.sparse_conv_cluster_spatial_2_min_loss import SparseConvClusteringSpatialMinLoss
+from readers import ReaderFactory
 
 
 class SparseConvClusteringTrainer:
@@ -39,6 +40,9 @@ class SparseConvClusteringTrainer:
         self.spatial_features_local_indices = tuple([int(x) for x in (self.config['input_spatial_features_local_indices']).split(',')])
         self.other_features_indices = tuple([int(x) for x in (self.config['input_other_features_indices']).split(',')])
         self.target_indices = tuple([int(x) for x in (self.config['target_indices']).split(',')])
+        self.reader_type = self.config['reader_type'] if len(self.config['reader_type']) != 0 else "data_and_num_entries_reader"
+
+        self.reader_factory = ReaderFactory()
 
 
     def initialize(self):
@@ -65,103 +69,9 @@ class SparseConvClusteringTrainer:
             except Exception as e:
                 print(e)
 
-    def _get_input_feeds(self, files_list, repeat=True, shuffle_size=None):
-        def _parse_function(example_proto):
-            keys_to_features = {
-                'data': tf.FixedLenFeature((self.num_max_entries, self.num_data_dims), tf.float32),
-                'num_entries': tf.FixedLenFeature(1, tf.int64)
-            }
-            parsed_features = tf.parse_single_example(example_proto, keys_to_features)
-            return parsed_features['data'], parsed_features['num_entries']
-
-        with open(files_list) as f:
-            content = f.readlines()
-        file_paths = [x.strip() for x in content]
-        dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
-        dataset = dataset.map(_parse_function)
-        dataset = dataset.shuffle(buffer_size=self.num_batch * 3 if shuffle_size is None else shuffle_size)
-        dataset = dataset.repeat(None if repeat else 1)
-        dataset = dataset.batch(self.num_batch)
-        iterator = dataset.make_one_shot_iterator()
-        inputs = iterator.get_next()
-
-        return inputs
-
     def profile(self):
-        self.initialize()
-        print("Beginning to profile network with parameters", get_num_parameters(self.model.get_variable_scope()))
-        placeholders = self. model.get_placeholders()
-        graph_loss = self.model.get_losses()
-        graph_optmiser = self.model.get_optimizer()
-        graph_summary = self.model.get_summary()
-        graph_summary_validation = self.model.get_summary_validation()
-        graph_output = self.model.get_compute_graphs()
-        graph_temp = self.model.get_temp()
+        raise ("Not implemented error")
 
-        inputs_feed = self._get_input_feeds(self.training_files)
-        inputs_validation_feed = self._get_input_feeds(self.validation_files)
-
-        init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
-        with tf.Session() as sess:
-            sess.run(init)
-            profiler = Profiler(sess.graph)
-
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
-            summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
-
-            iteration_number = 0
-
-            print("Starting iterations")
-            run_ops = [graph_temp, graph_loss, graph_optmiser, graph_summary, graph_accuracy, graph_prediction]
-            while iteration_number < 1000:
-                inputs_train = sess.run(list(inputs_feed))
-
-                inputs_train_dict = {
-                    placeholders[0]: inputs_train[0],
-                    placeholders[1]: inputs_train[1],
-                    placeholders[2]: inputs_train[2],
-                    placeholders[3]: inputs_train[3],
-                    placeholders[4]: inputs_train[4]
-                }
-
-                if iteration_number % 100 == 0:
-                    run_meta = tf.RunMetadata()
-
-                    sess.run(run_ops, feed_dict=inputs_train_dict,
-                                 options=tf.RunOptions(
-                                     trace_level=tf.RunOptions.FULL_TRACE),
-                                 run_metadata=run_meta)
-
-                    profiler.add_step(iteration_number, run_meta)
-
-                    # Profile the parameters of your model.
-                    profiler.profile_name_scope(options=(option_builder.ProfileOptionBuilder
-                                                         .trainable_variables_parameter()))
-
-                    # Or profile the timing of your model operations.
-                    opts = option_builder.ProfileOptionBuilder.time_and_memory()
-                    profiler.profile_operations(options=opts)
-
-                    # Or you can generate a timeline:
-                    opts = (option_builder.ProfileOptionBuilder(
-                        option_builder.ProfileOptionBuilder.time_and_memory())
-                            .with_step(iteration_number)
-                            .with_timeline_output(self.config['profiler_output_file_name']).build())
-                    profiler.profile_graph(options=opts)
-
-                else:
-                    sess.run(run_ops, feed_dict=inputs_train_dict)
-
-                print("Profiling - Iteration %4d" % iteration_number)
-                iteration_number += 1
-
-            # Stop the threads
-            coord.request_stop()
-
-            # Wait for threads to stop
-            coord.join(threads)
 
     def train(self):
         self.initialize()
@@ -177,8 +87,8 @@ class SparseConvClusteringTrainer:
         if self.from_scratch:
             self.clean_summary_dir()
 
-        inputs_feed = self._get_input_feeds(self.training_files)
-        inputs_validation_feed = self._get_input_feeds(self.validation_files)
+        inputs_feed = self.reader_factory.get_class(self.reader_type)(self.training_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
+        inputs_validation_feed = self.reader_factory.get_class(self.reader_type)(self.validation_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
         with tf.Session() as sess:
@@ -243,95 +153,4 @@ class SparseConvClusteringTrainer:
             coord.join(threads)
 
     def test(self):
-        raise ("Problem problem problem")
-        self.num_batch = 1
-        self.initialize()
-        print("Beginning to test network with parameters", get_num_parameters(self.model.get_variable_scope()))
-
-        placeholders = self.model.get_placeholkders()
-        graph_loss = self.model.get_losses()
-        graph_optmiser = self.model.get_optimizer()
-        graph_summary = self.model.get_summary()
-        graph_summary_validation = self.model.get_summary_validation()
-        graph_confusion_matrix = self.model.get_confusion_matrix()
-        graph_accuracy = self.model.get_accuracy()
-        graph_logits, graph_prediction = self.model.get_compute_graphs()
-        graph_temp = self.model.get_temp()
-
-        inputs_feed = self._get_input_feeds(self.test_files, repeat=True)
-
-        accuracy_sum = 0
-        num_examples = 0
-
-        confusion_matrix = np.zeros((self.num_classes, self.num_classes), dtype=np.float32)
-
-        init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
-        with tf.Session() as sess:
-            sess.run(init)
-
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
-            self.saver_sparse.restore(sess, self.model_path)
-            print("\n\nINFO: Loading model\n\n")
-            iteration_number = 0
-
-            labels = np.zeros((1000000, self.num_classes))
-            scores = np.zeros((1000000, self.num_classes))
-
-            print("Starting iterations")
-            while iteration_number < 1000000:
-                try:
-                    inputs = sess.run(inputs_feed)
-                except tf.errors.OutOfRangeError:
-                    break
-
-                print(np.shape(inputs[0]), np.shape(inputs[1]), np.shape(inputs[2]), np.shape(inputs[3]), np.shape(inputs[4]))
-                print(placeholders[0].get_shape().as_list(), placeholders[1].get_shape().as_list(), placeholders[2].get_shape().as_list(),
-                      placeholders[3].get_shape().as_list(),placeholders[4].get_shape().as_list())
-
-                inputs_train_dict = {
-                    placeholders[0]: inputs[0],
-                    placeholders[1]: inputs[1],
-                    placeholders[2]: inputs[2],
-                    placeholders[3]: inputs[3],
-                    placeholders[4]: inputs[4]
-                }
-
-                labels[iteration_number] = np.squeeze(inputs[3])
-
-                t, eval_loss, eval_accuracy, eval_confusion, test_logits, eval_logits = sess.run(
-                    [graph_temp, graph_loss, graph_accuracy, graph_confusion_matrix, graph_prediction, graph_logits],
-                    feed_dict=inputs_train_dict)
-
-                scores[iteration_number] = np.squeeze(eval_logits)
-
-                confusion_matrix += eval_confusion
-                accuracy_sum += eval_accuracy * self.num_batch
-                num_examples += self.num_batch
-
-                print("Test - Batch %4d: loss %0.5f accuracy %03.3f accuracy (cumm) %03.3f" % (
-                iteration_number, eval_loss, eval_accuracy, accuracy_sum / num_examples))
-                iteration_number += 1
-
-                if iteration_number == 100:
-                    break
-
-            # Stop the threads
-            coord.request_stop()
-
-            # Wait for threads to stop
-            coord.join(threads)
-
-        classes_names = 'Electron', 'Muon', 'Pion Charged', 'Pion Neutral', 'K0 Long', 'K0 Short' # TODO: Pick from config
-
-        test_result = ClassificationModelTestResult()
-        test_result.initialize(confusion_matrix, labels, scores, self.model.get_human_name(),
-                               get_num_parameters(self.model.get_variable_scope()), classes_names, self.summary_path)
-        test_result.evaluate(self.test_out_path)
-
-        print("Evaluation complete")
-        print("Evaluation accuracy ", accuracy_sum / num_examples)
-        print("Confusion matrix:")
-        print(confusion_matrix)
-
+        raise ("Not implemented error")
