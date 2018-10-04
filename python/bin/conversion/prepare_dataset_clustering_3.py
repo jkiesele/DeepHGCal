@@ -9,6 +9,7 @@ import sys
 import tensorflow as tf
 import time
 from sklearn.utils import shuffle
+import sparse_hgcal
 
 max_gpu_events = 500
 
@@ -22,56 +23,6 @@ args = parser.parse_args()
 with open(args.input) as f:
     content = f.readlines()
 file_paths = [x.strip() for x in content]
-
-
-def plot4d(x,y,z,c, outname, xlabel='', ylabel='', zlabel='',areas=np.array([])):
-
-    from mpl_toolkits.mplot3d import Axes3D
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from pylab import cm
-
-    fig = plt.figure(figsize=(8, 6), dpi=300)
-    ax = fig.add_subplot(111, projection='3d')
-
-    if len(areas):
-        c=c/areas
-    # c=c/c.max()
-    # c*=100
-    s = c /c.max()*100
-    from math import log10
-    s = s 
-    for i in range(len(s)):
-        c[i]=log10(c[i]+1)
-        s[i]=log10(s[i]+1)
-        
-    
-    #sarr=c>0.06914700
-    #sarr2=c<0.06914702
-    #sarr=sarr&sarr2
-    #s[sarr]=100
-    #print(c)
-        
-    #colmap = cm.ScalarMappable(cmap=cm.hsv)
-    #colmap.set_array(c)
-    
-    #s=s+1
-    ax.scatter(x, z, y, c=cm.hot(c),s=s)
-    
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_zlabel(zlabel)
-    
-    
-    #fig.axes.get_xaxis().set_visible(False)
-    #fig.axes.get_yaxis().set_visible(False)
-    #fig.axes.get_zaxis().set_visible(False)
-    if len(outname):
-        fig.savefig(outname)
-    #plt.show()
-    return ax,plt,x,y,z,c
-    
-    #plt.close()
 
 
 def _write_entry(data, writer):
@@ -89,7 +40,7 @@ def write_to_tf_records(data, i, output_file_prefix):
                                              tf.python_io.TFRecordCompressionType.GZIP))
     for i in range(len(data)):
         _write_entry(data[i], writer)
-        print("Written", i)
+        print("Written", i, data[i].shape)
 
     writer.close()
 
@@ -107,32 +58,27 @@ def concat_all_branches(nparray,branches):
     
 
 def run_conversion_simple(input_file, firstrun=False):
-    
-    
-    import matplotlib as mpl
-    from mpl_toolkits.mplot3d import Axes3D
-    import matplotlib.pyplot as plt
-    
     np.set_printoptions(threshold=np.nan)
-    
-    
-    usebranches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer',
-                   'true_x','true_y']
-    from root_numpy import  root2array
-    nparray = root2array(input_file, 
-                treename = "B4", 
-                branches = usebranches,
-                #stop=5
-                ).view(np.ndarray)
+
+    location = 'B4'
+    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer']
+
+    types = ['float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64']
+
+    max_size = [2679 for i in range(len(branches))]
+
+    nparray, sizes = sparse_hgcal.read_np_array(input_file, location, branches, types, max_size)
+
+
     
     print(len(nparray))
     #common part:
     common = concat_all_branches(nparray,
-                                 ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz','rechit_layer'])
+                                 [0, 1, 2, 3, 4, 6])
     
-    positions = concat_all_branches(nparray,['rechit_x', 'rechit_y', 'rechit_z'])
+    positions = concat_all_branches(nparray,[0, 1, 2])
     
-    energy1 = make_fixed_array(nparray['rechit_energy'],expand=False)
+    energy1 = make_fixed_array(nparray[5],expand=False)
     
     shuffleindices=np.array(range(1,energy1.shape[0]))
     shuffleindices = np.concatenate([shuffleindices, np.array([0])])
@@ -153,13 +99,6 @@ def run_conversion_simple(input_file, firstrun=False):
     
     #print(totdiff)
     #common = common[totdiff!=0]
-    
-    
-    #for i in range(4):
-    #    plot4d(positions[i][:,0],positions[i][:,1],positions[i][:,2],energy1[i],"out"+ str(i) +".pdf",
-    #       areas=np.square(common[0][:,3])*common[0][:,4])
-    
-
     
     esum = energy2+energy1
     print(esum.shape)
@@ -200,6 +139,7 @@ def run_conversion_simple(input_file, firstrun=False):
     allout = np.concatenate([allout, moreinfo],axis=1)
     
     allout = allout[totdiff!=0] #remove same seeded showers
+
     
     if firstrun:
         print('output shape ',allout.shape)
@@ -209,7 +149,7 @@ def run_conversion_simple(input_file, firstrun=False):
     
     just_file_name = os.path.splitext(os.path.split(input_file)[1])[0] + '_'
     output_file_prefix = os.path.join(args.output, just_file_name)
-    write_to_tf_records([allout],0,output_file_prefix)
+    write_to_tf_records(allout,0,output_file_prefix)
     
 
 
