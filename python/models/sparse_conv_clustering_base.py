@@ -21,10 +21,13 @@ class SparseConvClusteringBase(Model):
         self._construct_graphs()
 
     def get_summary(self):
-        return self.__graph_summaries
+        return self._graph_summaries
+
+    def get_performance_measures(self):
+        raise RuntimeError("Unimplemented")
 
     def get_summary_validation(self):
-        return self.__graph_summaries_validation
+        return self._graph_summaries_validation
 
     def get_placeholders(self):
         return self._placeholder_space_features,self._placeholder_space_features_local, self._placeholder_other_features, \
@@ -34,10 +37,10 @@ class SparseConvClusteringBase(Model):
         return self._graph_output
 
     def get_losses(self):
-        return self.__graph_loss
+        return self._graph_loss
 
     def get_optimizer(self):
-        return self.__graph_optimizer
+        return self._graph_optimizer
 
     def get_temp(self):
         return self._graph_temp
@@ -79,13 +82,13 @@ class SparseConvClusteringBase(Model):
 
             # self._graph_temp = tf.nn.softmax(self.__graph_logits)
 
-            self.__graph_loss = self._get_loss()
+            self._graph_loss = self._get_loss()
 
-            self.__graph_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.__graph_loss)
+            self._graph_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self._graph_loss)
 
             # Repeating, maybe there is a better way?
-            self.__graph_summary_loss = tf.summary.scalar('Loss', self.__graph_loss)
-            self.__graph_summaries = tf.summary.merge([self.__graph_summary_loss])
+            self._graph_summary_loss = tf.summary.scalar('Loss', self._graph_loss)
+            self._graph_summaries = tf.summary.merge([self._graph_summary_loss])
 
-            self.__graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self.__graph_loss)
-            self.__graph_summaries_validation = tf.summary.merge([self.__graph_summary_loss_validation])
+            self._graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self._graph_loss)
+            self._graph_summaries_validation = tf.summary.merge([self._graph_summary_loss_validation])
