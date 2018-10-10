@@ -750,8 +750,62 @@ def sparse_conv_loop(sparse_dict, num_neighbors=8, num_filters=16, space_depth=4
     return construct_sparse_io_dict(filter_output , space_global, space_local, num_entries)
 
 
+from ops.neighbors import euclidean_squared
+def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1):
+    
+    colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
+                                                                                 sparse_dict['spatial_features_global'], \
+                                                                                 sparse_dict['spatial_features_local'], \
+                                                                                 sparse_dict['num_entries']
+    
+    layerout = tf.concat([colours_in,space_local/100.], axis=-1)                                                                           
+    if  AdMat is  None:
+        firstelement_space = space_global[0,:,:]
+        firstelement_space = tf.expand_dims(firstelement_space,axis=0)
+        print('firstelement_space',firstelement_space.shape)
+        AdMat = tf.sqrt(euclidean_squared(firstelement_space,firstelement_space))
+        print('AdMat',AdMat.shape)
+        #BxExE
+        #normalise
+        #AdMat=tf.Print(AdMat,[AdMat],'AdMat')
+        maxAdMat = tf.reduce_max(tf.reduce_max(AdMat, axis=-1,keepdims=True),axis=-1,keepdims=True)
+        AdMat = AdMat/maxAdMat
+        #AdMat=tf.Print(AdMat,[AdMat],'AdMata')
+        AdMat = (tf.zeros_like(AdMat)+1) - AdMat
+        AdMat = tf.expand_dims(AdMat, axis=3)
+        scaling = tf.reduce_sum(tf.reduce_mean(AdMat, axis=-1, keep_dims=False))/float(int(AdMat.get_shape()[1]))
+        AdMat = AdMat / scaling 
+        print('AdMat shape',AdMat.shape)
+        #AdMat=tf.Print(AdMat,[AdMat],'AdMat2')
+        #features = tf.concat([colours_in,space_local], axis=-1)
+        
+    
+    print('features',layerout.shape)
 
-
+    
+    isseq=(not hasattr(nfilters, "strip") and
+            hasattr(nfilters, "__getitem__") or
+            hasattr(nfilters, "__iter__"))
+    
+    if not isseq:
+        nfilters=[nfilters]
+    
+    for i in range(len(nfilters)):
+        layerout = tf.layers.dense(layerout, nfilters[i], activation=tf.nn.relu)
+    
+    for i in range(iterations):
+        layerout = tf.reshape(layerout,shape=[layerout.shape[0],AdMat.shape[1],1,nfilters[-1]])
+        layerout = AdMat * layerout #tf.tile(transformed_features,[1,1,AdMat.shape[-2],1]) *1./2000.
+        print('layerout ',layerout.shape)
+        layerout = tf.reduce_sum(layerout,axis=-2)
+    #layerout = tf.Print(layerout,[layerout],'layerout')
+    print('layerout2 ',layerout.shape)
+    
+    return construct_sparse_io_dict(layerout , space_global, space_local, num_entries), AdMat
+    
+    
+    
+    
 
 
 
