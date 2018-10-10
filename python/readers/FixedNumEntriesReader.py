@@ -36,6 +36,6 @@ class FixNumEntriesReader(DataAndNumEntriesReader):
         iterator = dataset.make_one_shot_iterator()
         data = iterator.get_next()
         data = data[:, 0:-1, :]
-        num_entries = tf.ones(shape=(self.num_batch) ,dtype=tf.int64) * self.num_max_entries
+        num_entries = tf.ones(shape=(self.num_batch, 1) ,dtype=tf.int64) * self.num_max_entries
 
         return data, num_entries
