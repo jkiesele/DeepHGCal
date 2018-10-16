@@ -806,7 +806,23 @@ def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1):
     
     
     
-
+def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, orig_sparse_dict=None):
+    colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
+                                                                    sparse_dict['spatial_features_global'], \
+                                                                    sparse_dict['spatial_features_local'], \
+                                                                    sparse_dict['num_entries']
+                                                                    
+    #seeds dimension: Bx2XF
+    
+    if orig_sparse_dict is not None:
+        colours_in = tf.concat([colours_in,    orig_sparse_dict['all_features']], axis=-1)
+        space_global = tf.concat([space_global,orig_sparse_dict['spatial_features_global']], axis=-1)
+        space_local = tf.concat([space_local,  orig_sparse_dict['spatial_features_local']], axis=-1)
+    
+    #seed_indices = XXX
+    
+    
+    
 
 
 

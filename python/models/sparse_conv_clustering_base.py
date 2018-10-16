@@ -13,6 +13,7 @@ class SparseConvClusteringBase(Model):
         self.batch_size = batch_size
         self.max_entries = max_entries
         self.learning_rate = learning_rate
+        self.use_seeds=False
 
     def initialize(self):
         if self.initialized:

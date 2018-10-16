@@ -11,23 +11,36 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                                           learning_rate)
         self.weight_weights = []
         self.AdMat = None
+        self.use_seeds = True
 
     def _get_loss(self):
         assert self._graph_output.shape[2] == 2
 
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
-
+        print(num_entries.shape)
         energy = self._placeholder_other_features[:, :, 0]
+        
+        prediction = self._graph_output
+        
+        print('self.max_entries',self.max_entries)
+        print('self._placeholder_other_features',self._placeholder_other_features)
+        
+        maxlen = self.max_entries
+        if self.use_seeds:
+            energy=energy[:,0:-1]
+            maxlen -= 1
+        #    prediction=prediction[:,0:-1,:]
+            
 
-        diff_sq_1 = (self._graph_output[:,:,0:2] - self._placeholder_targets) ** 2 * tf.cast(
-            tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
+        diff_sq_1 = (prediction[:,:,0:2] - self._placeholder_targets) ** 2 * tf.cast(
+            tf.sequence_mask(num_entries, maxlen=maxlen)[:, :,
             tf.newaxis], tf.float32) * energy[:,:, tf.newaxis]
         diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) / tf.reduce_sum(energy, axis=-1)
         loss_unreduced_1 = (diff_sq_1 / tf.cast(num_entries, tf.float32)) * tf.cast(
             num_entries != 0, tf.float32)
 
-        diff_sq_2 = (self._graph_output[:,:,0:2] - (1-self._placeholder_targets)) ** 2 * tf.cast(
-            tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
+        diff_sq_2 = (prediction[:,:,0:2] - (1-self._placeholder_targets)) ** 2 * tf.cast(
+            tf.sequence_mask(num_entries, maxlen=maxlen)[:, :,
             tf.newaxis], tf.float32) * energy[:,:, tf.newaxis]
         diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) / tf.reduce_sum(energy, axis=-1)
         loss_unreduced_2 = (diff_sq_2 / tf.cast(num_entries, tf.float32)) * tf.cast(
@@ -41,8 +54,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
         # + (1-self._placeholder_targets) * tf.cast(shower_indices[:,tf.newaxis,tf.newaxis]==1, tf.float32)
 
-        perf1 = tf.reduce_sum(self._graph_output[:,:,0] * energy, axis=[-1]) / tf.reduce_sum(sorted_target[:,:,0] * energy, axis=[-1])
-        perf2 = tf.reduce_sum(self._graph_output[:,:,1] * energy, axis=[-1]) / tf.reduce_sum(sorted_target[:,:,1] * energy, axis=[-1])
+        perf1 = tf.reduce_sum(prediction[:,:,0] * energy, axis=[-1]) / tf.reduce_sum(sorted_target[:,:,0] * energy, axis=[-1])
+        perf2 = tf.reduce_sum(prediction[:,:,1] * energy, axis=[-1]) / tf.reduce_sum(sorted_target[:,:,1] * energy, axis=[-1])
+
 
         self.mean_resolution, self.variance_resolution = tf.nn.moments(tf.concat((perf1, perf2), axis=0), axes=0)
 
@@ -60,9 +74,30 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         # net = tf.concat((net, self._placeholder_space_features_local), axis=2)
 
         # TODO: Will cause problems with batch size of 1
+        
+        feat = self._placeholder_other_features
+        print("feat",feat.shape)
+        space_feat = self._placeholder_space_features
+        local_space_feat = self._placeholder_space_features_local
+        num_entries = self._placeholder_num_entries
+        
+        seed_idxs=None
+        
+        if self.use_seeds:
+            feat=feat[:,0:-1,:]
+            space_feat=space_feat[:,0:-1,:]
+            local_space_feat=local_space_feat[:,0:-1,:]
+            #num_entries=num_entries[:,0:-1,:]
+            idxa=tf.expand_dims(feat[:,-1,0], axis=1)
+            idxb=tf.expand_dims(space_feat[:,-1,0], axis=1)
+            seed_idxs=tf.concat([idxa, idxb], axis=-1)
+            print(seed_idxs.shape)
+            
+        
+        print("featself._placeholder_other_features",self._placeholder_other_features.shape)
 
-        _input = construct_sparse_io_dict(self._placeholder_other_features, self._placeholder_space_features, self._placeholder_space_features_local,
-                                          tf.squeeze(self._placeholder_num_entries))
+        _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
+                                          tf.squeeze(num_entries))
 
         
         net,self.AdMat = sparse_conv_full_adjecency(_input, [64,32,16,4], AdMat=self.AdMat)
@@ -77,7 +112,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         #net = sparse_conv_make_neighbors(_input, num_neighbors=18, output_all=3, n_transformed_spatial_features=3, propagrate_ahead=True)
 
       
-        output = net['all_features'] * tf.cast(tf.sequence_mask(tf.squeeze(self._placeholder_num_entries, axis=1), maxlen=self.max_entries)[:,:,tf.newaxis], tf.float32)
+        output = net['all_features'] # * tf.cast(tf.sequence_mask(tf.squeeze(self._placeholder_num_entries, axis=1), maxlen=self.max_entries)[:,:,tf.newaxis], tf.float32)
         output = tf.nn.softmax(output)
 
         self._graph_temp = output

@@ -5,6 +5,7 @@ from readers.DataAndNumEntriesReader import DataAndNumEntriesReader
 class FixNumEntriesReader(DataAndNumEntriesReader):
     def __init__(self, files_list, num_max_entries, num_data_dims, num_batch, repeat=True, shuffle_size=None):
         super(FixNumEntriesReader, self).__init__(files_list, num_max_entries, num_data_dims, num_batch, repeat, shuffle_size)
+        self.return_seeds=False
 
     def _parse_function(self, example_proto):
         keys_to_features = {
@@ -35,7 +36,19 @@ class FixNumEntriesReader(DataAndNumEntriesReader):
         dataset = dataset.batch(self.num_batch)
         iterator = dataset.make_one_shot_iterator()
         data = iterator.get_next()
-        data = data[:, 0:-1, :]
         num_entries = tf.ones(shape=(self.num_batch, 1) ,dtype=tf.int64) * self.num_max_entries
-
-        return data, num_entries
+        
+        if self.return_seeds:
+            return data, num_entries
+        else:
+            return data[:, 0:-1, :], num_entries
+        
+class FixNumEntriesReaderSeeds(FixNumEntriesReader):
+    def __init__(self, files_list, num_max_entries, num_data_dims, num_batch, repeat=True, shuffle_size=None,
+                 return_seeds=True):
+        super(FixNumEntriesReaderSeeds, self).__init__(files_list, num_max_entries, num_data_dims, num_batch, repeat, shuffle_size)
+        self.return_seeds=True
+    
+    
+    
+    
