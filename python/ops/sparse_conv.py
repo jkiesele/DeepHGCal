@@ -750,7 +750,7 @@ def sparse_conv_loop(sparse_dict, num_neighbors=8, num_filters=16, space_depth=4
     return construct_sparse_io_dict(filter_output , space_global, space_local, num_entries)
 
 
-from ops.neighbors import euclidean_squared
+from ops.neighbors import euclidean_squared,n_range_tensor
 def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1):
     
     colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
@@ -804,21 +804,86 @@ def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1):
     return construct_sparse_io_dict(layerout , space_global, space_local, num_entries), AdMat
     
     
+def make_seed_selector(seed_ids):
+    batch=tf.range(seed_ids.shape[0])
+    batch=tf.expand_dims(batch, axis=1)
+    batch = tf.tile(batch,[1,seed_ids.shape[1]])
+    batch=tf.expand_dims(batch, axis=2)
+    seed_ids = tf.expand_dims(seed_ids,axis=2)
+    select = tf.concat([batch,seed_ids], axis=-1)
+    return select
+
+def normalise_distance_matrix(AdMat):
+    maxAdMat = tf.reduce_max(tf.reduce_max(AdMat, axis=-1,keepdims=True),axis=-1,keepdims=True)
+    AdMat = AdMat/maxAdMat
+    AdMat = (tf.zeros_like(AdMat)+1) - AdMat
+    scaling = tf.reduce_sum(tf.reduce_mean(AdMat, axis=-1, keep_dims=False))
+    AdMat = AdMat / scaling 
+    return AdMat
     
-    
-def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, orig_sparse_dict=None):
+def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1, nspacetransform=1,add_to_orig=True):
     colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
                                                                     sparse_dict['spatial_features_global'], \
                                                                     sparse_dict['spatial_features_local'], \
                                                                     sparse_dict['num_entries']
                                                                     
-    #seeds dimension: Bx2XF
     
-    if orig_sparse_dict is not None:
-        colours_in = tf.concat([colours_in,    orig_sparse_dict['all_features']], axis=-1)
-        space_global = tf.concat([space_global,orig_sparse_dict['spatial_features_global']], axis=-1)
-        space_local = tf.concat([space_local,  orig_sparse_dict['spatial_features_local']], axis=-1)
     
+    trans_colours = tf.layers.dense(colours_in,nfilters)
+    trans_colours = tf.expand_dims(trans_colours,axis=1)
+    all_space = tf.concat([space_global,space_local],axis=-1)
+    layerout=[]
+    space_layerout=[]
+    seedselector = make_seed_selector(seed_indices)
+    
+    for i in range(nspacetransform):
+        #starting space matrix loop
+        #transform space (make this a few layers, ending with one dimension per space matrix
+        trans_space = tf.layers.dense(all_space,nspacefilters,activation=tf.nn.relu)
+        trans_space = tf.layers.dense(trans_space,1)
+        space_layerout.append(trans_space)
+        
+        #select seeds // put this to once per batch outside of the layer
+        
+        seed_trans_space = tf.gather_nd(trans_space,seedselector)
+        seed_trans_space = tf.tile(seed_trans_space,[1,1,trans_space.shape[1]])
+        
+        all_trans_space = tf.reshape(trans_space,[trans_space.shape[0],trans_space.shape[2],trans_space.shape[1]])
+        all_trans_space = tf.tile(all_trans_space,[1,seed_trans_space.shape[1],1])
+        
+        diff = all_trans_space - seed_trans_space
+        
+        diff = normalise_distance_matrix(diff*diff) #take square, well behaven gradient
+        
+        diff = tf.expand_dims(diff,axis=3)
+        
+        print('diff',diff.shape)
+        print('trans_colours',trans_colours.shape)
+        
+        thisout = diff*trans_colours
+        
+        thisout = tf.reduce_sum(thisout,axis=2)
+        thisout = tf.expand_dims(thisout,axis=2)
+        print('thisout',thisout.shape)
+        thisout = thisout*diff
+        print('thisout',thisout.shape)
+        thisout = tf.transpose(thisout, perm=[0,2, 1,3])
+        print('thisout',thisout.shape)
+        thisout = tf.reshape(thisout,[thisout.shape[0],thisout.shape[1],thisout.shape[2]*thisout.shape[3]])
+        # now we are at seed level, expand back
+        print('thisout',thisout.shape)
+        
+        
+        layerout.append(thisout)
+    
+    layerout = tf.concat(layerout,axis=-1)
+    space_layerout = tf.concat(space_layerout,axis=-1)
+    
+    if add_to_orig:
+        layerout = tf.concat([colours_in, layerout],axis=-1)
+        space_layerout = tf.concat([space_local, space_layerout],axis=-1)
+    
+    return construct_sparse_io_dict(layerout , space_global, space_layerout, num_entries)
     #seed_indices = XXX
     
     
