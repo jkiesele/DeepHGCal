@@ -113,9 +113,20 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                                           tf.squeeze(num_entries))
         net = _input
         
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=16, nspacetransform=12)
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=8, nspacetransform=12)
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=1,nspacefilters=1, nspacetransform=1,add_to_orig=False)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=8,nspacedim=3)
+        
+        #net = sparse_conv_make_neighbors(net, num_neighbors=6, output_all=4, spatial_degree_non_linearity=1, propagrate_ahead=False)
+        
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=2,nspacedim=3)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64, nspacetransform=2,nspacedim=3)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64, nspacetransform=2,nspacedim=3)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=2,nspacedim=3)
+        
+        #net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=16, nspacetransform=1,nspacedim=1)
+        
+        #net = sparse_conv_make_neighbors(net, num_neighbors=6, output_all=4, spatial_degree_non_linearity=1, propagrate_ahead=False)
+        
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=1,nspacefilters=1, nspacetransform=1,add_to_orig=False,nspacedim=1)
         
 
 

@@ -817,11 +817,11 @@ def normalise_distance_matrix(AdMat):
     maxAdMat = tf.reduce_max(tf.reduce_max(AdMat, axis=-1,keepdims=True),axis=-1,keepdims=True)
     AdMat = AdMat/maxAdMat
     AdMat = (tf.zeros_like(AdMat)+1) - AdMat
-    scaling = tf.reduce_sum(tf.reduce_mean(AdMat, axis=-1, keep_dims=False))
+    scaling = tf.reduce_sum(tf.reduce_mean(AdMat, axis=-1, keepdims=False))
     AdMat = AdMat / scaling 
     return AdMat
     
-def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1, nspacetransform=1,add_to_orig=True):
+def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1, nspacedim=3, nspacetransform=1,add_to_orig=True):
     colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
                                                                     sparse_dict['spatial_features_global'], \
                                                                     sparse_dict['spatial_features_local'], \
@@ -840,38 +840,55 @@ def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1, nsp
         #starting space matrix loop
         #transform space (make this a few layers, ending with one dimension per space matrix
         trans_space = tf.layers.dense(all_space,nspacefilters,activation=tf.nn.relu)
-        trans_space = tf.layers.dense(trans_space,1)
+        #trans_space2 = tf.layers.dense(all_space,nspacefilters,activation=gauss_activation,kernel_initializer=tf.random_normal_initializer(0, 0.5))
+        #trans_space= tf.concat([trans_space,trans_space2],axis=-1)
+        
+        trans_space = tf.layers.dense(trans_space,nspacedim)
+        #print('trans_space',trans_space.shape)
+        
         space_layerout.append(trans_space)
         
         #select seeds // put this to once per batch outside of the layer
         
         seed_trans_space = tf.gather_nd(trans_space,seedselector)
-        seed_trans_space = tf.tile(seed_trans_space,[1,1,trans_space.shape[1]])
+        #print('seed_trans_space',seed_trans_space.shape)
+        seed_trans_space = tf.expand_dims(seed_trans_space,axis=2)
+        seed_trans_space = tf.tile(seed_trans_space,[1,1,colours_in.shape[1],1])
+        #print('seed_trans_space2',seed_trans_space.shape)
         
-        all_trans_space = tf.reshape(trans_space,[trans_space.shape[0],trans_space.shape[2],trans_space.shape[1]])
-        all_trans_space = tf.tile(all_trans_space,[1,seed_trans_space.shape[1],1])
+        all_trans_space = tf.expand_dims(trans_space,axis=1)
+        #print('all_trans_space1',all_trans_space.shape)
+        all_trans_space = tf.tile(all_trans_space,[1,seed_trans_space.shape[1],1,1])
+        #print('all_trans_space2',all_trans_space.shape)
+        #all_trans_space = tf.reshape(trans_space,[trans_space.shape[0],trans_space.shape[2],trans_space.shape[1]])
+        ##print('all_trans_space',all_trans_space.shape)
+        #all_trans_space = tf.tile(all_trans_space,[1,seed_trans_space.shape[1],1])
+        ##print('all_trans_space1',all_trans_space.shape)
         
         diff = all_trans_space - seed_trans_space
         
-        diff = normalise_distance_matrix(diff*diff) #take square, well behaven gradient
+        diff = tf.reduce_sum(diff*diff,axis=-1)
+        diff = normalise_distance_matrix(diff) #take square, well behaven gradient
+        
         
         diff = tf.expand_dims(diff,axis=3)
         
-        print('diff',diff.shape)
-        print('trans_colours',trans_colours.shape)
+        #print('diff',diff.shape)
+        #print('trans_colours',trans_colours.shape)
         
         thisout = diff*trans_colours
         
+        #print('thisout',thisout.shape)
         thisout = tf.reduce_sum(thisout,axis=2)
         thisout = tf.expand_dims(thisout,axis=2)
-        print('thisout',thisout.shape)
+        #print('thisout1',thisout.shape)
         thisout = thisout*diff
-        print('thisout',thisout.shape)
+        #print('thisout',thisout.shape)
         thisout = tf.transpose(thisout, perm=[0,2, 1,3])
-        print('thisout',thisout.shape)
+        #print('thisout',thisout.shape)
         thisout = tf.reshape(thisout,[thisout.shape[0],thisout.shape[1],thisout.shape[2]*thisout.shape[3]])
         # now we are at seed level, expand back
-        print('thisout',thisout.shape)
+        #print('thisout2',thisout.shape)
         
         
         layerout.append(thisout)
