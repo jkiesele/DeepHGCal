@@ -7,7 +7,7 @@ def TBI_huber_loss(y_true, y_pred):
     return tf.losses.huber_loss(y_true,y_pred,delta=10)
 
 def huber(x):
-    clip_delta=10.
+    clip_delta=20.
     import tensorflow as tf
     
     cond  = tf.abs(x) < clip_delta
@@ -38,7 +38,7 @@ def huber_loss_calo(y_true, y_pred):
     calo-like huber loss with quadratic until around 10% relative difference for inputs around 100
     '''
     import tensorflow as tf
-    scaleddiff=(y_true-y_pred)/(tf.sqrt(tf.abs(y_true)+K.epsilon())+K.epsilon())
+    scaleddiff=(y_true-y_pred)/(tf.sqrt(tf.abs(y_true-8)+K.epsilon())+K.epsilon())
     ret = huber(scaleddiff)
     ret = tf.where(tf.is_nan(ret), y_true*1000, ret)
     ret = tf.clip_by_value(ret, 0 ,1e6)

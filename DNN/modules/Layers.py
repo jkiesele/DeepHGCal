@@ -143,7 +143,7 @@ class Reduce_sum(Layer):
         return tf.reduce_sum(inputs, axis=-1, keep_dims=False)
     
     def get_config(self):
-        base_config = super(Log_plus_one, self).get_config()
+        base_config = super(Reduce_sum, self).get_config()
         return dict(list(base_config.items()))
     
 
@@ -167,9 +167,9 @@ class Clip(Layer):
 
 
 
-class Multiply(Layer):
+class ScalarMultiply(Layer):
     def __init__(self, factor, **kwargs):
-        super(Multiply, self).__init__(**kwargs)
+        super(ScalarMultiply, self).__init__(**kwargs)
         self.factor=factor
     
     def compute_output_shape(self, input_shape):
@@ -180,7 +180,7 @@ class Multiply(Layer):
     
     def get_config(self):
         config = {'factor': self.factor}
-        base_config = super(Multiply, self).get_config()
+        base_config = super(ScalarMultiply, self).get_config()
         return dict(list(base_config.items()) + list(config.items() ))
     
 class Multiply_feature(Layer):
@@ -401,7 +401,7 @@ global_layers_list['SelectFeatureOnly']=SelectFeatureOnly
 global_layers_list['Multiply_feature']=Multiply_feature
 global_layers_list['Print']=Print
 global_layers_list['Clip'] = Clip
-global_layers_list['Multiply'] = Multiply
+global_layers_list['ScalarMultiply'] = ScalarMultiply
 global_layers_list['Log_plus_one'] = Log_plus_one
 global_layers_list['SelectEnergyOnly'] = SelectEnergyOnly
 global_layers_list['Sum3DFeatureOne'] = Sum3DFeatureOne

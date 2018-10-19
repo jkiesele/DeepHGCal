@@ -17,7 +17,7 @@ import keras.backend as K
 
 import tensorflow as tf
 
-from Layers import Sum3DFeatureOne,Sum3DFeaturePerLayer, SelectEnergyOnly, ReshapeBatch, Multiply, Log_plus_one, Clip, Print, Reduce_sum, Sum_difference_squared
+from Layers import Sum3DFeatureOne,Sum3DFeaturePerLayer, SelectEnergyOnly, ReshapeBatch, ScalarMultiply, Log_plus_one, Clip, Print, Reduce_sum, Sum_difference_squared
 ############# just a placeholder
 
 from keras.layers import LeakyReLU
@@ -49,8 +49,8 @@ def resnet_like_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, n
     
     x = create_conv_resnet(x, name='conv_block_1',
                        kernel_dumb=(2,2,1), strides_dumb=(2,2,1),
-                       nodes_lin=16,
-                       nodes_nonlin=24, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
+                       nodes_lin=24,
+                       nodes_nonlin=32, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
                        leaky_relu_alpha=0.01,
                        dropout=dropoutRate,
                        lin_trainable=True,
@@ -63,8 +63,8 @@ def resnet_like_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, n
     
     x = create_conv_resnet(x, name='conv_block_2',
                        kernel_dumb=(4,4,1), strides_dumb=(4,4,1),
-                       nodes_lin=16,
-                       nodes_nonlin=16, kernel_nonlin_a=(4,4,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
+                       nodes_lin=24,
+                       nodes_nonlin=24, kernel_nonlin_a=(4,4,2), kernel_nonlin_b=(2,2,3), lambda_reg=l2_lambda,
                        leaky_relu_alpha=0.01, 
                        dropout=dropoutRate,
                        lin_trainable=True,
@@ -75,8 +75,8 @@ def resnet_like_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, n
     
     x = create_conv_resnet(x, name='conv_block_3',
                        kernel_dumb=(1,1,3), strides_dumb=(1,1,3),
-                       nodes_lin=16,
-                       nodes_nonlin=16, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,4), lambda_reg=l2_lambda,
+                       nodes_lin=24,
+                       nodes_nonlin=24, kernel_nonlin_a=(3,3,2), kernel_nonlin_b=(2,2,4), lambda_reg=l2_lambda,
                        leaky_relu_alpha=0.01,
                        dropout=dropoutRate,
                        lin_trainable=True,
@@ -89,7 +89,7 @@ def resnet_like_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, n
     x = create_conv_resnet(x, name='conv_block_4',
                        kernel_dumb=(2,2,3), strides_dumb=(2,2,3),
                        nodes_lin=16,
-                       nodes_nonlin=16, kernel_nonlin_a=(3,3,3), kernel_nonlin_b=(3,3,3), lambda_reg=l2_lambda,
+                       nodes_nonlin=24, kernel_nonlin_a=(3,3,3), kernel_nonlin_b=(3,3,3), lambda_reg=l2_lambda,
                        leaky_relu_alpha=0.01,
                        dropout=dropoutRate,
                        lin_trainable=True,
@@ -109,20 +109,28 @@ def resnet_like_3D(Inputs,nclasses,nregressions,dropoutRate=0.05,momentum=0.6, n
     alldiff = Add()([diffA,diffB,diffC,diffD])
     
     
-    x = Dense(32, kernel_initializer=keras.initializers.random_normal(1./32., 1./32.),name='dense1', trainable=True)(x)
+    x = Dense(64, kernel_initializer=keras.initializers.random_normal(1./32., 1./32.),name='dense1', trainable=True)(x)
     x = LeakyReLU(alpha=0.001)(x)
     x = Dense(12, kernel_initializer=keras.initializers.random_normal(1./(32.*120.), 1./(32.*120.)),name='dense2', trainable=True)(x)
     
-    
-   
     predictE=Dense(1, activation='linear',kernel_initializer=keras.initializers.random_normal(1./12., 1./12.),name='pre_pred_E')(x)
     
-    predictE=Multiply(200.)(predictE)
+    corr_factor=Dense(512, activation='softsign',
+                      kernel_initializer='lecun_uniform',
+                      bias_initializer='lecun_uniform',
+                      name='corr_pred_E_pre',trainable=False)(predictE)
+    corr_factor=Dense(1, activation='sigmoid',kernel_initializer=keras.initializers.random_normal(0.0, 1e-6),
+                      name='corr_pred_E',trainable=False)(corr_factor)
+   
+    
+    predictE = keras.layers.Multiply()([corr_factor,predictE])
+    
+    predictE=ScalarMultiply(200.)(predictE)
     #predictE=Print("predictE")(predictE)
-    predictE = Clip(-1000,2000,name='pred_E')(predictE)
+    predictE = Clip(-100,10000,name='pred_E')(predictE)
     #predictE=Print("predictE")(predictE)
     
-    #alldiff=Multiply(1e5)(alldiff)
+    #alldiff=ScalarMultiply(1e5)(alldiff)
     #alldiff=Print("alldiff")(alldiff)
     predictID=RepeatVector(nclasses)(alldiff)
     predictID=Reshape([nclasses],name="ID_pred")(predictID)
@@ -184,7 +192,7 @@ if not train.modelSet():
     
     nodemulti=16
 
-    train.setModel(resnet_like_3D,dropoutRate=0.1,momentum=0.3,nodemulti=nodemulti,l2_lambda=1e-4)
+    train.setModel(resnet_like_3D,dropoutRate=0.03,momentum=0.6,nodemulti=nodemulti,l2_lambda=1e-12)
     
     train.compileModel(learningrate=0.01,#will be overwritten anyway
                        clipnorm=1,
@@ -246,6 +254,24 @@ def open_resnet(train):
         if "pred_E" == layer.name: #clip layer
             layer.min=1
     print(train.keras_model.summary())
+    
+    
+def open_last_correction(train):
+    print('only allowing last linear correction')
+    freeze_batchnorm(train)
+    for layer in train.keras_model.layers:
+        if "corr_pred_E" in layer.name:
+            layer.trainable=True
+            
+def only_last_correction(train):
+    print('only allowing last linear correction')
+    freeze_batchnorm(train)
+    for layer in train.keras_model.layers:
+        if "corr_pred_E" in layer.name:
+            layer.trainable=True
+        else:
+            layer.trainable=False
+    
 
 import collections
 Learning_sched = collections.namedtuple('Learning_sched', 'lr nepochs batchmulti funccall loss_weights en_loss')
@@ -264,12 +290,16 @@ verbose=1
 #learn.append(Learning_sched(lr=1e-6,     nepochs=15,   batchmulti=1,   funccall=open_resnet,  loss_weights=[1e-7, 100.], en_loss=huber_loss_calo))
 #learn.append(Learning_sched(lr=1e-7,     nepochs=25,   batchmulti=1,   funccall=None,         loss_weights=None, en_loss=None))
 
+learn.append(Learning_sched(lr=1e-3,     nepochs=0,   batchmulti=0.5,  funccall=None,         loss_weights=[1e-7, 1.],  en_loss='mean_squared_error'))
+learn.append(Learning_sched(lr=1e-3,     nepochs=5,   batchmulti=0.8,    funccall=open_resnet,         loss_weights=[1e-7, 1.],  en_loss=huber_loss_calo))
+learn.append(Learning_sched(lr=1e-4,     nepochs=5,   batchmulti=1,    funccall=None,    loss_weights=None, en_loss=None))
+learn.append(Learning_sched(lr=5e-5,     nepochs=15,  batchmulti=1,    funccall=open_last_correction,         loss_weights=[1e-7, 1.],       en_loss=huber_loss_calo))
+learn.append(Learning_sched(lr=1e-5,     nepochs=20,   batchmulti=1,    funccall=None,    loss_weights=None, en_loss=None))
+learn.append(Learning_sched(lr=1e-6,     nepochs=10,   batchmulti=1,    funccall=None,    loss_weights=None, en_loss=None))
 
-learn.append(Learning_sched(lr=1e-3,     nepochs=3,   batchmulti=0.5,  funccall=open_resnet,         loss_weights=[1e-7, 100], en_loss=huber_loss_calo))
-learn.append(Learning_sched(lr=1e-4,     nepochs=4,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
-learn.append(Learning_sched(lr=1e-5,     nepochs=4,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
-learn.append(Learning_sched(lr=1e-6,     nepochs=15,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
-learn.append(Learning_sched(lr=1e-7,     nepochs=25,   batchmulti=1,    funccall=None,         loss_weights=None, en_loss=None))
+learn.append(Learning_sched(lr=1e-7,     nepochs=10,   batchmulti=1,    funccall=only_last_correction,    loss_weights=[1e-7, 1.], en_loss=huber_loss_calo))
+learn.append(Learning_sched(lr=1e-8,     nepochs=10,   batchmulti=1,    funccall=None,    loss_weights=None, en_loss=None))
+
 
 totalepochs=0
 import keras.backend as K

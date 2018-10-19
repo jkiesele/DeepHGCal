@@ -323,19 +323,22 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
         //re-calculate center
         for(size_t hit=0; hit < nrechits; hit++) {
             double rechitphi=rh_phi_eta.getData(0, hit);
-            if(fabs(deltaPhi(rechitphi, seedphi))>xwidth) continue;
+            double deltaphi=deltaPhi(rechitphi, seedphi);
+            if(fabs(deltaphi)>xwidth) continue;
             double rechiteta=rh_phi_eta.getData(1, hit);
             if(fabs(rechiteta - seedeta)>ywidth) continue;
             float  energy=rh_energybranch.getData(0, hit);
 
             //all is around phi=0, so no special considerations needed
             etasum+=energy*rechiteta;
-            phisum+=energy*rechitphi;
+            phisum+=energy*deltaphi;
             energysum+=energy;
         }
         double newphi=phisum/energysum;
         double neweta=etasum/energysum;
-        seedphi = newphi;
+        seedphi = seedphi+newphi;
+        if(seedphi>3.14159265358979323846)seedphi-=3.14159265358979323846;
+        if(seedphi<3.14159265358979323846)seedphi+=3.14159265358979323846;
         seedeta = neweta;
 
         for(size_t hit=0; hit < nrechits; hit++) {

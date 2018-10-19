@@ -12,7 +12,7 @@ from keras.layers import Cropping3D
 from keras.regularizers import l2
 import keras.backend as K
 
-from Layers import Sum3DFeatureOne,Sum3DFeaturePerLayer, Create_per_layer_energies,SelectEnergyOnly, ReshapeBatch, Multiply, Log_plus_one, Clip, SelectFeatureOnly, Print, Reduce_sum, Multiply_feature
+from Layers import Sum3DFeatureOne,Sum3DFeaturePerLayer, Create_per_layer_energies,SelectEnergyOnly, ReshapeBatch, ScalarMultiply, Log_plus_one, Clip, SelectFeatureOnly, Print, Reduce_sum, Multiply_feature
 from tensorflow.contrib.learn.python.learn import trainable
 
 def create_full_calo_image(Inputs, dropoutRate, momentum, trainable=True):
@@ -28,10 +28,10 @@ def create_full_calo_image(Inputs, dropoutRate, momentum, trainable=True):
     leaky_relu_alpha=0.001
     #ecalhits = SelectEnergyOnly()(ecalhits)
     
-    ecalhits = Multiply(1./1000.)(ecalhits)
+    ecalhits = ScalarMultiply(1./1000.)(ecalhits)
     #17x17x10x2
     #hcalhits = SelectEnergyOnly()(hcalhits)
-    hcalhits = Multiply(1./1000.)(hcalhits)
+    hcalhits = ScalarMultiply(1./1000.)(hcalhits)
     
     
     hcalhits_energy = SelectEnergyOnly()(hcalhits)
