@@ -1,4 +1,4 @@
-from readers.InputReader import InputReader
+from io_modules.InputReader import InputReader
 import tensorflow as tf
 
 
