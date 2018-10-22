@@ -46,20 +46,100 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         print('targets',targets.shape)
         print('maxlen',maxlen)
         print('energy',energy.shape)
+        
+        true_energy_pc = targets * energy[:,:, tf.newaxis]
+        predicted_fraction_pc = prediction[:,:,0:2]
+        predicted_fraction_pc_swapped = tf.concat([tf.expand_dims(prediction[:,:,1],axis=2),
+                                                 tf.expand_dims(prediction[:,:,0],axis=2)],
+                                                 axis=-1)
+                                                 
+        true_shower_energies = tf.reduce_sum(true_energy_pc,axis=1)
+        predicted_shower_energies =  tf.reduce_sum(predicted_fraction_pc * energy[:,:, tf.newaxis],axis=1)
+        predicted_shower_energies_swapped =  tf.reduce_sum(predicted_fraction_pc_swapped * energy[:,:, tf.newaxis],axis=1)
+        
+        predicted_energy_fraction = predicted_fraction_pc * energy[:,:, tf.newaxis]
+        predicted_energy_fraction_swapped =  predicted_fraction_pc_swapped * energy[:,:, tf.newaxis]
+        
+        resolution = tf.where(tf.less( tf.abs(predicted_shower_energies-true_shower_energies), tf.abs(predicted_shower_energies_swapped - true_shower_energies)),
+                              predicted_shower_energies,
+                              predicted_shower_energies_swapped)
+        
+        resolution = resolution[:,0]/true_shower_energies[:,0] -1 #one is enough
+        
+        print('resolution',resolution.shape)
+        
+        mean_resolution, variance_resolution = tf.nn.moments( resolution , axes=0)
+        self.mean_resolution, self.variance_resolution = tf.clip_by_value(mean_resolution, -1, 1), tf.clip_by_value(variance_resolution,0,3)
+        
+        
+        print('self.mean_resolution',self.mean_resolution.shape)
+        print('self.mean_resolution',self.mean_resolution.shape)
+        
+        loss_direct = (predicted_energy_fraction-true_energy_pc)**2
+        loss_swapped = (predicted_energy_fraction_swapped-true_energy_pc)**2
+        
+        #return tf.reduce_mean(loss_direct)
+        return tf.reduce_mean(tf.minimum(loss_direct, loss_swapped))
+        
+        # do cat cross entropy with prediction and targets and then weight by energy for both combinations
+        loss_direct = tf.nn.softmax_cross_entropy_with_logits_v2(labels=targets,logits=predicted_fraction_pc,dim=-1) # * energy / tf.reduce_sum(energy,keepdims=True)
+        loss_swapped = tf.nn.softmax_cross_entropy_with_logits_v2(labels=targets,logits=predicted_fraction_pc_swapped,dim=-1) # * energy / tf.reduce_sum(energy,keepdims=True)
+        
+        loss_direct = tf.reduce_mean(loss_direct, axis=-1)
+        loss_swapped = tf.reduce_mean(loss_swapped, axis=-1)
+        
+        return tf.reduce_mean(loss_direct)
+        
+        return tf.reduce_mean(tf.minimum(loss_direct, loss_swapped))
+    
+    
+        
+        logits = predicted_energy_pc / tf.expand_dims(true_shower_energies, axis=1) 
+        logits_swapped = predicted_energy_pc_swapped / tf.expand_dims(true_shower_energies, axis=1)
+        
+        
+        print('true_shower_energies',true_shower_energies.shape)
+        print('true_energy_pc',true_energy_pc.shape)
+        print('diff2',diff2.shape)
 
-        diff_sq_1 = (prediction[:,:,0:2] - targets) ** 2 * tf.cast(
-            tf.sequence_mask(num_entries, maxlen=maxlen)[:, :,
-            tf.newaxis], tf.float32) * energy[:,:, tf.newaxis]
-        diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) / tf.reduce_sum(energy, axis=-1)
-        loss_unreduced_1 = (diff_sq_1 / tf.cast(num_entries, tf.float32)) * tf.cast(
-            num_entries != 0, tf.float32)
+        exit()
 
-        diff_sq_2 = (prediction[:,:,0:2] - (1-targets)) ** 2 * tf.cast(
-            tf.sequence_mask(num_entries, maxlen=maxlen)[:, :,
-            tf.newaxis], tf.float32) * energy[:,:, tf.newaxis]
-        diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) / tf.reduce_sum(energy, axis=-1)
-        loss_unreduced_2 = (diff_sq_2 / tf.cast(num_entries, tf.float32)) * tf.cast(
-            num_entries != 0, tf.float32)
+
+        diff_sq_1 = (prediction[:,:,0:2] - targets) ** 2 * energy[:,:, tf.newaxis] #* tf.cast(
+            #tf.sequence_mask(num_entries, maxlen=maxlen)[:, :,
+            #tf.newaxis], tf.float32) 
+        
+        print('energy[:,:, tf.newaxis]',energy[:,:, tf.newaxis])
+        totalE = energy[:,:, tf.newaxis]*targets
+        totalE = tf.reduce_sum(totalE,axis=1)
+        totalE = tf.expand_dims(totalE, axis=1)
+        print('totalE',totalE)
+        
+        diff_sq_1=diff_sq_1/totalE
+        lossout= tf.reduce_mean(diff_sq_1);
+        
+        
+        print('lossout',lossout)
+        
+        #exit()
+        
+        mean_resolution, variance_resolution = tf.nn.moments(diff_sq_1, axes=0)
+        
+        self.mean_resolution, self.variance_resolution = tf.clip_by_value(mean_resolution, -2, 2), tf.clip_by_value(variance_resolution,0,10)
+        
+        return lossout
+    
+        
+        #exit()
+        
+        diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) #/ tf.reduce_sum(energy, axis=-1)
+        loss_unreduced_1 = diff_sq_1
+
+        diff_sq_2 = (prediction[:,:,0:2] - (1-targets)) ** 2 * energy[:,:, tf.newaxis] #* tf.cast(
+            #tf.sequence_mask(num_entries, maxlen=maxlen)[:, :,
+            #tf.newaxis], tf.float32) 
+        diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) #/ tf.reduce_sum(energy, axis=-1)
+        loss_unreduced_2 = diff_sq_2
 
         shower_indices = tf.argmin(tf.concat((loss_unreduced_1[:, tf.newaxis], loss_unreduced_2[:, tf.newaxis]), axis=-1), axis=-1)
 
@@ -75,7 +155,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
         self.mean_resolution, self.variance_resolution = tf.nn.moments(tf.concat((perf1, perf2), axis=0), axes=0)
 
+        
         #return tf.reduce_mean(loss_unreduced_1)
+        #this is the symmetrised
         return tf.reduce_mean(tf.minimum(loss_unreduced_1, loss_unreduced_2))
 
 
@@ -108,43 +190,47 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             seed_idxs=tf.concat([idxa, idxb], axis=-1)
             seed_idxs=tf.cast(seed_idxs+0.1,dtype=tf.int32)
             print(seed_idxs.shape)
+        
+        
             
         _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
+        
+        _input = sparse_conv_batchnorm(_input,momentum=0.6)
+       
         net = _input
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=16, nspacefilters=16, nspacetransform=3,nspacedim=3)#,original_dict=_input)
+        net = sparse_conv_batchnorm(net,momentum=0.6)
+        #net = sparse_conv_make_neighbors(net, num_neighbors=6, output_all=4, spatial_degree_non_linearity=1,propagrate_ahead=False)
         
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=8,nspacedim=3)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=64,nspacefilters=32, nspacetransform=1,nspacedim=3)#original_dict=_input)
+        net = sparse_conv_batchnorm(net,momentum=0.6)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=64,nspacefilters=64, nspacetransform=1,nspacedim=3)#original_dict=_input)
+        net = sparse_conv_batchnorm(net,momentum=0.6)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64, nspacetransform=1,nspacedim=3)#original_dict=_input)
+        net = sparse_conv_batchnorm(net,momentum=0.6)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=128, nspacetransform=1,nspacedim=3)#original_dict=_input)
+        net = sparse_conv_batchnorm(net,momentum=0.6)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=24,nspacefilters=128, nspacetransform=1,nspacedim=3)#original_dict=_input)
+        net = sparse_conv_batchnorm(net,momentum=0.6)
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=12,nspacefilters=128, nspacetransform=1,nspacedim=3)#original_dict=_input)
+        net = sparse_conv_batchnorm(net,momentum=0.6)
         
         #net = sparse_conv_make_neighbors(net, num_neighbors=6, output_all=4, spatial_degree_non_linearity=1,propagrate_ahead=False)
         
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=2,nspacedim=6)
+        #net = sparse_conv_batchnorm(net)
+        #net = sparse_conv_seeded(net,seed_idxs,nfilters=8,nspacefilters=64, nspacetransform=2,nspacedim=3,original_dict=_input)
+        #net = sparse_conv_seeded(net,seed_idxs,nfilters=8,nspacefilters=64, nspacetransform=2,nspacedim=3,original_dict=_input)
         
         #net = sparse_conv_make_neighbors(net, num_neighbors=6, output_all=4, spatial_degree_non_linearity=1,propagrate_ahead=False)
         
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64, nspacetransform=2,nspacedim=3)
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64, nspacetransform=2,nspacedim=3)
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=2,nspacedim=3)
+        #net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=2,nspacedim=3,original_dict=_input)
+        #net = sparse_conv_batchnorm(net)
         
-        #net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=16, nspacetransform=1,nspacedim=1)
-        
-        #net = sparse_conv_make_neighbors(net, num_neighbors=6, output_all=4, spatial_degree_non_linearity=1, propagrate_ahead=False)
-        
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=1,nspacefilters=1, nspacetransform=1,add_to_orig=False,nspacedim=1)
-        
+        net = sparse_conv_seeded(net,seed_idxs,nfilters=1,nspacefilters=1, nspacetransform=1,nspacedim=3,add_to_orig=False)
+        #net = sparse_conv_batchnorm(net)
 
 
-
-        
-        #net,self.AdMat = sparse_conv_full_adjecency(_input, [64,32,16,4], AdMat=self.AdMat)
-        #net,_ = sparse_conv_full_adjecency(net, [64,32,4], AdMat=self.AdMat)
-        #net,_ = sparse_conv_full_adjecency(net, [64,32,2], AdMat=self.AdMat)
-        #net,AdMat = sparse_conv_full_adjecency(net, 4, AdMat=AdMat)
-        #net,AdMat = sparse_conv_full_adjecency(net, 4, AdMat=AdMat)
-        #net,AdMat = sparse_conv_full_adjecency(net, 3, AdMat=AdMat, iterations=1)
-        #just multple multiplications
-        #net,AdMat = sparse_conv_full_adjecency(net, 3, AdMat=AdMat)
-        #net,_ = sparse_conv_full_adjecency(net, 3, AdMat=AdMat)
-        #net = sparse_conv_make_neighbors(_input, num_neighbors=18, output_all=3, n_transformed_spatial_features=3, propagrate_ahead=True)
 
       
         output = net['all_features'] # * tf.cast(tf.sequence_mask(tf.squeeze(self._placeholder_num_entries, axis=1), maxlen=self.max_entries)[:,:,tf.newaxis], tf.float32)
