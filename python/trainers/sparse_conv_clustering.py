@@ -9,6 +9,7 @@ from tensorflow.python.profiler.model_analyzer import Profiler
 from models.sparse_conv_cluster_spatial_1 import SparseConvClusteringSpatial1
 from models.sparse_conv_cluster_spatial_2_min_loss import SparseConvClusteringSpatialMinLoss
 from models.binning_cluster_alpha_min_loss import BinningClusteringMinLoss
+from models.sparse_conv_cluster_spatial_2_min_loss2 import SparseConvClusteringSpatialMinLoss2
 from readers import ReaderFactory
 from inference import InferenceOutputStreamer
 

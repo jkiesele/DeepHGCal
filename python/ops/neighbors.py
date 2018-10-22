@@ -138,6 +138,7 @@ def n_range_tensor(dims):
 def sort_last_dim_tensor(x):
     shape = x.shape.as_list()
     v, ind = tf.nn.top_k(x, shape[-1], sorted=False)
+    
 
     ind = tf.expand_dims(ind, axis=-1)
     tensor_combine_with = n_range_tensor(shape)
