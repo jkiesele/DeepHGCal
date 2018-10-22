@@ -8,7 +8,9 @@ from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 from models.sparse_conv_cluster_spatial_1 import SparseConvClusteringSpatial1
 from models.sparse_conv_cluster_spatial_2_min_loss import SparseConvClusteringSpatialMinLoss
+from models.binning_cluster_alpha_min_loss import BinningClusteringMinLoss
 from readers import ReaderFactory
+from inference import InferenceOutputStreamer
 
 
 class SparseConvClusteringTrainer:
@@ -30,7 +32,9 @@ class SparseConvClusteringTrainer:
         self.training_files = self.config['training_files_list']
         self.validation_files = self.config['validation_files_list']
         self.test_files = self.config['test_files_list']
+
         self.validate_after = int(self.config['validate_after'])
+        self.num_testing_samples = int(self.config['num_testing_samples'])
 
         self.num_batch = int(self.config['batch_size'])
         self.num_max_entries = int(self.config['max_entries'])
@@ -53,6 +57,20 @@ class SparseConvClusteringTrainer:
             len(self.other_features_indices),
             len(self.target_indices),
             self.num_batch,
+            self.num_max_entries,
+            self.learning_rate
+        )
+        self.model.initialize()
+        self.saver_sparse = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.model.get_variable_scope()))
+
+    def initialize_test(self):
+        model_type = self.config['model_type']
+        self.model = globals()[model_type](
+            len(self.spatial_features_indices),
+            len(self.spatial_features_local_indices),
+            len(self.other_features_indices),
+            len(self.target_indices),
+            1,
             self.num_max_entries,
             self.learning_rate
         )
@@ -89,6 +107,9 @@ class SparseConvClusteringTrainer:
 
         inputs_feed = self.reader_factory.get_class(self.reader_type)(self.training_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
         inputs_validation_feed = self.reader_factory.get_class(self.reader_type)(self.validation_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
+
+        inputs_train_reader = self.reader_factory.get_class(self.reader_type)(self.training_files, self.num_max_entries, self.num_data_dims, self.num_batch)
+        inputs_validation_reader  = self.reader_factory.get_class(self.reader_type)(self.validation_files, self.num_max_entries, self.num_data_dims, self.num_batch)
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
         with tf.Session() as sess:
@@ -153,4 +174,61 @@ class SparseConvClusteringTrainer:
             coord.join(threads)
 
     def test(self):
-        raise ("Not implemented error")
+        self.initialize_test()
+        print("Beginning to test network with parameters", get_num_parameters(self.model.get_variable_scope()))
+        placeholders = self. model.get_placeholders()
+        graph_loss = self.model.get_losses()
+        graph_optmiser = self.model.get_optimizer()
+        graph_summary = self.model.get_summary()
+        graph_summary_validation = self.model.get_summary_validation()
+        graph_output = self.model.get_compute_graphs()
+        graph_temp = self.model.get_temp()
+
+        if self.from_scratch:
+            self.clean_summary_dir()
+
+        inputs_feed = self.reader_factory.get_class(self.reader_type)(self.test_files, self.num_max_entries, self.num_data_dims, 1).get_feeds()
+
+        inference_streamer = InferenceOutputStreamer(output_path=self.test_out_path, cache_size=100)
+        inference_streamer.start_thread()
+
+        init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
+        with tf.Session() as sess:
+            sess.run(init)
+
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+            summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
+
+            self.saver_sparse.restore(sess, self.model_path)
+            print("\n\nINFO: Loading model\n\n")
+
+            print("Starting testing")
+            iteration_number = 0
+            while iteration_number < self.num_testing_samples:
+                inputs_train = sess.run(list(inputs_feed))
+
+                inputs_train_dict = {
+                    placeholders[0]: inputs_train[0][:, :, self.spatial_features_indices],
+                    placeholders[1]: inputs_train[0][:, :, self.spatial_features_local_indices],
+                    placeholders[2]: inputs_train[0][:, :, self.other_features_indices],
+                    placeholders[3]: inputs_train[0][:, :, self.target_indices],
+                    placeholders[4]: inputs_train[1]
+                }
+
+                t, eval_loss, eval_output = sess.run([graph_temp, graph_loss, graph_output], feed_dict=inputs_train_dict)
+
+                inference_streamer.add((np.squeeze(inputs_train[0], axis=0), (inputs_train[1])[0,0], np.squeeze(eval_output, axis=0)))
+
+                print("Testing - Sample %4d: loss %0.5f" % (iteration_number, eval_loss))
+                print(t[0])
+                iteration_number += 1
+
+            # Stop the threads
+            coord.request_stop()
+
+            # Wait for threads to stop
+            coord.join(threads)
+
+        inference_streamer.close()

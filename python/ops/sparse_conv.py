@@ -28,7 +28,7 @@ def sparse_conv_delta(A, B):
 
 def construct_sparse_io_dict(all_features, spatial_features_global, spatial_features_local, num_entries):
     """
-    Constructs dictionary for io of sparse convolution layers
+    Constructs dictionary for readers of sparse convolution layers
 
     :param all_features: All features tensor.  Should be of shape [batch_size, num_entries, num_features]
     :param spatial_features_global: Space like features tensor. Should be of shape [batch_size, num_entries, num_features]
@@ -583,7 +583,7 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spa
 
     _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors)
 
-    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.expand_dims(tf.nn.softmax(-distance), axis=3) # [B,E,5,F]
+    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.nn.softmax(tf.expand_dims(-distance, axis=3)) # [B,E,5,F]
 
     pre_output = tf.layers.dense(gathered_all, output_all, activation=tf.nn.relu)
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)

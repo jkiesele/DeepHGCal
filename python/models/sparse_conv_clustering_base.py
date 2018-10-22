@@ -33,6 +33,15 @@ class SparseConvClusteringBase(Model):
         return self._placeholder_space_features,self._placeholder_space_features_local, self._placeholder_other_features, \
                self._placeholder_targets, self._placeholder_num_entries
 
+    def get_placeholders_dict(self):
+        placeholders = dict()
+        placeholders['features_space'] = self._placeholder_space_features
+        placeholders['features_space_local'] = self._placeholder_space_features_local
+        placeholders['features_others'] = self._placeholder_other_features
+        placeholders['targets'] = self._placeholder_targets
+        placeholders['num_entries'] = self._placeholder_num_entries
+        return placeholders
+
     def get_compute_graphs(self):
         return self._graph_output
 
