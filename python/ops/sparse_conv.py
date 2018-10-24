@@ -531,9 +531,14 @@ def noisy_eye_initializer():
     return _initializer
 
 
-def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spatial_degree_non_linearity=1, n_transformed_spatial_features=10, propagrate_ahead=False):
+def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, 
+                               output_all=15, spatial_degree_non_linearity=1, 
+                               n_transformed_spatial_features=10, 
+                               propagrate_ahead=False):
     """
     Defines sparse convolutional layer
+    
+    --> revise the space distance stuff
 
     :param sparse_dict: Dictionary containing input
     :param num_neighbors: An integer containing number of neighbors to pick + 1 (+1 is for yourself)
@@ -579,18 +584,26 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spa
     transformed_space_features = tf.expand_dims(transformed_space_features,axis=0)
 
     for i in range(spatial_degree_non_linearity - 1):
-        transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, activation=tf.nn.relu)
+        transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, 
+                                                     activation=tf.nn.relu, kernel_initializer=NoisyEyeInitializer)
 
-    transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, activation=None, kernel_initializer=NoisyEyeInitializer)
+    transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, 
+                                                 activation=None, kernel_initializer=NoisyEyeInitializer)
     # transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
 
+    #_indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors,n_batch)
     _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors,n_batch)
     
     #for future use
     transformed_space_features = tf.tile(transformed_space_features,[n_batch,1,1])
+    
+    #distance is strict positive
+    inverse_distance =  1-tf.nn.softsign(-distance) # *float(num_neighbors)
+    
+    gathered_all = tf.gather_nd(all_features, _indexing_tensor) 
+    gathered_all = gathered_all *  tf.expand_dims(inverse_distance, axis=3) # features, name)) #tf.nn.softmax(tf.expand_dims(-distance, axis=3)) # [B,E,5,F]
 
-    gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.nn.softmax(tf.expand_dims(-distance, axis=3)) # [B,E,5,F]
-
+    
     pre_output = tf.layers.dense(gathered_all, output_all, activation=tf.nn.relu)
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
 

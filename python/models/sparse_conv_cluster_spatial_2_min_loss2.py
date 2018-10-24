@@ -306,16 +306,21 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
     
     
     def compute_output_neighbours(self,_input):
-        momentum=0.6
+        momentum=0.1
+        
+        propagrate_ahead=True
         
         net=_input
         net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=16, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=16, spatial_degree_non_linearity=3, propagrate_ahead=True)
+        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=16, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead)
+        net = sparse_conv_batchnorm(net,momentum=momentum)
+        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=16, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead)
+        net = sparse_conv_batchnorm(net,momentum=momentum)
+        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead) 
+        net = sparse_conv_batchnorm(net,momentum=momentum)
+        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead)
+        net = sparse_conv_batchnorm(net,momentum=momentum)
         net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=16, n_transformed_spatial_features=3, propagrate_ahead=True)
         net = sparse_conv_batchnorm(net,momentum=momentum)
         output = net['all_features'] 
         output = tf.layers.dense(output,3,activation=tf.nn.relu)
