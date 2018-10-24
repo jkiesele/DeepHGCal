@@ -838,12 +838,9 @@ def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1,s
     
     
 def make_seed_selector(seed_ids):
-    batch=tf.range(seed_ids.shape[0])
-    batch=tf.expand_dims(batch, axis=1)
-    batch = tf.tile(batch,[1,seed_ids.shape[1]])
-    batch=tf.expand_dims(batch, axis=2)
-    seed_ids = tf.expand_dims(seed_ids,axis=2)
-    select = tf.concat([batch,seed_ids], axis=-1)
+    batch=tf.range(seed_ids.shape[0], dtype=tf.int64)
+    batch = tf.tile(batch[..., tf.newaxis, tf.newaxis], [1,2,1])
+    select = tf.concat((batch, seed_ids[..., tf.newaxis]), axis=-1)
     return select
 
 def normalise_distance_matrix(AdMat):
@@ -897,7 +894,13 @@ def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1,
             
         space_layerout.append(trans_space)
         
-        seed_trans_space = tf.gather_nd(trans_space,seedselector)
+        seed_trans_space = tf.gather_nd(trans_space,seedselector) # [B, 2, S] S is number of spatial features
+
+        label = tf.argmin(euclidean_squared(trans_space, seed_trans_space), axis=-1)
+        print(label.shape)
+        0/0
+
+
         seed_trans_space = tf.expand_dims(seed_trans_space,axis=2)
         seed_trans_space = tf.tile(seed_trans_space,[1,1,nvertex,1])
         

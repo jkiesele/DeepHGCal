@@ -1,5 +1,5 @@
 from readers.DataAndNumEntriesReader import DataAndNumEntriesReader
-from readers.FixedNumEntriesReader import FixNumEntriesReader,FixNumEntriesReaderSeeds
+from readers.FixedNumEntriesReader import FixNumEntriesReader,FixNumEntriesReaderSeeds, FixNumEntriesReaderSeedsSeparate
 
 
 class ReaderFactory:
@@ -10,3 +10,5 @@ class ReaderFactory:
             return FixNumEntriesReaderSeeds
         elif reader_name == "data_and_num_entries_reader":
             return DataAndNumEntriesReader
+        if reader_name == "fixed_num_entries_reader_seeds_separate":
+            return FixNumEntriesReaderSeedsSeparate

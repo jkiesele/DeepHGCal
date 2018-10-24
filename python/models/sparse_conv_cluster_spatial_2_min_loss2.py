@@ -16,11 +16,12 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self.fixed_seeds=None
 
     def make_placeholders(self):
-        self._placeholder_space_features = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries+1, self.n_space])
-        self._placeholder_space_features_local = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries+1, self.n_space_local])
-        self._placeholder_other_features = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries+1, self.n_other_features])
-        self._placeholder_targets = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries+1, self.n_target_dim])
+        self._placeholder_space_features = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries, self.n_space])
+        self._placeholder_space_features_local = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries, self.n_space_local])
+        self._placeholder_other_features = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries, self.n_other_features])
+        self._placeholder_targets = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries, self.n_target_dim])
         self._placeholder_num_entries = tf.placeholder(dtype=tf.int64, shape=[self.batch_size, 1])
+        self._placeholder_seed_indices = tf.placeholder(dtype=tf.int64, shape=[self.batch_size, 2])
 
 
     def get_loss2(self):
@@ -361,8 +362,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
         #output=self.compute_output_seed_driven(_input,seed_idxs)
         #output = self.compute_output_seed_driven_neighbours(_input,seed_idxs)
-        output = self.compute_output_neighbours(_input)
-        #output=self.compute_output_seed_driven(_input,self.fixed_seeds)
+        # output = self.compute_output_neighbours(_input)
+        output=self.compute_output_seed_driven(_input,self._placeholder_seed_indices)
         #output=self.compute_output_full_adjecency(_input)
         
         self._graph_temp = tf.reduce_sum(output[:,:,0], axis=1)/2679.

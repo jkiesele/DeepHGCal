@@ -18,7 +18,7 @@ def euclidean_squared(A, B):
     
     assert (A.dtype == tf.float32 or A.dtype == tf.float64) and (B.dtype == tf.float32 or B.dtype == tf.float64)
     assert len(shape_A) == 3 and len(shape_B) == 3
-    assert shape_A[0] == shape_B[0] and shape_A[1] == shape_B[1]
+    assert shape_A[0] == shape_B[0]# and shape_A[1] == shape_B[1]
     
     #just exploit broadcasting
     B_trans = tf.transpose(tf.expand_dims(B,axis=3), perm=[0, 3, 1, 2])
