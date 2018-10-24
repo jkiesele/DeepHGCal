@@ -23,6 +23,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self._placeholder_num_entries = tf.placeholder(dtype=tf.int64, shape=[self.batch_size, 1])
         self._placeholder_seed_indices = tf.placeholder(dtype=tf.int64, shape=[self.batch_size, 2])
 
+    def get_placeholders(self):
+        return self._placeholder_space_features,self._placeholder_space_features_local, self._placeholder_other_features, \
+               self._placeholder_targets, self._placeholder_num_entries, self._placeholder_seed_indices
+
 
     def get_loss2(self):
         assert self._graph_output.shape[2] == 3

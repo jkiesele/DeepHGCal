@@ -82,6 +82,6 @@ class FixNumEntriesReaderSeedsSeparate(FixNumEntriesReader):
         data = iterator.get_next()
         num_entries = tf.ones(shape=(self.num_batch, 1), dtype=tf.int64) * self.num_max_entries
 
-        seed_indices = data[:, -1, [0,1]]
+        seed_indices = tf.cast(data[:, -1, 0:2], tf.int64)
 
         return data[:, 0:-1, :], num_entries, seed_indices

@@ -98,6 +98,8 @@ class SparseConvClusteringTrainer:
         self.initialize()
         print("Beginning to train network with parameters", get_num_parameters(self.model.get_variable_scope()))
         placeholders = self. model.get_placeholders()
+
+
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
         graph_summary = self.model.get_summary()
