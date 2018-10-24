@@ -10,6 +10,8 @@ from models.sparse_conv_cluster_spatial_1 import SparseConvClusteringSpatial1
 from models.sparse_conv_cluster_spatial_2_min_loss import SparseConvClusteringSpatialMinLoss
 from models.binning_cluster_alpha_min_loss import BinningClusteringMinLoss
 from models.sparse_conv_cluster_spatial_2_min_loss2 import SparseConvClusteringSpatialMinLoss2
+from models.sparse_conv_cluster_lstm_based import SparseConvClusterLstmBased
+
 from readers import ReaderFactory
 from inference import InferenceOutputStreamer
 
@@ -133,26 +135,46 @@ class SparseConvClusteringTrainer:
             while iteration_number < self.train_for_iterations:
                 inputs_train = sess.run(list(inputs_feed))
 
-                inputs_train_dict = {
-                    placeholders[0]: inputs_train[0][:, :, self.spatial_features_indices],
-                    placeholders[1]: inputs_train[0][:, :, self.spatial_features_local_indices],
-                    placeholders[2]: inputs_train[0][:, :, self.other_features_indices],
-                    placeholders[3]: inputs_train[0][:, :, self.target_indices],
-                    placeholders[4]: inputs_train[1]
-                }
+                if len(placeholders)==5:
+                    inputs_train_dict = {
+                        placeholders[0]: inputs_train[0][:, :, self.spatial_features_indices],
+                        placeholders[1]: inputs_train[0][:, :, self.spatial_features_local_indices],
+                        placeholders[2]: inputs_train[0][:, :, self.other_features_indices],
+                        placeholders[3]: inputs_train[0][:, :, self.target_indices],
+                        placeholders[4]: inputs_train[1]
+                    }
+                else:
+                    inputs_train_dict = {
+                        placeholders[0]: inputs_train[0][:, :, self.spatial_features_indices],
+                        placeholders[1]: inputs_train[0][:, :, self.spatial_features_local_indices],
+                        placeholders[2]: inputs_train[0][:, :, self.other_features_indices],
+                        placeholders[3]: inputs_train[0][:, :, self.target_indices],
+                        placeholders[4]: inputs_train[1],
+                        placeholders[5]: inputs_train[2]
+                    }
 
                 t, eval_loss, _, eval_summary, eval_output = sess.run([graph_temp, graph_loss, graph_optmiser, graph_summary,
                                                                       graph_output], feed_dict=inputs_train_dict)
 
                 if iteration_number % self.validate_after == 0:
                     inputs_validation = sess.run(list(inputs_validation_feed))
-                    inputs_validation_dict = {
-                        placeholders[0]: inputs_validation[0][:, :, self.spatial_features_indices],
-                        placeholders[1]: inputs_validation[0][:, :, self.spatial_features_local_indices],
-                        placeholders[2]: inputs_validation[0][:, :, self.other_features_indices],
-                        placeholders[3]: inputs_validation[0][:, :, self.target_indices],
-                        placeholders[4]: inputs_validation[1]
-                    }
+                    if len(placeholders) == 5:
+                        inputs_validation_dict = {
+                            placeholders[0]: inputs_validation[0][:, :, self.spatial_features_indices],
+                            placeholders[1]: inputs_validation[0][:, :, self.spatial_features_local_indices],
+                            placeholders[2]: inputs_validation[0][:, :, self.other_features_indices],
+                            placeholders[3]: inputs_validation[0][:, :, self.target_indices],
+                            placeholders[4]: inputs_validation[1]
+                        }
+                    else:
+                        inputs_validation_dict = {
+                            placeholders[0]: inputs_validation[0][:, :, self.spatial_features_indices],
+                            placeholders[1]: inputs_validation[0][:, :, self.spatial_features_local_indices],
+                            placeholders[2]: inputs_validation[0][:, :, self.other_features_indices],
+                            placeholders[3]: inputs_validation[0][:, :, self.target_indices],
+                            placeholders[4]: inputs_validation[1],
+                            placeholders[5]: inputs_validation[2]
+                        }
 
                     eval_loss_validation, eval_summary_validation= sess.run([graph_loss, graph_summary_validation], feed_dict=inputs_validation_dict)
                     summary_writer.add_summary(eval_summary_validation, iteration_number)
