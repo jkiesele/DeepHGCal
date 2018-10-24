@@ -499,7 +499,7 @@ class NoisyEyeInitializer(Initializer):
     dtype: The data type. Only floating point types are supported.
   """
 
-  def __init__(self, low=0.0, up=1.0, seed=None, dtype=tf.float32):
+  def __init__(self, low=0.0, up=0.05, seed=None, dtype=tf.float32):
     self.low = low
     self.high = up
     self.seed = seed
@@ -572,7 +572,11 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spa
 
     assert spatial_degree_non_linearity >= 1
 
-    transformed_space_features = tf.concat([spatial_features_global], axis=2)
+    #add local space features here?
+    transformed_space_features = tf.concat([spatial_features_global,spatial_features_local], axis=-1)
+    #these are the same in each sample
+    transformed_space_features = transformed_space_features[0,:,:]
+    transformed_space_features = tf.expand_dims(transformed_space_features,axis=0)
 
     for i in range(spatial_degree_non_linearity - 1):
         transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, activation=tf.nn.relu)
@@ -580,7 +584,10 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, output_all=15, spa
     transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, activation=None, kernel_initializer=NoisyEyeInitializer)
     # transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
 
-    _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors)
+    _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors,n_batch)
+    
+    #for future use
+    transformed_space_features = tf.tile(transformed_space_features,[n_batch,1,1])
 
     gathered_all = tf.gather_nd(all_features, _indexing_tensor) * tf.nn.softmax(tf.expand_dims(-distance, axis=3)) # [B,E,5,F]
 
@@ -750,19 +757,26 @@ def sparse_conv_loop(sparse_dict, num_neighbors=8, num_filters=16, space_depth=4
 
 
 from ops.neighbors import euclidean_squared,n_range_tensor
-def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1):
+def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1,spacetransform=-1,noutputfilters=-1):
     
     colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
                                                                                  sparse_dict['spatial_features_global'], \
                                                                                  sparse_dict['spatial_features_local'], \
                                                                                  sparse_dict['num_entries']
     
-    layerout = tf.concat([colours_in,space_local/100.], axis=-1)                                                                           
+    layerin = tf.concat([colours_in,space_local,space_global], axis=-1)      
+    layerout=layerin                                                                     
     if  AdMat is  None:
         firstelement_space = space_global[0,:,:]
         firstelement_space = tf.expand_dims(firstelement_space,axis=0)
+        if spacetransform>0:
+            firstelement_space = tf.concat([firstelement_space,tf.expand_dims(space_local[0,:,:],axis=0)],axis=-1)
+            firstelement_space = tf.layers.dense(firstelement_space, spacetransform,activation=tf.nn.relu,
+                                                 kernel_initializer=NoisyEyeInitializer)
+            firstelement_space = tf.layers.dense(firstelement_space,3,activation=None,
+                                                 kernel_initializer=NoisyEyeInitializer)
         print('firstelement_space',firstelement_space.shape)
-        AdMat = tf.sqrt(euclidean_squared(firstelement_space,firstelement_space))
+        AdMat = euclidean_squared(firstelement_space,firstelement_space)
         print('AdMat',AdMat.shape)
         #BxExE
         #normalise
@@ -797,7 +811,14 @@ def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1):
         layerout = AdMat * layerout #tf.tile(transformed_features,[1,1,AdMat.shape[-2],1]) *1./2000.
         print('layerout ',layerout.shape)
         layerout = tf.reduce_sum(layerout,axis=-2)
+    
+    layerout = tf.concat([layerout,layerin],axis=-1)
+    #new
+    if noutputfilters<=0:
+        noutputfilters=nfilters[-1]
+    layerout = tf.layers.dense(layerout,noutputfilters,activation=tf.nn.relu)
     #layerout = tf.Print(layerout,[layerout],'layerout')
+    
     print('layerout2 ',layerout.shape)
     
     return construct_sparse_io_dict(layerout , space_global, space_local, num_entries), AdMat
@@ -822,34 +843,29 @@ def normalise_distance_matrix(AdMat):
     
 def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1, 
                        nspacedim=3, nspacetransform=1,add_to_orig=True,
-                       original_dict=None,
-                       seed_talk=True,
+                       seed_talk=False,
                        name=None):
     '''
     first nspacetransform uses just the untransformed first <nspacedim> entries of the space coordinates
     '''
     if name is None:
         name=""
+     
+    
     colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
                                                                     sparse_dict['spatial_features_global'], \
                                                                     sparse_dict['spatial_features_local'], \
-                                                                    sparse_dict['num_entries']
-                                                                    
+                                                                    sparse_dict['num_entries'] 
     
+    all_features = tf.concat([space_global,space_local,colours_in],axis=-1)   
+    space_features_per_batch = tf.concat([space_global,space_local],axis=-1)   
+    trans_features = tf.layers.dense(all_features,nfilters,activation=tf.nn.relu)
+    trans_features = tf.expand_dims(trans_features,axis=1)
     
+    nbatch=all_features.shape[0]
+    nvertex=all_features.shape[1]
     
-    
-    trans_colours = tf.layers.dense(colours_in,nfilters,activation=tf.nn.tanh)
-     # tf.layers.dense(tf.concat([colours_in, space_global, space_local],axis=-1),nfilters,activation=tf.nn.relu)
-    trans_colours = tf.expand_dims(trans_colours,axis=1)
-    all_space = tf.concat([space_global,space_local],axis=-1)
-    
-    if not original_dict is  None:
-        all_space = tf.concat([original_dict['spatial_features_global'],
-                               original_dict['spatial_features_local'],all_space],axis=-1)
-        
-    
-    layerout=[]
+    feature_layerout=[]
     space_layerout=[]
     seedselector = make_seed_selector(seed_indices)
     
@@ -857,25 +873,20 @@ def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1,
         
         #starting space matrix loop
         #transform space (make this a few layers, ending with one dimension per space matrix
-        trans_space = all_space[0,:,:]
-        expanded_all_space = tf.expand_dims(trans_space,axis=0)
-        trans_space = expanded_all_space
-        trans_space1 = tf.layers.dense(trans_space,nspacefilters,activation=tf.nn.relu)#*10.
-        #trans_space1 = tf.sin(trans_space1)
-
-        trans_space2 = tf.layers.dense(trans_space,nspacefilters,activation=gauss_activation,
-                                       kernel_initializer=tf.random_normal_initializer(0, 0.5))
-        trans_space= tf.concat([expanded_all_space,trans_space1,trans_space2],axis=-1)
-        #trans_space = trans_space1
-        trans_space = tf.layers.dense(trans_space,nspacedim,activation=tf.nn.relu)
+        trans_space = space_features_per_batch[0,:,:]
+        trans_space = tf.expand_dims(trans_space,axis=0)
+        trans_space = tf.layers.dense(trans_space/10.,nspacefilters,activation=tf.nn.tanh,
+                                       kernel_initializer=NoisyEyeInitializer)
+        trans_space = tf.layers.dense(trans_space,nspacedim,activation=tf.nn.tanh,
+                                      kernel_initializer=NoisyEyeInitializer)
         #bring trans space back to full dimensions
-        trans_space = tf.tile(trans_space,[seed_indices.shape[0],1,1])
+        trans_space = tf.tile(trans_space*10.,[nbatch,1,1])
             
         space_layerout.append(trans_space)
         
         seed_trans_space = tf.gather_nd(trans_space,seedselector)
         seed_trans_space = tf.expand_dims(seed_trans_space,axis=2)
-        seed_trans_space = tf.tile(seed_trans_space,[1,1,colours_in.shape[1],1])
+        seed_trans_space = tf.tile(seed_trans_space,[1,1,nvertex,1])
         
         all_trans_space = tf.expand_dims(trans_space,axis=1)
         all_trans_space = tf.tile(all_trans_space,[1,seed_trans_space.shape[1],1,1])
@@ -884,14 +895,15 @@ def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1,
         diff = tf.reduce_sum(diff*diff,axis=-1)
         diff = normalise_distance_matrix(diff) #take square, well behaven gradient
         
+        print('Distance matrix ',diff.shape)
         
         diff = tf.expand_dims(diff,axis=3)
         
-        thisout = diff*trans_colours
-        
+        thisout = diff*trans_features
         
         thisout = tf.reduce_sum(thisout,axis=2)
         
+        #simple dense
         if seed_talk:
             nseeds = thisout.shape[1]
             nfeat = thisout.shape[2]
@@ -900,27 +912,30 @@ def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1,
             thisout = thisout+thisout1/10.
             thisout = tf.reshape(thisout,[thisout.shape[0],nseeds,nfeat])
         
-        
         thisout = tf.expand_dims(thisout,axis=2)
         thisout = thisout*diff
         thisout = tf.transpose(thisout, perm=[0,2, 1,3])
         thisout = tf.reshape(thisout,[thisout.shape[0],thisout.shape[1],thisout.shape[2]*thisout.shape[3]])
         
-        layerout.append(thisout)
+        feature_layerout.append(thisout)
     
-    layerout = tf.concat(layerout,axis=-1)
+    feature_layerout = tf.concat(feature_layerout,axis=-1)
     space_layerout = tf.concat(space_layerout,axis=-1)
     
     
     if add_to_orig:
         #this prevents training somehow??
-        #space_layerout = tf.concat([space_local, space_layerout],axis=-1)
-        layerout = tf.concat([colours_in, layerout],axis=-1)
-        #layerout = tf.layers.dense(layerout,nfilters, activation=tf.nn.relu)
+        feature_layerout = tf.concat([feature_layerout,all_features],axis=-1)
+        feature_layerout = tf.layers.dense(feature_layerout,nfilters, activation=tf.nn.relu)
     
-    print('layer '+name+ ' out ', layerout.shape)
+    #orig_space = all_features[:,:,0:3]
+    #output = tf.concat([orig_space,space_layerout, feature_layerout],axis=-1)
     
-    return construct_sparse_io_dict(layerout , space_global, space_layerout, num_entries)
+    return construct_sparse_io_dict(feature_layerout , space_global, space_layerout, num_entries)
+    
+    print('layer '+name+ ' out ', output.shape)
+    
+    return output# construct_sparse_io_dict(layerout , space_global, space_layerout, num_entries)
     
     
 def sparse_conv_seedtalk(sparse_dict, seed_indices): 
@@ -949,16 +964,17 @@ def sparse_conv_seedtalk(sparse_dict, seed_indices):
     
     return construct_sparse_io_dict(layerout , space_global, space_local, num_entries)
     
-def sparse_conv_batchnorm(net,**kwargs):
+def sparse_conv_batchnorm(net,momentum=0.9,**kwargs):
     colours_in, space_global, space_local, num_entries = net['all_features'], \
                                                                     net['spatial_features_global'], \
                                                                     net['spatial_features_local'], \
                                                                     net['num_entries']
     
-    
-    colours_in=tf.layers.batch_normalization(colours_in,**kwargs)
-    space_global=tf.layers.batch_normalization(space_global,**kwargs)
-    space_local=tf.layers.batch_normalization(space_local,**kwargs)
+    if momentum<=0:
+        return net
+    colours_in=tf.layers.batch_normalization(colours_in,momentum=momentum,**kwargs)
+    space_global=tf.layers.batch_normalization(space_global,momentum=momentum,**kwargs)
+    space_local=tf.layers.batch_normalization(space_local,momentum=momentum,**kwargs)
     
     return construct_sparse_io_dict(colours_in , space_global, space_local, num_entries)
 

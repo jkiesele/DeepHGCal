@@ -92,11 +92,13 @@ def indexing_tensor(spatial_features, k=10):
     return tf.cast(_indexing_tensor, tf.int64)
 
 
-def indexing_tensor_2(spatial_features, k=10):
+def indexing_tensor_2(spatial_features, k=10, n_batch=-1):
 
     shape_spatial_features = spatial_features.get_shape().as_list()
-
-    n_batch = shape_spatial_features[0]
+    generate_batch=True
+    if n_batch<=0:
+        n_batch = shape_spatial_features[0]
+        generate_batch=False
     n_max_entries = shape_spatial_features[1]
 
     # All of these tensors should be 3-dimensional
@@ -110,6 +112,9 @@ def indexing_tensor_2(spatial_features, k=10):
     batch_range = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1),axis=1), axis=1)
     batch_range = tf.tile(batch_range, [1,n_max_entries,k,1])
     expanded_neighbor_matrix = tf.expand_dims(neighbor_matrix, axis=3)
+    
+    if generate_batch:
+        expanded_neighbor_matrix = tf.tile(expanded_neighbor_matrix,[n_batch,1,1,1])
 
     _indexing_tensor = tf.concat([batch_range, expanded_neighbor_matrix], axis=3)
 
