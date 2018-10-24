@@ -35,9 +35,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         targets = self._placeholder_targets
         
         maxlen = self.max_entries
-        if self.use_seeds:
-            energy=energy[:,0:-1] 
-            targets = targets[:,0:-1,:]
+        #if self.use_seeds:
+        #    energy=energy[:,0:-1] 
+        #    targets = targets[:,0:-1,:]
 
         diff_sq_1 = (prediction[:,:,0:2] - targets) ** 2 * tf.cast(
             tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
@@ -339,16 +339,16 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         seed_idxs=None
         
-        if self.use_seeds:
-            feat=feat[:,0:-1,:]
-            space_feat=space_feat[:,0:-1,:]
-            local_space_feat=local_space_feat[:,0:-1,:]
-            #num_entries=num_entries[:,0:-1,:]
-            idxa=tf.expand_dims(feat[:,-1,0], axis=1)
-            idxb=tf.expand_dims(space_feat[:,-1,0], axis=1)
-            seed_idxs=tf.concat([idxa, idxb], axis=-1)
-            seed_idxs=tf.cast(seed_idxs+0.1,dtype=tf.int32)
-            print(seed_idxs.shape)
+        #if self.use_seeds:
+        #    feat=feat[:,0:-1,:]
+        #    space_feat=space_feat[:,0:-1,:]
+        #    local_space_feat=local_space_feat[:,0:-1,:]
+        #    #num_entries=num_entries[:,0:-1,:]
+        #    idxa=tf.expand_dims(feat[:,-1,0], axis=1)
+        #    idxb=tf.expand_dims(space_feat[:,-1,0], axis=1)
+        #    seed_idxs=tf.concat([idxa, idxb], axis=-1)
+        #    seed_idxs=tf.cast(seed_idxs+0.1,dtype=tf.int32)
+        #    print(seed_idxs.shape)
             
         if self.fixed_seeds is None:
             self.fixed_seeds = tf.constant([i*2679 for i in range(0,11)],dtype=tf.int32)

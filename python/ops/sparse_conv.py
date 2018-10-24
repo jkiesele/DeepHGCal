@@ -898,7 +898,7 @@ def sparse_conv_seeded(sparse_dict, seed_indices, nfilters, nspacefilters=1,
 
         label = tf.argmin(euclidean_squared(trans_space, seed_trans_space), axis=-1)
         print(label.shape)
-        0/0
+        # 0/0
 
 
         seed_trans_space = tf.expand_dims(seed_trans_space,axis=2)
