@@ -13,6 +13,15 @@ def gauss_activation(x, name=None):
     return tf.exp(-x * x / 4, name)
 
 
+def make_sequence(nfilters):
+    isseq=(not hasattr(nfilters, "strip") and
+            hasattr(nfilters, "__getitem__") or
+            hasattr(nfilters, "__iter__"))
+    
+    if not isseq:
+        nfilters=[nfilters]
+    return nfilters
+
 def sparse_conv_delta(A, B):
     """
     A-B
@@ -531,10 +540,44 @@ def noisy_eye_initializer():
     return _initializer
 
 
-def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, 
-                               output_all=15, spatial_degree_non_linearity=1, 
-                               n_transformed_spatial_features=10, 
-                               propagrate_ahead=False):
+def sparse_conv_mix_colours_to_space(sparse_dict):
+    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
+                                                                                 sparse_dict['spatial_features_global'], \
+                                                                                 sparse_dict['spatial_features_local'], \
+                                                                                 sparse_dict['num_entries']
+                                                                                 
+    spatial_features_global = tf.concat([spatial_features_global,all_features],axis=-1)
+    return construct_sparse_io_dict(all_features, spatial_features_global, spatial_features_local, num_entries)
+
+def sparse_conv_collapse(sparse_dict):
+    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
+                                                                                 sparse_dict['spatial_features_global'], \
+                                                                                 sparse_dict['spatial_features_local'], \
+                                                                                 sparse_dict['num_entries']
+    return tf.concat([all_features, spatial_features_global, spatial_features_local],axis=-1)                                                                             
+    
+def sparse_conv_split_batch(sparse_dict,split):
+    
+    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
+                                                                                 sparse_dict['spatial_features_global'], \
+                                                                                 sparse_dict['spatial_features_local'], \
+                                                                                 sparse_dict['num_entries']
+    
+    first  = construct_sparse_io_dict(all_features[0:split,:,:], spatial_features_global[0:split,:,:], spatial_features_local[0:split,:,:], num_entries)
+    second = construct_sparse_io_dict(all_features[split:,:,:], spatial_features_global[split:,:,:], spatial_features_local[split:,:,:], num_entries)
+    return first,second
+
+def sparse_conv_make_neighbors2(sparse_dict, num_neighbors=10, 
+                               output_all=15, space_transformations=[10],
+                               propagrate_ahead=False,
+                               strict_global_space=True):
+        
+        
+        
+    #   sparse_dict, num_neighbors=10, 
+    #                          output_all=15, spatial_degree_non_linearity=1, 
+    #                          n_transformed_spatial_features=10, 
+    #                          propagrate_ahead=False):
     """
     Defines sparse convolutional layer
     
@@ -575,27 +618,32 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10,
     # Neighbor matrix should be int as it should be used for indexing
     assert _indexing_tensor.dtype == tf.int64
 
-    assert spatial_degree_non_linearity >= 1
 
     #add local space features here?
     transformed_space_features = tf.concat([spatial_features_global,spatial_features_local], axis=-1)
     #these are the same in each sample
-    transformed_space_features = transformed_space_features[0,:,:]
-    transformed_space_features = tf.expand_dims(transformed_space_features,axis=0)
+    if strict_global_space:
+        transformed_space_features = transformed_space_features[0,:,:]
+        transformed_space_features = tf.expand_dims(transformed_space_features,axis=0)
 
-    for i in range(spatial_degree_non_linearity - 1):
-        transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, 
-                                                     activation=tf.nn.relu, kernel_initializer=NoisyEyeInitializer)
+    space_transformations = make_sequence(space_transformations)
 
-    transformed_space_features = tf.layers.dense(transformed_space_features, n_transformed_spatial_features, 
-                                                 activation=None, kernel_initializer=NoisyEyeInitializer)
-    # transformed_space_features = tf.layers.dense(transformed_space_features, 10, activation=tf.nn.relu)
-
-    #_indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors,n_batch)
-    _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors,n_batch)
+    for i in range(len(space_transformations)):
+        if i > len(space_transformations)-1:
+            transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
+                                                     activation=tf.nn.tanh, kernel_initializer=NoisyEyeInitializer)
+        else:
+            transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
+                                                     activation=None, kernel_initializer=NoisyEyeInitializer)
+            
+    create_indexing_batch = n_batch
+    if not strict_global_space:
+        create_indexing_batch=-1
+    _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors,create_indexing_batch)
     
     #for future use
-    transformed_space_features = tf.tile(transformed_space_features,[n_batch,1,1])
+    if strict_global_space:
+        transformed_space_features = tf.tile(transformed_space_features,[n_batch,1,1])
     
     #distance is strict positive
     inverse_distance =  1-tf.nn.softsign(-distance) # *float(num_neighbors)
@@ -603,14 +651,28 @@ def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10,
     gathered_all = tf.gather_nd(all_features, _indexing_tensor) 
     gathered_all = gathered_all *  tf.expand_dims(inverse_distance, axis=3) # features, name)) #tf.nn.softmax(tf.expand_dims(-distance, axis=3)) # [B,E,5,F]
 
-    
     pre_output = tf.layers.dense(gathered_all, output_all, activation=tf.nn.relu)
     output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
 
-    return construct_sparse_io_dict(output, transformed_space_features if propagrate_ahead else spatial_features_global, spatial_features_local, num_entries)
+    output_global_space = spatial_features_global
+    if propagrate_ahead:
+        output_global_space = tf.concat([transformed_space_features,spatial_features_global],axis=-1)
+       
+    return construct_sparse_io_dict(output, output_global_space, spatial_features_local, num_entries)
+
+   
 
 
 
+def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, 
+                               output_all=15, spatial_degree_non_linearity=1, 
+                               n_transformed_spatial_features=10, 
+                               propagrate_ahead=False):
+    
+    return sparse_conv_make_neighbors2(sparse_dict=sparse_dict, num_neighbors=num_neighbors, 
+                               output_all=output_all, space_transformations=
+                               [n_transformed_spatial_features for i in range(spatial_degree_non_linearity)],
+                               propagrate_ahead=propagrate_ahead)
 
 # loop implementations down here...
 # loop implementations down here...

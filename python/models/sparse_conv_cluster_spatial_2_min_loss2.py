@@ -282,7 +282,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
     
     def compute_output_seed_driven_neighbours(self,_input,seed_idxs):
         
-        momentum=0.6
+        momentum=0.9
         
         propagate=True
         _input = sparse_conv_batchnorm(_input,momentum=momentum)
@@ -317,17 +317,38 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         net=_input
         net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=16, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead)
+        
+        #neta, netb = sparse_conv_split_batch(net,int(float(int(net['all_features'].shape[0]))/2))
+        #nets=[neta,netb]
+        out=[]
+        #for i in range(len(nets)):
+        #    with tf.device("/job:localhost/replica:0/task:0/device:GPU:"+str(i)):
+        #        net = nets[i]
+        net = sparse_conv_mix_colours_to_space(net)
+        net = sparse_conv_make_neighbors2(net, num_neighbors=24, output_all=32, 
+                                         space_transformations=[64,32,16,4], 
+                                         propagrate_ahead=propagrate_ahead,
+                                         strict_global_space=False)
         net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=16, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead)
+        
+        net = sparse_conv_mix_colours_to_space(net)
+        net = sparse_conv_make_neighbors2(net, num_neighbors=24, output_all=32, 
+                                         space_transformations=[64,32,16,4], 
+                                         propagrate_ahead=propagrate_ahead,
+                                         strict_global_space=False)
         net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead) 
+        
+        net = sparse_conv_mix_colours_to_space(net)
+        net = sparse_conv_make_neighbors2(net, num_neighbors=24, output_all=32, 
+                                         space_transformations=[64,32,16,4], 
+                                         propagrate_ahead=propagrate_ahead,
+                                         strict_global_space=False)
         net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=propagrate_ahead)
-        net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_make_neighbors(net, num_neighbors=18, output_all=32, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_batchnorm(net,momentum=momentum)
-        output = net['all_features'] 
+        out.append(sparse_conv_collapse(net))
+            
+        
+
+        output = tf.concat(out,axis=0)
         output = tf.layers.dense(output,3,activation=tf.nn.relu)
         output = tf.nn.softmax(output)
         return output
@@ -365,9 +386,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
         #output=self.compute_output_seed_driven(_input,seed_idxs)
-        #output = self.compute_output_seed_driven_neighbours(_input,seed_idxs)
-        # output = self.compute_output_neighbours(_input)
-        output=self.compute_output_seed_driven(_input,self._placeholder_seed_indices)
+        #output = self.compute_output_seed_driven_neighbours(_input,self._placeholder_seed_indices)
+        output = self.compute_output_neighbours(_input)
+        #output=self.compute_output_seed_driven(_input,self._placeholder_seed_indices)
         #output=self.compute_output_full_adjecency(_input)
         
         self._graph_temp = tf.reduce_sum(output[:,:,0], axis=1)/2679.
