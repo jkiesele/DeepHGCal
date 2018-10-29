@@ -143,6 +143,16 @@ def n_range_tensor(dims):
     return tf.concat(n_range_tensor, axis=len(dims))
 
 
+def get_sorted_vertices_ids(x):
+    
+    _, I = tf.nn.top_k(x, x.shape[1])
+    I = tf.expand_dims(I, axis=2)
+
+    batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, x.shape[0]), axis=1), axis=1)
+    batch_range = tf.tile(batch_range, [1,x.shape[1], 1])
+    _indexing_tensor = tf.concat([batch_range, I], axis=2)
+    return _indexing_tensor
+
 def sort_last_dim_tensor(x):
     shape = x.shape.as_list()
     v, ind = tf.nn.top_k(x, shape[-1], sorted=False)

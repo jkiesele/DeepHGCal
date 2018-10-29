@@ -83,37 +83,64 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         return self.get_loss2()
         
 
-    def compute_output_seed_driven(self,_input,seed_idxs):
+    def compute_output_seed_driven(self,_input,in_seed_idxs):
         
         momentum=0.9
-        
+        # with two random seeds
+        #nfilters=24, space=32, spacedim=4, layers=11: batch 160, lr 0.002, approx 0.038 loss
+        #nfilters=24, space=32, spacedim=6, layers=11: batch 140, lr 0.00013, 107530 paras, 
+        #nfilters=24*1.5, space=32*1.5, spacedim=6, layers=5: batch 140, lr 0.00013, approx 100k paras, 
+        # last two seem to not make a big difference.. but latter seems slightly slower in converging
+        # but with more potential maybe?
+        # deeper one 0.04 at 26k, 0.045 at 26k
+        # same config (just 6 layers) without random seeds: 
         
         _input = sparse_conv_batchnorm(_input,momentum=momentum)
        
+       
+       
         net = _input
-        net = sparse_conv_mix_colours_to_space(net)
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=4, nspacefilters=128, nspacetransform=1,nspacedim=5)#,original_dict=_input)
-        net = sparse_conv_batchnorm(net,momentum=momentum)
-        #net = sparse_conv_make_neighbors(net, num_neighbors=6, output_all=4, spatial_degree_non_linearity=1,propagrate_ahead=False)
         
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=64, nspacetransform=1,nspacedim=5)#original_dict=_input)
-        net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64, nspacetransform=1,nspacedim=5)#original_dict=_input)
-        net = sparse_conv_batchnorm(net,momentum=momentum)
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=64,nspacefilters=64,  nspacetransform=1,nspacedim=4)#original_dict=_input)
-        net = sparse_conv_batchnorm(net,momentum=momentum)                    
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=64,nspacefilters=64,  nspacetransform=1,nspacedim=4)#original_dict=_input)
-        net = sparse_conv_batchnorm(net,momentum=momentum)                    
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=64,nspacefilters=64,  nspacetransform=1,nspacedim=4)#original_dict=_input)
-        net = sparse_conv_batchnorm(net,momentum=momentum)                    
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64,  nspacetransform=1,nspacedim=4)#original_dict=_input)
-        net = sparse_conv_batchnorm(net,momentum=momentum)                    
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=32,nspacefilters=64,  nspacetransform=1,nspacedim=4)#original_dict=_input)
+        #seed_scaling,seed_idxs = sparse_conv_make_seeds(net,space_dimensions=4,
+        #                                                n_seeds=2,
+        #                               conv_kernels=[(6,6),(6,6)],conv_filters=[16,16])
+        seed_scaling=None
+        seed_idxs=in_seed_idxs
         
-        net = sparse_conv_seeded(net,seed_idxs,nfilters=16,nspacefilters=1,   nspacetransform=1,nspacedim=4)#,add_to_orig=False)
-
-        output = net['all_features'] # * tf.cast(tf.sequence_mask(tf.squeeze(self._placeholder_num_entries, axis=1), maxlen=self.max_entries)[:,:,tf.newaxis], tf.float32)
-        output = tf.layers.dense(output,3,activation=tf.nn.relu)
+        seed_idxs = tf.Print(seed_idxs,[seed_idxs[0],in_seed_idxs[0]],'seeds')
+        # anyway uses everything
+        #net = sparse_conv_mix_colours_to_space(net)
+        nfilters=24*1.5
+        nspacefilters=32*1.5
+        nspacedim=5
+        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=12, nspacefilters=96, 
+                                  nspacetransform=1,nspacedim=4)#,original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=24, nspacefilters=64, 
+                                  nspacetransform=1,nspacedim=4)#,original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=32, nspacefilters=32, 
+                                  nspacetransform=1,nspacedim=5)#,original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=46, nspacefilters=32, 
+                                  nspacetransform=1,nspacedim=5)#,original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=64, nspacefilters=24, 
+                                  nspacetransform=1,nspacedim=6)#,original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=64, nspacefilters=24, 
+                                  nspacetransform=1,nspacedim=6)#,original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=24, nspacefilters=16, 
+                                  nspacetransform=1,nspacedim=6)#,original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        
+        feat = sparse_conv_seeded(None,feat,seed_idxs,seed_scaling,nfilters=int(nfilters),nspacefilters=nspacefilters, 
+                                  nspacetransform=1,nspacedim=nspacedim)#original_dict=_input)
+        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        
+        
+        output = tf.layers.dense(feat,3,activation=tf.nn.relu)
         output = tf.nn.softmax(output)
         return output
         
@@ -179,7 +206,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
     
     
     def compute_output_neighbours(self,_input,seeds):
-        momentum=0.1
+        momentum=0.9
         
         propagrate_ahead=True
         
@@ -228,6 +255,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         space_feat = self._placeholder_space_features
         local_space_feat = self._placeholder_space_features_local
         num_entries = self._placeholder_num_entries
+        n_batch = space_feat.shape[0]
         
         seed_idxs=None
         
@@ -242,17 +270,21 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         #    seed_idxs=tf.cast(seed_idxs+0.1,dtype=tf.int32)
         #    print(seed_idxs.shape)
             
-        if self.fixed_seeds is None:
-            self.fixed_seeds = tf.constant([i*2679 for i in range(0,11)],dtype=tf.int32)
-            self.fixed_seeds = tf.expand_dims(self.fixed_seeds, axis=0)
-            self.fixed_seeds = tf.tile(self.fixed_seeds,[space_feat.shape[0],1])
-            print('self.fixed_seeds',self.fixed_seeds.shape)
+        nrandom = 1
+        random_seeds = tf.random_uniform(shape=(int(n_batch),nrandom),minval=0,maxval=2679,dtype=tf.int64)
+        print('random_seeds',random_seeds.shape)
+        seeds = tf.concat([self._placeholder_seed_indices,random_seeds],axis=-1)
+        seeds = tf.transpose(seeds,[1,0])
+        seeds = tf.random_shuffle(seeds)
+        seeds = tf.transpose(seeds,[1,0])
+        print('seeds',seeds.shape)
+        #seeds = self._placeholder_seed_indices
         
         _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
         
         simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
-        output=self.compute_output_seed_driven(_input,self._placeholder_seed_indices)
+        output=self.compute_output_seed_driven(_input,seeds)#self._placeholder_seed_indices)
         #output = self.compute_output_seed_driven_neighbours(_input,self._placeholder_seed_indices)
         #output = self.compute_output_neighbours(_input,self._placeholder_seed_indices)
         #output=self.compute_output_seed_driven(_input,self._placeholder_seed_indices)
