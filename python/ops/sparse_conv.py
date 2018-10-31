@@ -555,7 +555,7 @@ def sparse_conv_collapse(sparse_dict):
                                                                                  sparse_dict['spatial_features_global'], \
                                                                                  sparse_dict['spatial_features_local'], \
                                                                                  sparse_dict['num_entries']
-    return tf.concat([all_features, spatial_features_global, spatial_features_local],axis=-1)                                                                             
+    return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)                                                                             
     
 def sparse_conv_split_batch(sparse_dict,split):
     
@@ -770,13 +770,22 @@ def sparse_conv_full_adjecency(sparse_dict, nfilters, AdMat=None, iterations=1,s
     print('layerout2 ',layerout.shape)
     
     return construct_sparse_io_dict(layerout , space_global, space_local, num_entries), AdMat
-    
-    
-def make_seed_selector(seed_ids):
-    batch=tf.range(seed_ids.shape[0], dtype=tf.int64)
-    batch = tf.tile(batch[..., tf.newaxis, tf.newaxis], [1,seed_ids.shape[1],1])
-    select = tf.concat((batch, seed_ids[..., tf.newaxis]), axis=-1)
+
+def make_batch_selection(ids):
+    n_batch=ids.shape[0]
+    n_vertices=ids.shape[1]
+    ids = tf.cast(ids, dtype=tf.int64)
+    batch=tf.range(n_batch, dtype=tf.int64)
+    batch = tf.tile(batch[..., tf.newaxis, tf.newaxis], [1,n_vertices,1])
+    select = tf.concat((batch, ids[..., tf.newaxis]), axis=-1)
     return select
+    
+    
+    
+
+#just for compat
+def make_seed_selector(seed_ids):
+    return make_batch_selection(seed_ids)
 
 def normalise_distance_matrix(AdMat):
     maxAdMat = tf.reduce_max(tf.reduce_max(AdMat, axis=-1,keepdims=True),axis=-1,keepdims=True)
@@ -838,7 +847,23 @@ def sparse_conv_make_seeds(sparse_dict,
     v, outidx = tf.nn.top_k(x,k=n_seeds)
     v = tf.nn.tanh(v)
     v = tf.expand_dims(v, axis=2)
-    return v,tf.cast(outidx,dtype=tf.int64)
+    #translate back
+    allids = tf.range(n_vertices)
+    allids = tf.expand_dims(allids, axis=0)
+    print('allids',allids.shape)
+    allids = tf.tile(allids,[n_batch,1])
+    
+    #resort
+    allids = tf.gather_nd(allids,ids)
+    print('allids',allids.shape)
+    
+    #select in resorted space
+    selids = make_batch_selection(outidx)
+    selids=sprint(selids,'selids')
+    outidx=sprint(outidx,'outidx')
+    out_seed_ids = tf.gather_nd(allids,selids)
+    
+    return v,tf.cast(out_seed_ids,dtype=tf.int64)
 
 
 def sparse_conv_prepare_2Dconv(sparse_dict,

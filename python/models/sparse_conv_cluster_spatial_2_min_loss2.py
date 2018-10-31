@@ -101,44 +101,25 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
        
         net = _input
         
-        #seed_scaling,seed_idxs = sparse_conv_make_seeds(net,space_dimensions=4,
-        #                                                n_seeds=2,
-        #                               conv_kernels=[(6,6),(6,6)],conv_filters=[16,16])
-        seed_scaling=None
-        seed_idxs=in_seed_idxs
+        seed_scaling,seed_idxs = sparse_conv_make_seeds(net,space_dimensions=4,
+                                                        n_seeds=2,
+                                       conv_kernels=[(6,6),(6,6)],conv_filters=[16,16])
+        
+        #seed_idxs=in_seed_idxs
         
         seed_idxs = tf.Print(seed_idxs,[seed_idxs[0],in_seed_idxs[0]],'seeds')
         # anyway uses everything
         #net = sparse_conv_mix_colours_to_space(net)
-        nfilters=24*1.5
-        nspacefilters=32*1.5
-        nspacedim=5
-        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=12, nspacefilters=96, 
-                                  nspacetransform=1,nspacedim=4)#,original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
-        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=24, nspacefilters=64, 
-                                  nspacetransform=1,nspacedim=4)#,original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
-        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=32, nspacefilters=32, 
-                                  nspacetransform=1,nspacedim=5)#,original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
-        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=46, nspacefilters=32, 
-                                  nspacetransform=1,nspacedim=5)#,original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
-        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=64, nspacefilters=24, 
-                                  nspacetransform=1,nspacedim=6)#,original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
-        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=64, nspacefilters=24, 
-                                  nspacetransform=1,nspacedim=6)#,original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
-        feat = sparse_conv_seeded(net,None,seed_idxs,seed_scaling,nfilters=24, nspacefilters=16, 
-                                  nspacetransform=1,nspacedim=6)#,original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
+        nfilters=24
+        nspacefilters=32
+        nspacedim=4
         
-        feat = sparse_conv_seeded(None,feat,seed_idxs,seed_scaling,nfilters=int(nfilters),nspacefilters=nspacefilters, 
-                                  nspacetransform=1,nspacedim=nspacedim)#original_dict=_input)
-        feat = tf.layers.batch_normalization(feat,momentum=momentum)
-        
+        feat = sparse_conv_collapse(net)
+        for i in range(11):
+            feat = sparse_conv_seeded(None,feat,seed_idxs,seed_scaling,nfilters=nfilters, nspacefilters=nspacefilters, 
+                                      nspacetransform=1,nspacedim=nspacedim)#,original_dict=_input)
+            feat = tf.layers.batch_normalization(feat,momentum=momentum)
+            
         
         output = tf.layers.dense(feat,3,activation=tf.nn.relu)
         output = tf.nn.softmax(output)
@@ -277,8 +258,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         seeds = tf.transpose(seeds,[1,0])
         seeds = tf.random_shuffle(seeds)
         seeds = tf.transpose(seeds,[1,0])
-        print('seeds',seeds.shape)
         #seeds = self._placeholder_seed_indices
+        print('seeds',seeds.shape)
         
         _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
