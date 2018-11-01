@@ -101,13 +101,14 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
        
         net = _input
         
-        seed_scaling,seed_idxs = sparse_conv_make_seeds(net,space_dimensions=4,
-                                                        n_seeds=2,
-                                       conv_kernels=[(6,6),(6,6)],conv_filters=[16,16])
-        
-        #seed_idxs=in_seed_idxs
-        
-        seed_idxs = tf.Print(seed_idxs,[seed_idxs[0],in_seed_idxs[0]],'seeds')
+        # seed_scaling,seed_idxs = sparse_conv_make_seeds(net,space_dimensions=4,
+        #                                                 n_seeds=2,
+        #                                conv_kernels=[(6,6),(6,6)],conv_filters=[16,16])
+        #
+        # #seed_idxs=in_seed_idxs
+        #
+        # seed_idxs = tf.Print(seed_idxs,[seed_idxs[0],in_seed_idxs[0]],'seeds')
+        seed_idxs = in_seed_idxs
         # anyway uses everything
         #net = sparse_conv_mix_colours_to_space(net)
         nfilters=24
