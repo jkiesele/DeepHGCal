@@ -632,13 +632,8 @@ def sparse_conv_make_neighbors2(sparse_dict, num_neighbors=10,
     space_transformations = make_sequence(space_transformations)
 
     for i in range(len(space_transformations)):
-        if i > len(space_transformations)-1:
-            transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
+        transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
                                                      activation=tf.nn.tanh, kernel_initializer=NoisyEyeInitializer,
-                                                     name=name+"_sp_"+str(i))
-        else:
-            transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
-                                                     activation=None, kernel_initializer=NoisyEyeInitializer,
                                                      name=name+"_sp_"+str(i))
             
     create_indexing_batch = n_batch
