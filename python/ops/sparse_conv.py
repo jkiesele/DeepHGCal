@@ -783,12 +783,8 @@ def make_seed_selector(seed_ids):
     return make_batch_selection(seed_ids)
 
 def normalise_distance_matrix(AdMat):
-    maxAdMat = tf.reduce_max(tf.reduce_max(AdMat, axis=-1,keepdims=True),axis=-1,keepdims=True)
-    AdMat = AdMat/maxAdMat
-    AdMat = (tf.zeros_like(AdMat)+1) - AdMat
-    scaling = tf.reduce_sum(tf.reduce_mean(AdMat, axis=-1, keepdims=False))
-    AdMat = AdMat / scaling 
-    return AdMat
+    return tf.exp(-2*(tf.abs(AdMat)))
+    
 
 
 def sparse_conv_make_seeds(sparse_dict,
@@ -971,6 +967,9 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
         if seed_talk:
             #seed space transform?
             seed_distance = euclidean_squared(seed_trans_space_orig,seed_trans_space_orig)
+            seed_distance = normalise_distance_matrix(seed_distance)
+            print('seed_distance',seed_distance.shape)
+            print('seed_all_features',seed_all_features.shape)
             seed_distance = tf.expand_dims(seed_distance,axis=3)
             seed_update = seed_distance*tf.expand_dims(seed_all_features,axis=1)
             seed_update = tf.reduce_sum(seed_update,axis=2)
