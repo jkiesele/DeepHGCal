@@ -11,6 +11,10 @@ from models.sparse_conv_cluster_spatial_2_min_loss import SparseConvClusteringSp
 from models.binning_cluster_alpha_min_loss import BinningClusteringMinLoss
 from models.sparse_conv_cluster_spatial_2_min_loss2 import SparseConvClusteringSpatialMinLoss2
 from models.sparse_conv_cluster_lstm_based import SparseConvClusterLstmBased
+from models.sparse_conv_cluster_seeds_truth_1rand_alpha import SparseConvClusteringSeedsTruthPlusOneRandomAlpha
+from models.sparse_conv_cluster_truth_seeds_alpha import SparseConvClusteringSeedsTruthAlpha
+from models.sparse_conv_cluster_make_neighbors_new import SparseConvClusteringMakeNeighborsNew
+from models.sparse_conv_cluster_bare_baseline import SparseConvClusteringBareBaselineAlpha
 
 from readers import ReaderFactory
 from inference import InferenceOutputStreamer
@@ -64,6 +68,11 @@ class SparseConvClusteringTrainer:
             self.learning_rate
         )
         self.model.initialize()
+        try:
+            self.model.set_training(True)
+        except AttributeError:
+            pass
+
         self.saver_sparse = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.model.get_variable_scope()))
 
     def initialize_test(self):
@@ -73,10 +82,15 @@ class SparseConvClusteringTrainer:
             len(self.spatial_features_local_indices),
             len(self.other_features_indices),
             len(self.target_indices),
-            1,
+            self.num_batch,
             self.num_max_entries,
             self.learning_rate
         )
+        try:
+            self.model.set_training(False)
+        except AttributeError:
+            pass
+
         self.model.initialize()
         self.saver_sparse = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.model.get_variable_scope()))
 
@@ -117,6 +131,7 @@ class SparseConvClusteringTrainer:
         inputs_validation_reader  = self.reader_factory.get_class(self.reader_type)(self.validation_files, self.num_max_entries, self.num_data_dims, self.num_batch)
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
+
         with tf.Session() as sess:
             sess.run(init)
 
@@ -155,8 +170,7 @@ class SparseConvClusteringTrainer:
                         placeholders[5]: inputs_train[2]
                     }
 
-                t, eval_loss, _, eval_summary, eval_output = sess.run([graph_temp, graph_loss, graph_optmiser, graph_summary,
-                                                                      graph_output], feed_dict=inputs_train_dict)
+                t, eval_loss, _, eval_summary, eval_output = sess.run([graph_temp, graph_loss, graph_optmiser, graph_summary, graph_output], feed_dict=inputs_train_dict)
 
                 if iteration_number % self.validate_after == 0:
                     inputs_validation = sess.run(list(inputs_validation_feed))
@@ -212,7 +226,7 @@ class SparseConvClusteringTrainer:
         if self.from_scratch:
             self.clean_summary_dir()
 
-        inputs_feed = self.reader_factory.get_class(self.reader_type)(self.test_files, self.num_max_entries, self.num_data_dims, 1).get_feeds()
+        inputs_feed = self.reader_factory.get_class(self.reader_type)(self.test_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
 
         inference_streamer = InferenceOutputStreamer(output_path=self.test_out_path, cache_size=100)
         inference_streamer.start_thread()
@@ -227,24 +241,35 @@ class SparseConvClusteringTrainer:
             summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
 
             self.saver_sparse.restore(sess, self.model_path)
-            print("\n\nINFO: Loading model\n\n")
+            print("\n\nINFO: Loading model", self.model_path,"\n\n")
 
             print("Starting testing")
             iteration_number = 0
-            while iteration_number < self.num_testing_samples:
-                inputs_train = sess.run(list(inputs_feed))
+            while iteration_number < int(np.ceil(self.num_testing_samples / self.num_batch)):
+                inputs_test = sess.run(list(inputs_feed))
 
-                inputs_train_dict = {
-                    placeholders[0]: inputs_train[0][:, :, self.spatial_features_indices],
-                    placeholders[1]: inputs_train[0][:, :, self.spatial_features_local_indices],
-                    placeholders[2]: inputs_train[0][:, :, self.other_features_indices],
-                    placeholders[3]: inputs_train[0][:, :, self.target_indices],
-                    placeholders[4]: inputs_train[1]
-                }
-
+                if len(placeholders)==5:
+                    inputs_train_dict = {
+                        placeholders[0]: inputs_test[0][:, :, self.spatial_features_indices],
+                        placeholders[1]: inputs_test[0][:, :, self.spatial_features_local_indices],
+                        placeholders[2]: inputs_test[0][:, :, self.other_features_indices],
+                        placeholders[3]: inputs_test[0][:, :, self.target_indices],
+                        placeholders[4]: inputs_test[1]
+                    }
+                else:
+                    inputs_train_dict = {
+                        placeholders[0]: inputs_test[0][:, :, self.spatial_features_indices],
+                        placeholders[1]: inputs_test[0][:, :, self.spatial_features_local_indices],
+                        placeholders[2]: inputs_test[0][:, :, self.other_features_indices],
+                        placeholders[3]: inputs_test[0][:, :, self.target_indices],
+                        placeholders[4]: inputs_test[1],
+                        placeholders[5]: inputs_test[2]
+                    }
                 t, eval_loss, eval_output = sess.run([graph_temp, graph_loss, graph_output], feed_dict=inputs_train_dict)
 
-                inference_streamer.add((np.squeeze(inputs_train[0], axis=0), (inputs_train[1])[0,0], np.squeeze(eval_output, axis=0)))
+                print("Adding", len(inputs_test[0]), "test results")
+                for i in range(len(inputs_test[0])):
+                    inference_streamer.add((inputs_test[0][i], (inputs_test[1])[i,0], eval_output[i]))
 
                 print("Testing - Sample %4d: loss %0.5f" % (iteration_number, eval_loss))
                 print(t[0])
