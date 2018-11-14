@@ -509,7 +509,7 @@ class NoisyEyeInitializer(Initializer):
     dtype: The data type. Only floating point types are supported.
   """
 
-  def __init__(self, low=-0.1, up=0.1, seed=None, dtype=tf.float32):
+  def __init__(self, low=-0.01, up=0.01, seed=None, dtype=tf.float32):
     self.low = low
     self.high = up
     self.seed = seed
@@ -632,13 +632,8 @@ def sparse_conv_make_neighbors2(sparse_dict, num_neighbors=10,
     space_transformations = make_sequence(space_transformations)
 
     for i in range(len(space_transformations)):
-        if i > len(space_transformations)-1:
-            transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
+        transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
                                                      activation=tf.nn.tanh, kernel_initializer=NoisyEyeInitializer,
-                                                     name=name+"_sp_"+str(i))
-        else:
-            transformed_space_features = tf.layers.dense(transformed_space_features, space_transformations[i], 
-                                                     activation=None, kernel_initializer=NoisyEyeInitializer,
                                                      name=name+"_sp_"+str(i))
             
     create_indexing_batch = n_batch
@@ -793,12 +788,11 @@ def make_seed_selector(seed_ids):
     return make_batch_selection(seed_ids)
 
 def normalise_distance_matrix(AdMat):
-    maxAdMat = tf.reduce_max(tf.reduce_max(AdMat, axis=-1,keepdims=True),axis=-1,keepdims=True)
-    AdMat = AdMat/maxAdMat
-    AdMat = (tf.zeros_like(AdMat)+1) - AdMat
-    scaling = tf.reduce_sum(tf.reduce_mean(AdMat, axis=-1, keepdims=False))
-    AdMat = AdMat / scaling
-    return AdMat
+    #return 1-tf.nn.softsign(4*AdMat)
+    #mat=tf.exp(-1*(tf.abs(AdMat)))
+    mat=tf.nn.softmax(-tf.abs(AdMat))
+    #mat=sprint(mat, "pstr")
+    return mat
 
 
 def sparse_conv_make_seeds(sparse_dict,
@@ -946,15 +940,17 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
     feature_layerout=[]
     space_layerout=[]
     seedselector = make_seed_selector(seed_indices)
+    all_features=sprint(all_features, 'all_features_in')
     
     for i in range(nspacetransform):
         
         trans_space = all_features 
         trans_space = tf.layers.dense(trans_space/10.,nspacefilters,activation=tf.nn.tanh,
                                        kernel_initializer=NoisyEyeInitializer)
-        trans_space = tf.layers.dense(trans_space,nspacedim,activation=tf.nn.tanh,
-                                      kernel_initializer=NoisyEyeInitializer)
-        trans_space = trans_space*10
+
+        trans_space = tf.layers.dense(trans_space*10.,nspacedim,activation=None,
+                                      kernel_initializer=NoisyEyeInitializer, use_bias=False)
+        trans_space = trans_space
 
         space_layerout.append(trans_space)
         
@@ -966,8 +962,10 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
         all_trans_space = tf.tile(all_trans_space,[1,seed_trans_space.shape[1],1,1])
         
         diff = all_trans_space - seed_trans_space
+        
         diff = tf.reduce_sum(diff*diff,axis=-1)
         diff = normalise_distance_matrix(diff)
+        
         
         diff = tf.expand_dims(diff,axis=3)
         
@@ -984,6 +982,7 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
         if seed_talk:
             #seed space transform?
             seed_distance = euclidean_squared(seed_trans_space_orig,seed_trans_space_orig)
+            seed_distance = normalise_distance_matrix(seed_distance)
             seed_distance = tf.expand_dims(seed_distance,axis=3)
             seed_update = seed_distance*tf.expand_dims(seed_all_features,axis=1)
             seed_update = tf.reduce_sum(seed_update,axis=2)
@@ -1003,10 +1002,12 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
     feature_layerout = tf.concat(feature_layerout,axis=-1)
     space_layerout = tf.concat(space_layerout,axis=-1)
     
+    
     #combien old features with new ones
     feature_layerout = tf.concat([all_features,space_layerout,feature_layerout,],axis=-1)
     feature_layerout = tf.layers.dense(feature_layerout/10.,nfilters, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
     feature_layerout = feature_layerout*10.
+    feature_layerout=sprint(feature_layerout, 'feature_layerout')
     
     print('layer '+name+ ' feature_layerout out ', feature_layerout.shape)
     if returnmerged:
