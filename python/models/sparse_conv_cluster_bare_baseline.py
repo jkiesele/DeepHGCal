@@ -5,11 +5,11 @@ from ops.sparse_conv_old import *
 from models.switch_model import SwitchModel
 
 
-class SparseConvClusteringSpatialMinLoss(SparseConvClusteringBase):
+class SparseConvClusteringBareBaselineAlpha(SparseConvClusteringBase):
 
     def __init__(self, n_space, n_space_local, n_others, n_target_dim, batch_size, max_entries, learning_rate=0.0001):
-        super(SparseConvClusteringSpatialMinLoss, self).__init__(n_space, n_space_local, n_others, n_target_dim, batch_size, max_entries,
-                                          learning_rate)
+        super(SparseConvClusteringBareBaselineAlpha, self).__init__(n_space, n_space_local, n_others, n_target_dim, batch_size, max_entries,
+                                                                    learning_rate)
         self.weight_weights = []
 
     def _get_loss(self):
@@ -63,11 +63,11 @@ class SparseConvClusteringSpatialMinLoss(SparseConvClusteringBase):
         _input = construct_sparse_io_dict(self._placeholder_other_features, self._placeholder_space_features, self._placeholder_space_features_local,
                                           tf.squeeze(self._placeholder_num_entries))
 
-        net = sparse_conv_make_neighbors_old(_input, num_neighbors=18, output_all=15, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors_old(net, num_neighbors=18, output_all=15, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors_old(net, num_neighbors=18, output_all=15, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors_old(net, num_neighbors=18, output_all=30, spatial_degree_non_linearity=3, propagrate_ahead=True)
-        net = sparse_conv_make_neighbors_old(net, num_neighbors=18, output_all=3, n_transformed_spatial_features=3, propagrate_ahead=True)
+        net = sparse_conv_bare(_input, num_neighbors=18, output_all=30)
+        net = sparse_conv_bare(net, num_neighbors=18, output_all=30)
+        net = sparse_conv_bare(net, num_neighbors=18, output_all=30)
+        net = sparse_conv_bare(net, num_neighbors=18, output_all=30)
+        net = sparse_conv_bare(net, num_neighbors=18, output_all=3)
 
         output = net['all_features'] * tf.cast(tf.sequence_mask(tf.squeeze(self._placeholder_num_entries, axis=1), maxlen=self.max_entries)[:,:,tf.newaxis], tf.float32)
         output = tf.nn.softmax(output)
