@@ -3,7 +3,7 @@ import os
 import sys
 import argparse
 import matplotlib as mpl
-# mpl.use('Agg')
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import math
@@ -11,7 +11,7 @@ import gzip
 import pickle
 import configparser as cp
 from libs.plots import plot_clustering
-
+from matplotlib import cm
 
 
 
@@ -30,7 +30,9 @@ other_features_indices = tuple([int(x) for x in (config['input_other_features_in
 target_indices = tuple([int(x) for x in (config['target_indices']).split(',')])
 
 
+energy_values = []
 histogram_values_resolution=[]
+loss_values = []
 
 index=0
 with open(os.path.join(config['test_out_path'], 'inference_output_files.txt')) as f:
@@ -57,6 +59,8 @@ with open(os.path.join(config['test_out_path'], 'inference_output_files.txt')) a
 
                 shower_indices = np.argmin(np.array([loss_1, loss_2]))
 
+                loss_values.append(min(loss_1, loss_2))
+
                 if loss_1 < loss_2:
                     sorted_target = targets
                 else:
@@ -65,8 +69,13 @@ with open(os.path.join(config['test_out_path'], 'inference_output_files.txt')) a
                 perf1 = np.sum(output[:,0]*energy) / np.sum(sorted_target[:,0] * energy)
                 perf2 = np.sum(output[:,1]*energy) / np.sum(sorted_target[:,1] * energy)
 
+                truth_energy_sum_1 = np.sum(sorted_target[:,0] * energy)
+                truth_energy_sum_2 = np.sum(sorted_target[:,1] * energy)
+
                 histogram_values_resolution.append(perf1)
+                energy_values.append(truth_energy_sum_1)
                 histogram_values_resolution.append(perf2)
+                energy_values.append(truth_energy_sum_2)
 
                 # a = plt.figure(0)
                 # a.suptitle('Output')
@@ -75,7 +84,7 @@ with open(os.path.join(config['test_out_path'], 'inference_output_files.txt')) a
                 # plot_clustering(spatial=spatial, energy=energy, prediction=output, fig=a)
                 # plot_clustering(spatial=spatial, energy=energy, prediction=sorted_target, fig=b)
                 # print("%05.5f %05.5f %05.5f %05.5f" % (loss_1, loss_2, perf1, perf2))
-                #
+                #3
                 # plt.show()
 
                 index+=1
@@ -83,10 +92,141 @@ with open(os.path.join(config['test_out_path'], 'inference_output_files.txt')) a
 
 mean = np.mean(histogram_values_resolution)
 variance = np.var(histogram_values_resolution)
+loss_mean = np.mean(loss_values)
+loss_variance = np.var(loss_values)
 
-print("Mean:", mean, "Variance:", variance)
+print("X-Test", np.max(energy_values), np.min(energy_values))
+print("Y-Test", max(energy_values), np.min(energy_values))
 
-bins = np.linspace(0,3,num=30)
-plt.hist(histogram_values_resolution, bins=bins)
-plt.ylabel('Frequency');
-plt.show()
+
+def get_mean_variance_histograms(energy_values, histogram_values_resolution):
+    nbins=30
+    min_value = np.min(energy_values)
+    max_value = np.max(energy_values)
+
+    bin_index = np.minimum((energy_values - min_value)*nbins/max_value, nbins-1).astype(np.int64)
+
+    energy_values_x = np.linspace(min_value, max_value, num=nbins)
+
+    resolution_sum = np.zeros(nbins, dtype=np.float64)
+    square_difference = np.zeros(nbins, dtype=np.float64)
+    count = np.zeros(nbins, dtype=np.int64)
+
+    for i in range(len(energy_values)):
+        resolution_sum[bin_index[i]] += histogram_values_resolution[i]
+        count[bin_index[i]] += 1
+
+    mean_resolution_values = resolution_sum/count
+    # mean_resolution_values[count==0]=0
+
+    for i in range(len(energy_values)):
+        square_difference[bin_index[i]] += float(histogram_values_resolution[i] - mean_resolution_values[bin_index[i]])**2
+
+    varaince_resolution_values = square_difference / (count-1)
+
+    # mean_resolution_values[(count-1)==0]=0
+    # mean_resolution_values[(count)==0]=0
+
+    return mean_resolution_values, varaince_resolution_values, energy_values_x, count
+
+
+def diff_2d_plot(energy_values, histogram_values_resolution):
+    nbins=30
+    energy_values_1 = energy_values[0::2]
+    energy_values_2 = energy_values[1::2]
+    min_energy, max_energy = np.min(energy_values), np.max(energy_values)
+
+    energy_values_x = np.linspace(min_energy, max_energy, num=nbins)
+
+    bin_indices_x = np.minimum((energy_values_1 - min_energy)*nbins/max_energy, nbins-1).astype(np.int64)
+    bin_indices_y = np.minimum((energy_values_2 - min_energy)*nbins/max_energy, nbins-1).astype(np.int64)
+
+    mean_2d = np.zeros((nbins,nbins), dtype=np.float32)
+    count_2d = np.zeros((nbins,nbins), dtype=np.int64)
+
+    for i in range(len(energy_values_1)):
+        mean_2d[bin_indices_x[i], bin_indices_y[i]] += histogram_values_resolution[i]
+        mean_2d[bin_indices_y[i], bin_indices_x[i]] += histogram_values_resolution[i+1]
+        count_2d[bin_indices_x[i], bin_indices_y[i]] += 1
+        count_2d[bin_indices_y[i], bin_indices_x[i]] += 1
+
+    mean_2d /= count_2d
+
+    return mean_2d, count_2d, energy_values_x
+
+
+resolution_mean_fo_energy, resolution_variance_fo_energy, energy_values_x, count = get_mean_variance_histograms(energy_values, histogram_values_resolution)
+mean_2d, count_2d, energy_values_x_2d = diff_2d_plot(energy_values, histogram_values_resolution)
+
+output_string = str(("Resolution mean:", mean, "Resolution variance :", variance, "Loss mean:", loss_mean, "Loss variance:", loss_variance))
+
+print("Samples tested", np.alen(histogram_values_resolution)/2)
+print(output_string)
+
+bins = np.linspace(-0.1,3.1,num=32)
+histogram_values_resolution_2 = np.copy(histogram_values_resolution)
+histogram_values_resolution_2[histogram_values_resolution_2<0.2] = -0.05
+histogram_values_resolution_2[histogram_values_resolution_2>2.8] = 3.05
+plt.hist(histogram_values_resolution_2, bins=bins)
+plt.ylabel('Frequency')
+plt.xlabel("Resolution")
+# plt.show()
+plt.savefig(os.path.join(config['test_out_path'], 'resolution_histogram.png'))
+
+plt.clf()
+plt.plot(energy_values_x, count)
+plt.xlabel("Energy")
+plt.ylabel('Frequency')
+# plt.show()
+plt.savefig(os.path.join(config['test_out_path'], 'energy_histogram.png'))
+
+
+
+plt.clf()
+
+plt.subplot(2, 1, 1)
+plt.plot(energy_values_x, resolution_mean_fo_energy)
+plt.xlabel("Energy")
+plt.ylabel('Resolution (mean)')
+# plt.show()
+
+plt.subplot(2, 1, 2)
+plt.plot(energy_values_x, resolution_variance_fo_energy)
+plt.xlabel("Energy")
+plt.ylabel('Resolution (variance)')
+# plt.show()
+plt.savefig(os.path.join(config['test_out_path'], 'fo_energy.png'))
+
+
+plt.clf()
+fig = plt.figure(1)
+cax = plt.imshow(mean_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
+plt.xlabel("Shower 1 energy")
+plt.ylabel("Shower 2 energy")
+plt.title("Resolution")
+cbar = fig.colorbar(cax)
+# plt.savefig(os.path.join(config['test_out_path'], 'mean_resolution_2d_fo_energy.png'))
+
+
+
+plt.clf()
+fig = plt.figure(2)
+cax = plt.imshow(count_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
+plt.xlabel("Shower 1 energy")
+plt.ylabel("Shower 2 energy")
+plt.title("Frequency")
+cbar = fig.colorbar(cax)
+plt.savefig(os.path.join(config['test_out_path'], 'frequency_2d_fo_energy.png'))
+
+histogram_values_resolution_3 = np.copy(histogram_values_resolution)
+histogram_values_resolution_3 = histogram_values_resolution_3[histogram_values_resolution_3<=2.5]
+histogram_values_resolution_3 = histogram_values_resolution_3[histogram_values_resolution_3 >=0.05]
+output_string_3 = str(("Inlier resolution mean:", np.mean(histogram_values_resolution_3), "Inlier resolution variance :",
+                       np.var(histogram_values_resolution_3),
+                      "Efficiency", str(np.alen(histogram_values_resolution_3)/float(np.alen(histogram_values_resolution)))))
+print(output_string_3)
+
+
+
+with open(os.path.join(config['test_out_path'], 'test_summary.txt'), "w") as text_file:
+    text_file.write(output_string)
