@@ -1,34 +1,16 @@
 import tensorflow as tf
-from .neighbors import indexing_tensor
-from .neighbors import sort_last_dim_tensor
+from .neighbors import euclidean_squared,indexing_tensor, indexing_tensor_2, sort_last_dim_tensor, get_sorted_vertices_ids
+from ops.nn import *
+import numpy as np
+from .initializers import NoisyEyeInitializer
+import math
 
-
-# just for testing
-
-def gauss_activation(x, name=None):
-    return tf.exp(-x * x / 4, name)
-
-
-def printLayerStuff(l, desc_str):
-    l = tf.Print(l, [l], desc_str + " ", summarize=2000)
-    return l
-
-
-def sparse_conv_delta(A, B):
-    """
-    A-B
-
-    :param A: A is of shape [B,E,N,F]
-    :param B: B is of shape [B,E,F]
-    :return:
-    """
-
-    return A - tf.expand_dims(B, axis=2)
-
+###helper functions
+_sparse_conv_naming_index=0
 
 def construct_sparse_io_dict(all_features, spatial_features_global, spatial_features_local, num_entries):
     """
-    Constructs dictionary for io of sparse convolution layers
+    Constructs dictionary for readers of sparse convolution layers
 
     :param all_features: All features tensor.  Should be of shape [batch_size, num_entries, num_features]
     :param spatial_features_global: Space like features tensor. Should be of shape [batch_size, num_entries, num_features]
@@ -40,287 +22,210 @@ def construct_sparse_io_dict(all_features, spatial_features_global, spatial_feat
         'all_features': all_features,
         'spatial_features_global': spatial_features_global,
         'spatial_features_local': spatial_features_local,
-        'num_entries': num_entries
+        'num_entries' : num_entries
     }
-
-
-@tf.custom_gradient
-def gradient_scale_down(x):
-    def grad(dy):
-        return dy * .01
-
-    return tf.identity(x), grad
-
-
-@tf.custom_gradient
-def gradient_scale_up(x):
-    def grad(dy):
-        return dy * 100
-
-    return tf.identity(x), grad
-
-
-def sparse_conv(sparse_dict, num_neighbors=10, num_filters=15, n_prespace_conditions=3):
-    """
-    Defines sparse convolutional layer
-
-    :param sparse_dict: Dictionary containing input
-    :param num_neighbors: An integer containing number of neighbors to pick + 1 (+1 is for yourself)
-    :param num_filters: Number of output features for color like outputs
-    :return: Dictionary containing output which can be made input to the next layer
-    """
-
+    
+def sparse_conv_collapse(sparse_dict):
     all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
                                                                                  sparse_dict['spatial_features_global'], \
                                                                                  sparse_dict['spatial_features_local'], \
                                                                                  sparse_dict['num_entries']
-
-    _indexing_tensor = indexing_tensor(spatial_features_global, num_neighbors)
-
-    shape_space_features = spatial_features_global.get_shape().as_list()
-    shape_space_features_local = spatial_features_local.get_shape().as_list()
-    shape_all_features = all_features.get_shape().as_list()
-    shape_indexing_tensor = _indexing_tensor.get_shape().as_list()
-
-    n_batch = shape_space_features[0]
-    n_max_entries = shape_space_features[1]
-    n_features_input_all = shape_all_features[2]
-    n_features_input_space = shape_space_features[2]
-    n_max_neighbors = shape_indexing_tensor[2]
-
-    # All of these tensors should be 3-dimensional
-    # TODO: Add assert for indexing_tensor shape
-    assert len(shape_space_features) == 3 and len(shape_all_features) == 3 and len(shape_indexing_tensor) == 4
-
-    # First dimension is batch, second is number of entries, hence these two should be same for all
-    assert shape_space_features[0] == shape_all_features[0]
-    assert shape_space_features[1] == shape_all_features[1]
-
-    # Neighbor matrix should be int as it should be used for indexing
-    assert _indexing_tensor.dtype == tf.int64
-
-    print("Indexing tensor shape", _indexing_tensor.shape)
-    gathered_spatial = tf.gather_nd(spatial_features_global, _indexing_tensor)  # [B,E,5,S]
-
-    print("Gathered spatial shape", spatial_features_global.shape, gathered_spatial.shape)
-    delta_space = sparse_conv_delta(gathered_spatial, spatial_features_global)  # [B,E,5,S]
-
-    spatial_features_local_gathered = tf.gather_nd(spatial_features_local, _indexing_tensor)
-    gathered_all = tf.gather_nd(all_features, _indexing_tensor)  # [B,E,N,A]
-
-    """
-    Hint: (from next line onward)
-        B = Batch Size
-        E = Num max entries
-        N = Number of neighbors
-        S = number of spatial features (both local and global combined)
-        F = number of filters
-        M = Number of pre-space conditions
-    """
-    spatial_features_concatenated = tf.concat([delta_space, spatial_features_local_gathered], axis=-1)  # [B, E, N, S]
-
-    # delta_space = tf.concat([delta_space,delta_space*delta_space], axis=-1)
+    return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)                                                                             
+    
 
 
-    sorting_condition = tf.layers.dense(inputs=spatial_features_concatenated,
-                                          units=num_filters,
-                                          activation=tf.nn.relu)   # [B, E, N, F]
+def sprint(tensor,pstr):
+    return tensor
+    return tf.Print(tensor,[tensor],pstr,summarize=300)
 
-    space_condition = tf.layers.dense(inputs=spatial_features_concatenated,
-                                          units=(num_filters*n_prespace_conditions),
-                                          activation=tf.nn.relu)  # [B, E, N, F*M]
-    space_condition = tf.reshape(space_condition, [n_batch, n_max_entries, num_neighbors, num_filters, -1])
+def make_sequence(nfilters):
+    isseq=(not hasattr(nfilters, "strip") and
+            hasattr(nfilters, "__getitem__") or
+            hasattr(nfilters, "__iter__"))
+    
+    if not isseq:
+        nfilters=[nfilters]
+    return nfilters
 
-    filter_outputs = []
-    for i in range(num_filters):
-        filter_input = space_condition[:,:,:, i, :]
-        filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=gauss_activation)
-        tf.expand_dims(filter_output, dim=3)
-        filter_outputs.append(filter_output)
-
-    space_condition = tf.concat(filter_outputs, axis=3)
-    sorting_values = tf.multiply(space_condition, sorting_condition) # [B, E, N, F]
-
-    filter_outputs = []
-    for i in range(num_filters):
-        filter_neighbor_values = sorting_values[..., i] # [B, E, N]
-        sorting_tensor = sort_last_dim_tensor(filter_neighbor_values)
-        filter_input = tf.reshape(tf.gather_nd(gathered_all, sorting_tensor), shape=[n_batch, n_max_entries, -1])
-        filter_output = tf.layers.dense(inputs=filter_input, units=1, activation=tf.nn.relu)
-        filter_outputs.append(filter_output)
-
-    color_like_output = tf.concat(filter_outputs, axis=-1)
-
-    return construct_sparse_io_dict(color_like_output , spatial_features_global, spatial_features_local, num_entries)
-
-
-def sparse_merge_flat(sparse_dict, combine_three=True):
-    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
-                                                                                 sparse_dict['spatial_features_global'], \
-                                                                                 sparse_dict['spatial_features_local'], \
-                                                                                 sparse_dict['num_entries']
-
-    shape_space_features = spatial_features_global.get_shape().as_list()
-    n_batch = shape_space_features[0]
-    n_max_entries = shape_space_features[1]
-
-    # order the output according to the spatial global distance to zero >= 0
-    distancetozero = tf.expand_dims(tf.reduce_sum(spatial_features_global *
-                                                  spatial_features_global, axis=2), axis=2)
-    _, I = tf.nn.top_k(tf.reduce_sum(distancetozero, axis=2), n_max_entries)
-    I = tf.expand_dims(I, axis=2)
-    batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1), axis=1)
-    batch_range = tf.tile(batch_range, [1, n_max_entries, 1])
-    ordering = tf.concat([batch_range, I], axis=2)
-
-    gathered_feat = tf.gather_nd(all_features, ordering)
-    gathered_spatial_global = tf.gather_nd(spatial_features_global, ordering)
-    gathered_spatial_local = tf.gather_nd(spatial_features_local, ordering)
-
-    # mask not used?!
-    # mask = tf.cast(tf.expand_dims(tf.sequence_mask(num_entries, maxlen=n_max_entries), axis=2), tf.float32)
-    # nonzeros = tf.count_nonzero(mask, axis=1, dtype=tf.float32)
-
-    flattened_features_all = tf.reshape(gathered_feat, [n_batch, -1])
-    flattened_features_spatial_features_global = tf.reshape(gathered_spatial_global, [n_batch, -1])
-    flattened_features_spatial_features_local = tf.reshape(gathered_spatial_local, [n_batch, -1])
-
-    if combine_three:
-        output = tf.concat([flattened_features_all, flattened_features_spatial_features_global,
-                            flattened_features_spatial_features_local], axis=-1)
-    else:
-        output = flattened_features_all
-
-    return output
-
-
-def sparse_max_pool(sparse_dict, num_entries_result):
-    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
-                                                                                 sparse_dict['spatial_features_global'], \
-                                                                                 sparse_dict['spatial_features_local'], \
-                                                                                 sparse_dict['num_entries']
-
-    shape_spatial_features = spatial_features_global.get_shape().as_list()
-    shape_spatial_features_local = spatial_features_local.get_shape().as_list()
-    shape_all_features = all_features.get_shape().as_list()
-
-    n_batch = shape_spatial_features[0]
-    n_max_entries = shape_spatial_features[1]
-    n_features_input_all = shape_all_features[2]
-    n_features_input_space = shape_spatial_features[2]
-
-    # All of these tensors should be 3-dimensional
-    assert len(shape_spatial_features) == 3
-
-    # Neighbor matrix should be int as it should be used for indexing
-    assert all_features.dtype == tf.float64 or all_features.dtype == tf.float32
-
-    _, I = tf.nn.top_k(tf.reduce_sum(all_features, axis=2), num_entries_result)
-    I = tf.expand_dims(I, axis=2)
-
-    batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1), axis=1)
-    batch_range = tf.tile(batch_range, [1, num_entries_result, 1])
-    _indexing_tensor = tf.concat([batch_range, I], axis=2)
-
-    out_all_features = tf.gather_nd(all_features, _indexing_tensor)
-    out_spatial_features_global = tf.gather_nd(spatial_features_global, _indexing_tensor)
-    out_spatial_features_local = tf.gather_nd(spatial_features_local, _indexing_tensor)
-
-    num_entries = tf.minimum(tf.ones(shape=[n_batch], dtype=tf.int64) * num_entries_result, num_entries)
-
-    return construct_sparse_io_dict(out_all_features, out_spatial_features_global, out_spatial_features_local,
+def sparse_conv_normalise(sparse_dict):
+    colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
+                                                         sparse_dict['spatial_features_global'], \
+                                                         sparse_dict['spatial_features_local'], \
+                                                         sparse_dict['num_entries']
+    
+    scaled_colours_in = colours_in*1e-4
+    print('space_global',space_global.shape)
+    print('colours_in',colours_in.shape)
+    print('space_local',space_local.shape)
+    
+    scaled_space_global=tf.concat([tf.expand_dims(space_global[:,:,0]/150.,axis=2),
+                                   tf.expand_dims(space_global[:,:,1]/150.,axis=2),
+                                   tf.expand_dims(space_global[:,:,2]/1600.,axis=2)],
+                                  axis=-1)
+    
+    scaled_space_local = space_local/150.
+    
+    return construct_sparse_io_dict(scaled_colours_in, 
+                                    scaled_space_global, 
+                                    scaled_space_local, 
                                     num_entries)
 
+#just for compat
+def make_batch_selection(ids):
+    n_batch=ids.shape[0]
+    n_vertices=ids.shape[1]
+    ids = tf.cast(ids, dtype=tf.int64)
+    batch=tf.range(n_batch, dtype=tf.int64)
+    batch = tf.tile(batch[..., tf.newaxis, tf.newaxis], [1,n_vertices,1])
+    select = tf.concat((batch, ids[..., tf.newaxis]), axis=-1)
+    return select
+    
+    
+    
 
-def sparse_max_pool_factored(sparse_dict, factor):
-    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
-                                                                                 sparse_dict['spatial_features_global'], \
-                                                                                 sparse_dict['spatial_features_local'], \
-                                                                                 sparse_dict['num_entries']
+def normalise_distance_matrix(AdMat):
+    #return 1-tf.nn.softsign(4*AdMat)
+    mat=tf.exp(-1*(tf.abs(AdMat)))
+    #mat=tf.nn.softmax(-tf.abs(AdMat))
+    #mat=sprint(mat, "pstr")
+    return mat
 
-    shape_spatial_features = spatial_features_global.get_shape().as_list()
-    shape_spatial_features_local = spatial_features_local.get_shape().as_list()
-    shape_all_features = all_features.get_shape().as_list()
+def get_distance_weight(x):
+    #return x
+    #return tf.exp(-1*(tf.abs(x)))
+    return tf.exp(-6.*tf.sqrt(tf.abs(x)+1e-4))*x*3.*36 #integral 0->inf = 1
+    
+    
 
-    n_batch = shape_spatial_features[0]
-    n_max_entries = shape_spatial_features[1]
-    n_features_input_all = shape_all_features[2]
-    n_features_input_space = shape_spatial_features[2]
+def create_edges(vertices_a, vertices_b, add_radial=True):
+    #BxVxF
+    expanded_vertices_a = tf.expand_dims(vertices_a, axis=1)
+    expanded_vertices_b = tf.expand_dims(vertices_b, axis=2)
+    raw_difference = expanded_vertices_a - expanded_vertices_b
+    #calculate explicitly rotational symmetric on
+    
+    rot_raw_difference = tf.reduce_sum(raw_difference*raw_difference,axis=-1)
+    rot_raw_difference = tf.expand_dims(rot_raw_difference,axis=3)
+    
+    edges = tf.concat([rot_raw_difference,raw_difference],axis=-1)
+    return get_distance_weight(edges)
+    
+    
+def apply_edges(vertices, edges, reduce_sum=True, flatten=True): 
+    '''
+    edges are naturally BxVxV'xF
+    vertices are BxVxF'  or BxV'xF'
+    This function returns BxVxF'' if flattened and summed
+    '''
+    edges = tf.expand_dims(edges,axis=3)
+    vertices = tf.expand_dims(vertices,axis=1)
+    vertices = tf.expand_dims(vertices,axis=4)
+    
+    out = edges*vertices
+    if reduce_sum:
+        out = tf.reduce_sum(out,axis=2)/float(int(out.shape[2]))
+    if flatten:
+        out = tf.reshape(out,shape=[out.shape[0],out.shape[1],-1])
+    
+    return out
 
-    # All of these tensors should be 3-dimensional
-    assert len(shape_spatial_features) == 3
+ 
+def apply_space_transform(vertices, units_transform, output_dimensions): 
+    
+    trans_space = tf.layers.dense(vertices/10.,units_transform,activation=tf.nn.tanh,
+                                   kernel_initializer=NoisyEyeInitializer)
+    trans_space = tf.layers.dense(trans_space*10.,output_dimensions,activation=None,
+                                  kernel_initializer=NoisyEyeInitializer, use_bias=False)
+    return trans_space
+########
 
-    # Neighbor matrix should be int as it should be used for indexing
-    assert all_features.dtype == tf.float64 or all_features.dtype == tf.float32
+def sparse_conv_seeded3(vertices_in, 
+                       seed_indices, 
+                       nfilters, 
+                       nspacefilters=1, 
+                       nspacedim=3, 
+                       seed_talk=True):
+    '''
+    '''
+    #for later
+    _sparse_conv_naming_index+=1
+    
+    seedselector = make_batch_selection(seed_indices)
+    
+    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim)
+    
+    seed_trans_space = tf.gather_nd(trans_space,seedselector)
+    
+    edges = create_edges(trans_space,seed_trans_space)
+    
+    expanded_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True)
+   
+    #add back seed features
+    seed_all_features = tf.gather_nd(vertices_in,seedselector)
+    
+    #simple dense check this part
+    #maybe add additional dense
+    if seed_talk:
+        #seed space transform?
+        seed_edges = create_edges(seed_trans_space,seed_trans_space)
+        trans_seeds = apply_edges(seed_all_features, seed_edges, reduce_sum=True, flatten=True)
+        seed_merged_features = tf.concat([seed_all_features,trans_seeds],axis=-1)
+        seed_all_features = tf.layers.dense(seed_merged_features,seed_all_features.shape[2],activation=tf.nn.relu,
+                                            kernel_initializer=NoisyEyeInitializer)
+    
+    #compress
+    
+    expanded_collapsed = tf.concat([seed_all_features,expanded_collapsed],axis=-1)
+    expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.tanh)
+    
+    #propagate back, transposing the edges does the trick, now they point from Nseeds to Nvertices
+    edges = tf.transpose(edges, perm=[0,2, 1,3])
+    expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
+    
 
-    result_max_entires = int(n_max_entries / factor)
-
-    _, I = tf.nn.top_k(tf.reduce_sum(all_features, axis=2), result_max_entires)
-    I = tf.expand_dims(I, axis=2)
-
-    batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, n_batch), axis=1), axis=1)
-    batch_range = tf.tile(batch_range, [1, result_max_entires, 1])
-    _indexing_tensor = tf.concat([batch_range, I], axis=2)
-
-    out_all_features = tf.gather_nd(all_features, _indexing_tensor)
-    out_spatial_features_global = tf.gather_nd(spatial_features_global, _indexing_tensor)
-    out_spatial_features_local = tf.gather_nd(spatial_features_local, _indexing_tensor)
-
-    num_entries_reduced = tf.cast(num_entries / factor, tf.int64)
-    num_entries_reduced = tf.where(tf.equal(num_entries_reduced, tf.zeros_like(num_entries_reduced)),
-                                   tf.zeros_like(num_entries_reduced) + 1, num_entries_reduced)
-
-    mask = tf.cast(tf.expand_dims(tf.sequence_mask(num_entries_reduced, maxlen=result_max_entires), axis=2), tf.float32)
-    #
-    # num_entries = tf.minimum(tf.ones(shape=[n_batch], dtype=tf.int64) * num_entries_result, num_entries)
-
-    return construct_sparse_io_dict(mask * out_all_features, mask * out_spatial_features_global,
-                                    mask * out_spatial_features_local, num_entries_reduced)
+    #combien old features with new ones
+    feature_layerout = tf.concat([vertices_in,expanded_collapsed,],axis=-1)
+    feature_layerout = tf.layers.dense(feature_layerout/10.,nfilters, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
+    feature_layerout = feature_layerout*10.
+    feature_layerout=sprint(feature_layerout, 'feature_layerout')
+    return feature_layerout
 
 
-def sparse_conv_bare(sparse_dict, num_neighbors=10, output_all=15, weight_init_width=1e-4):
-    """
-    Defines sparse convolutional layer
 
-    :param sparse_dict: Dictionary containing input
-    :param num_neighbors: An integer containing number of neighbors to pick + 1 (+1 is for yourself)
-    :param output_all: Number of output features for color like outputs
-    :param weight_init_width: TODO: Fill this
-    :return: Dictionary containing output which can be made input to the next layer
-    """
 
-    all_features, spatial_features_global, spatial_features_local, num_entries = sparse_dict['all_features'], \
-                                                                                 sparse_dict['spatial_features_global'], \
-                                                                                 sparse_dict['spatial_features_local'], \
-                                                                                 sparse_dict['num_entries']
+def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10, 
+                               output_all=15, space_transformations=10):
+    #for later
+    _sparse_conv_naming_index+=1
+    
+    space_transformations = make_sequence(space_transformations)
+    output_all = make_sequence(output_all)
+    
+    trans_space = vertices_in
+    for i in range(len(space_transformations)):
+        if i< len(space_transformations)-1:
+            trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=tf.nn.tanh,
+                                       kernel_initializer=NoisyEyeInitializer)
+            trans_space*=10.
+        else:
+            trans_space = tf.layers.dense(trans_space.,space_transformations[i],activation=None,
+                                       kernel_initializer=NoisyEyeInitializer)
 
-    _indexing_tensor = indexing_tensor(spatial_features_global, num_neighbors)
+    indexing, distance = indexing_tensor_2(trans_space, num_neighbors)
+    
+    neighbour_space = tf.gather_nd(trans_space, indexing)
+    print('neighbour_space',neighbour_space.shape)
+    edges = create_edges(trans_space, neighbour_space)
+        
+    updated_vertices = vertices_in
+    for f in output_all:
+        vertex_with_neighbours = tf.gather_nd(updated_vertices, indexing)
+        flattened_gathered = apply_edges(vertex_with_neighbours, edges, reduce_sum=True, flatten=True)
+        updated_vertices = tf.layers.dense(flattened_gathered, f, activation=tf.nn.relu) 
 
-    shape_space_features = spatial_features_global.get_shape().as_list()
-    shape_space_features_local = spatial_features_local.get_shape().as_list()
-    shape_all_features = all_features.get_shape().as_list()
-    shape_indexing_tensor = _indexing_tensor.get_shape().as_list()
 
-    n_batch = shape_space_features[0]
-    n_max_entries = shape_space_features[1]
-    n_features_input_all = shape_all_features[2]
-    n_features_input_space = shape_space_features[2]
-    n_max_neighbors = shape_indexing_tensor[2]
+    return 
 
-    # All of these tensors should be 3-dimensional
-    # TODO: Add assert for indexing_tensor shape
-    assert len(shape_space_features) == 3 and len(shape_all_features) == 3 and len(shape_indexing_tensor) == 4
 
-    # First dimension is batch, second is number of entries, hence these two should be same for all
-    assert shape_space_features[0] == shape_all_features[0]
-    assert shape_space_features[1] == shape_all_features[1]
-
-    # Neighbor matrix should be int as it should be used for indexing
-    assert _indexing_tensor.dtype == tf.int64
-
-    gathered_all = tf.gather_nd(all_features, _indexing_tensor)  # [B,E,5,F]
-
-    pre_output = tf.layers.dense(gathered_all, output_all, activation=tf.nn.relu)
-    output = tf.layers.dense(tf.reshape(pre_output, [n_batch, n_max_entries, -1]), output_all, activation=tf.nn.relu)
-
-    return construct_sparse_io_dict(output, spatial_features_global, spatial_features_local, num_entries)
+    
+    
