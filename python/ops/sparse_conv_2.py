@@ -2,7 +2,7 @@ import tensorflow as tf
 from .neighbors import euclidean_squared,indexing_tensor, indexing_tensor_2, sort_last_dim_tensor, get_sorted_vertices_ids
 from ops.nn import *
 import numpy as np
-from .initializers import NoisyEyeInitializer
+from ops.sparse_conv import NoisyEyeInitializer
 import math
 
 ###helper functions
@@ -145,6 +145,7 @@ def sparse_conv_seeded3(vertices_in,
                        nspacefilters=1, 
                        nspacedim=3, 
                        seed_talk=True):
+    global _sparse_conv_naming_index
     '''
     '''
     #for later
@@ -195,6 +196,7 @@ def sparse_conv_seeded3(vertices_in,
 
 def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10, 
                                output_all=15, space_transformations=10):
+    global _sparse_conv_naming_index
     #for later
     _sparse_conv_naming_index+=1
     
@@ -208,7 +210,7 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
                                        kernel_initializer=NoisyEyeInitializer)
             trans_space*=10.
         else:
-            trans_space = tf.layers.dense(trans_space.,space_transformations[i],activation=None,
+            trans_space = tf.layers.dense(trans_space,space_transformations[i],activation=None,
                                        kernel_initializer=NoisyEyeInitializer)
 
     indexing, distance = indexing_tensor_2(trans_space, num_neighbors)
