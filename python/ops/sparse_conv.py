@@ -639,7 +639,12 @@ def sparse_conv_make_neighbors2(sparse_dict, num_neighbors=10,
     create_indexing_batch = n_batch
     if not strict_global_space:
         create_indexing_batch=-1
-    _indexing_tensor, distance = indexing_tensor_2(transformed_space_features, num_neighbors,create_indexing_batch)
+
+    breakdown_x = (tf.layers.dense(transformed_space_features, 1, activation=tf.nn.tanh) + 3.) * 2
+    breakdown_y = tf.layers.dense(transformed_space_features, 1, activation=tf.nn.tanh)
+    sorting = breakdown_x + breakdown_y
+
+    _indexing_tensor, distance = indexing_tensor_2(sorting, num_neighbors,create_indexing_batch)
     
     #for future use
     if strict_global_space:
@@ -668,12 +673,12 @@ def sparse_conv_make_neighbors2(sparse_dict, num_neighbors=10,
 def sparse_conv_make_neighbors(sparse_dict, num_neighbors=10, 
                                output_all=15, spatial_degree_non_linearity=1, 
                                n_transformed_spatial_features=10, 
-                               propagrate_ahead=False):
+                               propagrate_ahead=False, name="sparse_conv_make_neighbors"):
     
     return sparse_conv_make_neighbors2(sparse_dict=sparse_dict, num_neighbors=num_neighbors, 
                                output_all=output_all, space_transformations=
                                [n_transformed_spatial_features for i in range(spatial_degree_non_linearity)],
-                               propagrate_ahead=propagrate_ahead)
+                               propagrate_ahead=propagrate_ahead, name=name)
 
 # loop implementations down here...
 # loop implementations down here...
@@ -788,7 +793,6 @@ def normalise_distance_matrix(AdMat):
     mat=tf.nn.softmax(-tf.abs(AdMat))
     #mat=sprint(mat, "pstr")
     return mat
-    
 
 
 def sparse_conv_make_seeds(sparse_dict,
@@ -924,7 +928,9 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
         all_features = tf.concat([space_global,space_local,colours_in],axis=-1)   
     else:
         all_features = all_features_in
-        
+
+
+
     trans_features = tf.layers.dense(all_features,nfilters,activation=tf.nn.relu)
     trans_features = tf.expand_dims(trans_features,axis=1)
     
@@ -941,9 +947,11 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
         trans_space = all_features 
         trans_space = tf.layers.dense(trans_space/10.,nspacefilters,activation=tf.nn.tanh,
                                        kernel_initializer=NoisyEyeInitializer)
+
         trans_space = tf.layers.dense(trans_space*10.,nspacedim,activation=None,
                                       kernel_initializer=NoisyEyeInitializer, use_bias=False)
         trans_space = trans_space
+
         space_layerout.append(trans_space)
         
         seed_trans_space_orig = tf.gather_nd(trans_space,seedselector)
@@ -956,7 +964,7 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
         diff = all_trans_space - seed_trans_space
         
         diff = tf.reduce_sum(diff*diff,axis=-1)
-        diff = normalise_distance_matrix(diff) 
+        diff = normalise_distance_matrix(diff)
         
         
         diff = tf.expand_dims(diff,axis=3)
@@ -1051,7 +1059,7 @@ def sparse_conv_add_simple_seed_labels(net,seed_indices):
     colours_in = tf.concat([colours_in,tf.expand_dims(label, axis=2)], axis=-1)
     return construct_sparse_io_dict(colours_in , space_global, space_local, num_entries)
     
-def sparse_conv_batchnorm(net,momentum=0.9,**kwargs):
+def sparse_conv_batchnorm(net,momentum=0.9, training=True,**kwargs):
     colours_in, space_global, space_local, num_entries = net['all_features'], \
                                                                     net['spatial_features_global'], \
                                                                     net['spatial_features_local'], \
@@ -1059,9 +1067,9 @@ def sparse_conv_batchnorm(net,momentum=0.9,**kwargs):
     
     if momentum<=0:
         return net
-    colours_in=tf.layers.batch_normalization(colours_in,momentum=momentum,**kwargs)
-    space_global=tf.layers.batch_normalization(space_global,momentum=momentum,**kwargs)
-    space_local=tf.layers.batch_normalization(space_local,momentum=momentum,**kwargs)
+    colours_in=tf.layers.batch_normalization(colours_in,training=training, momentum=momentum,**kwargs)
+    space_global=tf.layers.batch_normalization(space_global,training=training, momentum=momentum,**kwargs)
+    space_local=tf.layers.batch_normalization(space_local,momentum=momentum, training=training, **kwargs)
     
     return construct_sparse_io_dict(colours_in , space_global, space_local, num_entries)
 

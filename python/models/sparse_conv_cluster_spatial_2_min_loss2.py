@@ -14,9 +14,6 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self.use_seeds = True
         
         self.fixed_seeds=None
-        self.vertx=None
-        self.verty=None
-        self.vertz=None
 
     def make_placeholders(self):
         self._placeholder_space_features = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.max_entries, self.n_space])
@@ -98,12 +95,12 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         # deeper one 0.04 at 26k, 0.045 at 26k
         # same config (just 6 layers) without random seeds: 
         
-        
+        _input = sparse_conv_batchnorm(_input,momentum=momentum)
        
        
        
         net = _input
-        seed_scaling=None
+        
         # seed_scaling,seed_idxs = sparse_conv_make_seeds(net,space_dimensions=4,
         #                                                 n_seeds=2,
         #                                conv_kernels=[(6,6),(6,6)],conv_filters=[16,16])
@@ -114,23 +111,18 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         seed_idxs = in_seed_idxs
         # anyway uses everything
         #net = sparse_conv_mix_colours_to_space(net)
-        nfilters=30
-        nspacefilters=64
+        nfilters=24
+        nspacefilters=32
         nspacedim=4
-        feat = sparse_conv_collapse(net)/150.
-        #feat = tf.layers.batch_normalization(feat,momentum=momentum)/150.
         
+        feat = sparse_conv_collapse(net)
         for i in range(11):
             feat = sparse_conv_seeded(None,feat,seed_idxs,seed_scaling,nfilters=nfilters, nspacefilters=nspacefilters, 
                                       nspacetransform=1,nspacedim=nspacedim)#,original_dict=_input)
-            #feat = tf.layers.batch_normalization(feat,momentum=momentum)
+            feat = tf.layers.batch_normalization(feat,momentum=momentum)
             
-        self.vertx = feat[0,2140,0]
-        self.verty = feat[0,2140,1]
-        self.vertz = feat[0,2140,2]
-        self.verte = feat[0,2140,3]
         
-        output = tf.layers.dense(feat,3,activation=tf.nn.tanh)
+        output = tf.layers.dense(feat,3,activation=tf.nn.relu)
         output = tf.nn.softmax(output)
         return output
         
@@ -267,7 +259,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         seeds = tf.transpose(seeds,[1,0])
         seeds = tf.random_shuffle(seeds)
         seeds = tf.transpose(seeds,[1,0])
-        seeds = self._placeholder_seed_indices
+        #seeds = self._placeholder_seed_indices
         print('seeds',seeds.shape)
         
         _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
@@ -287,8 +279,6 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
     def get_variable_scope(self):
         return 'sparse_conv_clustering_spatial1'
 
-        
-        
 
     def _construct_graphs(self):
         with tf.variable_scope(self.get_variable_scope()):
@@ -307,14 +297,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
             # Repeating, maybe there is a better way?
             self._graph_summary_loss = tf.summary.scalar('loss', self._graph_loss)
-            self._graph_summaries = tf.summary.merge([self._graph_summary_loss, 
-                                                      tf.summary.scalar('mean-res', self.mean_resolution), 
-                                                      tf.summary.scalar('variance-res', self.variance_resolution),
-                                                      tf.summary.scalar('vert x', self.vertx),
-                                                      tf.summary.scalar('vert y', self.verty),
-                                                      tf.summary.scalar('vert z', self.vertz),
-                                                      tf.summary.scalar('vert e', self.verte)
-                                                      ])
+            self._graph_summaries = tf.summary.merge([self._graph_summary_loss, tf.summary.scalar('mean-res', self.mean_resolution), tf.summary.scalar('variance-res', self.variance_resolution)])
 
             self._graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self._graph_loss)
             self._graph_summaries_validation = tf.summary.merge([self._graph_summary_loss_validation])

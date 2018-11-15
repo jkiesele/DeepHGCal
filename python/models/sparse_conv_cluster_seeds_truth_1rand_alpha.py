@@ -15,6 +15,10 @@ class SparseConvClusteringSeedsTruthPlusOneRandomAlpha(SparseConvClusteringBase)
         self.use_seeds = True
 
         self.fixed_seeds = None
+        self.is_training = True
+
+    def set_training(self, is_training):
+        self.is_training = is_training
 
     def make_placeholders(self):
         self._placeholder_space_features = tf.placeholder(dtype=tf.float32,
@@ -91,7 +95,7 @@ class SparseConvClusteringSeedsTruthPlusOneRandomAlpha(SparseConvClusteringBase)
 
     def compute_output_seed_driven(self, _input, in_seed_idxs):
         momentum = 0.9
-        _input = sparse_conv_batchnorm(_input, momentum=momentum)
+        _input = sparse_conv_batchnorm(_input, momentum=momentum, training=self.is_training)
 
         net = _input
 
@@ -105,7 +109,7 @@ class SparseConvClusteringSeedsTruthPlusOneRandomAlpha(SparseConvClusteringBase)
         for i in range(11):
             feat = sparse_conv_seeded(None, feat, in_seed_idxs, 1, nfilters=nfilters, nspacefilters=nspacefilters,
                                       nspacetransform=1, nspacedim=nspacedim)  # ,original_dict=_input)
-            feat = tf.layers.batch_normalization(feat, momentum=momentum)
+            feat = tf.layers.batch_normalization(feat, momentum=momentum, training=self.is_training)
 
         output = tf.layers.dense(feat, 3, activation=tf.nn.relu)
         output = tf.nn.softmax(output)
@@ -156,7 +160,9 @@ class SparseConvClusteringSeedsTruthPlusOneRandomAlpha(SparseConvClusteringBase)
 
             self._graph_loss = self._get_loss()
 
-            self._graph_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self._graph_loss)
+            extra_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(extra_ops):
+                self._graph_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self._graph_loss)
 
             # Repeating, maybe there is a better way?
             self._graph_summary_loss = tf.summary.scalar('loss', self._graph_loss)
