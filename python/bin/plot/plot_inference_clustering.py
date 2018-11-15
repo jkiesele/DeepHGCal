@@ -104,7 +104,7 @@ def get_mean_variance_histograms(energy_values, histogram_values_resolution):
     min_value = np.min(energy_values)
     max_value = np.max(energy_values)
 
-    bin_index = np.minimum((energy_values - min_value)*nbins/max_value, nbins-1).astype(np.int64)
+    bin_index = np.minimum((energy_values - min_value)*nbins/(max_value-min_value), nbins-1).astype(np.int64)
 
     energy_values_x = np.linspace(min_value, max_value, num=nbins)
 
@@ -138,19 +138,22 @@ def diff_2d_plot(energy_values, histogram_values_resolution):
 
     energy_values_x = np.linspace(min_energy, max_energy, num=nbins)
 
-    bin_indices_x = np.minimum((energy_values_1 - min_energy)*nbins/max_energy, nbins-1).astype(np.int64)
-    bin_indices_y = np.minimum((energy_values_2 - min_energy)*nbins/max_energy, nbins-1).astype(np.int64)
+    bin_indices_x = np.minimum((energy_values_1 - min_energy)*nbins/(max_energy-min_energy), nbins-1).astype(np.int64)
+    bin_indices_y = np.minimum((energy_values_2 - min_energy)*nbins/(max_energy-min_energy), nbins-1).astype(np.int64)
 
     mean_2d = np.zeros((nbins,nbins), dtype=np.float32)
     count_2d = np.zeros((nbins,nbins), dtype=np.int64)
 
     for i in range(len(energy_values_1)):
-        mean_2d[bin_indices_x[i], bin_indices_y[i]] += histogram_values_resolution[i]
-        mean_2d[bin_indices_y[i], bin_indices_x[i]] += histogram_values_resolution[i+1]
+        mean_2d[bin_indices_x[i], bin_indices_y[i]] += histogram_values_resolution[i*2]
+        mean_2d[bin_indices_y[i], bin_indices_x[i]] += histogram_values_resolution[i*2+1]
         count_2d[bin_indices_x[i], bin_indices_y[i]] += 1
         count_2d[bin_indices_y[i], bin_indices_x[i]] += 1
 
     mean_2d /= count_2d
+
+    mean_2d = np.flip(mean_2d, axis=0)
+    count_2d = np.flip(count_2d, axis=0)
 
     return mean_2d, count_2d, energy_values_x
 
@@ -205,12 +208,11 @@ plt.xlabel("Shower 1 energy")
 plt.ylabel("Shower 2 energy")
 plt.title("Resolution")
 cbar = fig.colorbar(cax)
-# plt.savefig(os.path.join(config['test_out_path'], 'mean_resolution_2d_fo_energy.png'))
-
+plt.savefig(os.path.join(config['test_out_path'], 'mean_resolution_2d_fo_energy.png'))
 
 
 plt.clf()
-fig = plt.figure(2)
+fig = plt.figure(1)
 cax = plt.imshow(count_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
 plt.xlabel("Shower 1 energy")
 plt.ylabel("Shower 2 energy")
