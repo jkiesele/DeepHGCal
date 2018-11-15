@@ -238,8 +238,6 @@ class SparseConvClusteringTrainer:
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-            summary_writer = tf.summary.FileWriter(self.summary_path, sess.graph)
-
             self.saver_sparse.restore(sess, self.model_path)
             print("\n\nINFO: Loading model", self.model_path,"\n\n")
 
@@ -271,7 +269,7 @@ class SparseConvClusteringTrainer:
                 for i in range(len(inputs_test[0])):
                     inference_streamer.add((inputs_test[0][i], (inputs_test[1])[i,0], eval_output[i]))
 
-                print("Testing - Sample %4d: loss %0.5f" % (iteration_number, eval_loss))
+                print("Testing - Sample %4d: loss %0.5f" % (iteration_number*self.num_batch, eval_loss))
                 print(t[0])
                 iteration_number += 1
 
