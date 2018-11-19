@@ -1,6 +1,7 @@
 import tensorflow as tf
 from models.sparse_conv_clustering_base import SparseConvClusteringBase
 from ops.sparse_conv import *
+from ops.sparse_conv_2 import *
 from models.switch_model import SwitchModel
 
 
@@ -95,7 +96,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         # deeper one 0.04 at 26k, 0.045 at 26k
         # same config (just 6 layers) without random seeds: 
         
-        _input = sparse_conv_batchnorm(_input,momentum=momentum)
+        #_input = sparse_conv_batchnorm(_input,momentum=momentum)
        
        
        
@@ -111,20 +112,37 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         seed_idxs = in_seed_idxs
         # anyway uses everything
         #net = sparse_conv_mix_colours_to_space(net)
-        nfilters=24
-        nspacefilters=32
+        nfilters=16
+        nspacefilters=64
         nspacedim=4
         
-        feat = sparse_conv_collapse(net)
-        for i in range(11):
-            feat = sparse_conv_seeded(None,feat,seed_idxs,seed_scaling,nfilters=nfilters, nspacefilters=nspacefilters, 
-                                      nspacetransform=1,nspacedim=nspacedim)#,original_dict=_input)
-            feat = tf.layers.batch_normalization(feat,momentum=momentum)
-            
         
-        output = tf.layers.dense(feat,3,activation=tf.nn.relu)
-        output = tf.nn.softmax(output)
-        return output
+        feat = sparse_conv_collapse(net)
+        norigfeat=int(feat.shape[2])
+        
+        for i in range(7):
+            feat = tf.Print(feat, [feat[0,2146,:]], 'space layer '+str(i),summarize=30)
+            feat = sparse_conv_seeded3(feat, 
+                       seed_idxs, 
+                       nfilters=nfilters, 
+                       nspacefilters=nspacefilters, 
+                       nspacedim=nspacedim, 
+                       seed_talk=True,
+                       compress_before_propagate=False)
+        
+        feat = sparse_conv_seeded3(feat, 
+                       seed_idxs, 
+                       nfilters=nspacedim, 
+                       nspacefilters=nspacefilters, 
+                       nspacedim=nspacedim, 
+                       seed_talk=True)
+        feat = tf.Print(feat, [feat[0,2146,:]], 'space last layer ',summarize=30)    
+        
+        feat = get_distance_weight_to_seeds(feat,seeds,
+                                              dimensions = 3, 
+                                              add_zeros = 1)
+        
+        return feat
         
     def compute_output_full_adjecency(self,_input):
         
@@ -188,47 +206,18 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
     
     
     def compute_output_neighbours(self,_input,seeds):
-        momentum=0.9
         
-        propagrate_ahead=True
         
-        net=_input
-        net = sparse_conv_add_simple_seed_labels(net,seeds)
-        net = sparse_conv_batchnorm(net,momentum=momentum)
-        out=[]
-        neta, netb = sparse_conv_split_batch(net,int(float(int(net['all_features'].shape[0]))/2))
-        nets=[neta,netb]
+        feat = sparse_conv_collapse(_input)
         
-        #for i in range(len(nets)):
-        #    with tf.device("/job:localhost/replica:0/task:0/device:GPU:"+str(i)):
-        #        with tf.variable_scope('netscope',reuse=tf.AUTO_REUSE) as vscope:
-        #            net = nets[i]
-        net = sparse_conv_mix_colours_to_space(net)
-        net = sparse_conv_make_neighbors2(net, num_neighbors=16, output_all=[16 for i in range(16)], 
-                                         space_transformations=[16,4], 
-                                         propagrate_ahead=propagrate_ahead,
-                                         strict_global_space=False,
-                                         name="1")
-        net = sparse_conv_batchnorm(net,momentum=momentum)
+        feat = sparse_conv_make_neighbors2(feat, num_neighbors=9, 
+                               output_all=[32,32,32,32,32,32,32,32,32,32,32,32,32,3], 
+                               space_transformations=[64,4])
+        exit()
+        return feat
         
-        net = sparse_conv_mix_colours_to_space(net)
-        net = sparse_conv_make_neighbors2(net, num_neighbors=8, output_all=[16 for i in range(20)], 
-                                         space_transformations=[16,4], 
-                                         propagrate_ahead=propagrate_ahead,
-                                         strict_global_space=False,
-                                         name="2")
-        net = sparse_conv_batchnorm(net,momentum=momentum)
-        
-        flatout = sparse_conv_collapse(net)
-        flatout = tf.layers.dense(flatout,3,activation=tf.nn.relu)
-        flatout = tf.nn.softmax(flatout)
-        out.append(flatout)
-            
         
 
-        output = tf.concat(out,axis=0)
-        return output
-        
     def _compute_output(self):
         
         
@@ -259,18 +248,23 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         seeds = tf.transpose(seeds,[1,0])
         seeds = tf.random_shuffle(seeds)
         seeds = tf.transpose(seeds,[1,0])
-        #seeds = self._placeholder_seed_indices
+        seeds = self._placeholder_seed_indices
         print('seeds',seeds.shape)
         
-        _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
+        net = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
         
-        simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
-        output=self.compute_output_seed_driven(_input,seeds)#self._placeholder_seed_indices)
+        net = sparse_conv_normalise(net,log_energy=False)
+        net = sparse_conv_add_simple_seed_labels(net,seeds)
+        
+        #simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
+        #output=self.compute_output_seed_driven(_input,seeds)#self._placeholder_seed_indices)
         #output = self.compute_output_seed_driven_neighbours(_input,self._placeholder_seed_indices)
-        #output = self.compute_output_neighbours(_input,self._placeholder_seed_indices)
+        output = self.compute_output_neighbours(net,self._placeholder_seed_indices)
         #output=self.compute_output_seed_driven(_input,self._placeholder_seed_indices)
         #output=self.compute_output_full_adjecency(_input)
+        
+        output = tf.nn.softmax(output)
         
         self._graph_temp = tf.reduce_sum(output[:,:,:], axis=1)/2679.
 
@@ -297,7 +291,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
             # Repeating, maybe there is a better way?
             self._graph_summary_loss = tf.summary.scalar('loss', self._graph_loss)
-            self._graph_summaries = tf.summary.merge([self._graph_summary_loss, tf.summary.scalar('mean-res', self.mean_resolution), tf.summary.scalar('variance-res', self.variance_resolution)])
+            self._graph_summaries = tf.summary.merge([self._graph_summary_loss, 
+                                                      tf.summary.scalar('mean-res', self.mean_resolution), 
+                                                      tf.summary.scalar('variance-res', self.variance_resolution)])
 
             self._graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self._graph_loss)
             self._graph_summaries_validation = tf.summary.merge([self._graph_summary_loss_validation])
