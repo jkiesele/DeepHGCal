@@ -11,4 +11,7 @@ def gauss_times_linear(x):
 def sinc(x):
     return tf.sin(x)/x
 
+def open_tanh(x):
+    return 0.9*tf.nn.tanh(x)+0.1*x
+
 

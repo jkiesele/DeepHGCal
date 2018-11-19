@@ -3,7 +3,7 @@ from .neighbors import euclidean_squared,indexing_tensor, indexing_tensor_2, sor
 from ops.nn import *
 import numpy as np
 from .initializers import NoisyEyeInitializer
-from .activations import gauss_of_lin, gauss_times_linear, sinc
+from .activations import gauss_of_lin, gauss_times_linear, sinc, open_tanh
 import math
 
 ###helper functions
@@ -57,9 +57,6 @@ def sparse_conv_normalise(sparse_dict, log_energy=False):
     scaled_colours_in = colours_in*1e-4
     if log_energy:
         scaled_colours_in = tf.log(colours_in+1)/10.
-    print('space_global',space_global.shape)
-    print('colours_in',colours_in.shape)
-    print('space_local',space_local.shape)
     
     scaled_space_global=tf.concat([tf.expand_dims(space_global[:,:,0]/150.,axis=2),
                                    tf.expand_dims(space_global[:,:,1]/150.,axis=2),
@@ -136,12 +133,25 @@ def apply_edges(vertices, edges, reduce_sum=True, flatten=True):
  
 def apply_space_transform(vertices, units_transform, output_dimensions): 
     
-    trans_space = tf.layers.dense(vertices/10.,units_transform,activation=tf.nn.tanh,
+    trans_space = tf.layers.dense(vertices/10.,units_transform,activation=open_tanh,
                                    kernel_initializer=NoisyEyeInitializer)
     trans_space = tf.layers.dense(trans_space*10.,output_dimensions,activation=None,
                                   kernel_initializer=NoisyEyeInitializer, use_bias=False)
     return trans_space
 ########
+
+def sparse_conv_add_simple_seed_labels(net,seed_indices):
+    colours_in, space_global, space_local, num_entries = net['all_features'], \
+                                                                    net['spatial_features_global'], \
+                                                                    net['spatial_features_local'], \
+                                                                    net['num_entries']
+    seedselector = make_batch_selection(seed_indices)
+    seed_space = tf.gather_nd(space_global,seedselector)
+    label = tf.argmin(euclidean_squared(space_global, seed_space), axis=-1)
+    label = tf.cast(label,dtype=tf.float32)
+    colours_in = tf.concat([colours_in,tf.expand_dims(label, axis=2)], axis=-1)
+    return construct_sparse_io_dict(colours_in , space_global, space_local, num_entries)
+    
 
 def get_distance_weight_to_seeds(vertices_in, seed_idx, dimensions=4, add_zeros=0):
     
@@ -228,7 +238,7 @@ def sparse_conv_seeded3(vertices_in,
 def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10, 
                                output_all=15, space_transformations=10,
                                merge_neighbours=1,
-                               edge_activation=tf.nn.tanh):
+                               edge_activation=gauss_of_lin):
     
     assert merge_neighbours <= num_neighbors
     global _sparse_conv_naming_index
@@ -239,10 +249,11 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     space_transformations = make_sequence(space_transformations)
     output_all = make_sequence(output_all)
     
+    
     trans_space = vertices_in
     for i in range(len(space_transformations)):
         if i< len(space_transformations)-1:
-            trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=tf.nn.tanh,
+            trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=open_tanh,
                                        kernel_initializer=NoisyEyeInitializer)
             trans_space*=10.
         else:
@@ -257,14 +268,17 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     expanded_trans_space = tf.expand_dims(trans_space, axis=2)
     diff = expanded_trans_space - neighbour_space
     edges = add_rot_symmetric_distance(diff)
-    edges = apply_distance_weight(edges)
+    #edges = apply_distance_weight(edges)
     edges = tf.expand_dims(edges,axis=3)
     
         
     updated_vertices = vertices_in
+    orig_edges = edges
     for f in output_all:
         #interpret distances in a different way -> dense on edges (with funny activations TBI)
-        edges = tf.layers.dense(edges, edges.shape[-1],activation=edge_activation)
+        edges = tf.layers.dense(tf.concat([orig_edges,edges], axis=-1), 
+                                edges.shape[-1],activation=edge_activation,
+                                kernel_initializer = NoisyEyeInitializer)
         
         vertex_with_neighbours = tf.gather_nd(updated_vertices, indexing)
         vertex_with_neighbours = tf.expand_dims(vertex_with_neighbours,axis=4)
@@ -272,7 +286,8 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
         flattened_gathered = tf.reduce_mean(flattened_gathered, axis=2)
         flattened_gathered = tf.reshape(flattened_gathered, shape=[flattened_gathered.shape[0],
                                                                    flattened_gathered.shape[1],-1])
-        updated_vertices = tf.layers.dense(flattened_gathered, f, activation=tf.nn.tanh) 
+        updated_vertices = tf.layers.dense(tf.concat([vertices_in,flattened_gathered],axis=-1), 
+                                           f, activation=tf.nn.relu) 
 
 
     if merge_neighbours>1:
