@@ -27,8 +27,16 @@ file_paths = [x.strip() for x in content]
 
 def _write_entry(data, writer):
     feature = dict()
+
+    main_data = data[0]
+    true_values_1 = data[1]
+    true_values_2 = data[2]
     feature['data'] = tf.train.Feature( # TODO: Fix this
-        float_list=tf.train.FloatList(value=data.astype(np.float32).flatten()))
+        float_list=tf.train.FloatList(value=main_data.astype(np.float32).flatten()))
+    feature['truth_values_1'] = tf.train.Feature( # TODO: Fix this
+        float_list=tf.train.FloatList(value=true_values_1.astype(np.float32).flatten()))
+    feature['truth_values_2'] = tf.train.Feature( # TODO: Fix this
+        float_list=tf.train.FloatList(value=true_values_2.astype(np.float32).flatten()))
 
     example = tf.train.Example(features=tf.train.Features(feature=feature))
     writer.write(example.SerializeToString())
@@ -40,7 +48,7 @@ def write_to_tf_records(data, i, output_file_prefix):
                                              tf.python_io.TFRecordCompressionType.GZIP))
     for i in range(len(data)):
         _write_entry(data[i], writer)
-        print("Written", i, data[i].shape)
+        print("Written", i)
 
     writer.close()
 
@@ -61,17 +69,18 @@ def run_conversion_simple(input_file, firstrun=False):
     np.set_printoptions(threshold=np.nan)
 
     location = 'B4'
-    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer']
+    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer', 'true_x', 'true_y', 'true_r', 'true_energy']
 
-    types = ['float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64']
+    types = ['float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64']
 
-    max_size = [2679 for i in range(len(branches))]
+    max_size = [2679 for _ in range(7)] + [1, 1, 1, 1]
 
     nparray, sizes = sparse_hgcal.read_np_array(input_file, location, branches, types, max_size)
 
-
-    
     print(len(nparray))
+
+    true_values_1 = np.concatenate([nparray[i][..., np.newaxis] for i in [7, 8, 9, 10]], axis=1)
+
     #common part:
     common = concat_all_branches(nparray,
                                  [0, 1, 2, 3, 4, 6])
@@ -82,7 +91,8 @@ def run_conversion_simple(input_file, firstrun=False):
     
     shuffleindices=np.array(range(1,energy1.shape[0]))
     shuffleindices = np.concatenate([shuffleindices, np.array([0])])
-    energy2 = energy1[shuffleindices] 
+    energy2 = energy1[shuffleindices]
+    true_values_2 = true_values_1[shuffleindices]
     print(energy1.shape)
     maxenergyids1 = energy1.argmax(axis=1)
     maxenergyids2 = energy2.argmax(axis=1)
@@ -112,6 +122,10 @@ def run_conversion_simple(input_file, firstrun=False):
     fraction_temp=np.array(fraction1)
     fraction1[totdiff>0] = fraction2[totdiff>0]
     fraction2[totdiff>0] = fraction_temp[totdiff>0]
+
+    true_values_temp = np.array(true_values_1)
+    true_values_1[totdiff>0] = true_values_2[totdiff>0]
+    true_values_2[totdiff>0] = true_values_temp[totdiff>0]
     
     
     #prepare additional information about the seeds
@@ -137,8 +151,14 @@ def run_conversion_simple(input_file, firstrun=False):
     moreinfo = np.expand_dims(moreinfo,axis=1)
     
     allout = np.concatenate([allout, moreinfo],axis=1)
-    
-    allout = allout[totdiff!=0] #remove same seeded showers
+
+    # allout = allout[totdiff!=0] #remove same seeded showers
+
+    output_data = []
+
+    for i in range(len(allout)):
+        if totdiff[i] != 0:
+            output_data.append((allout[i], true_values_1[i], true_values_2[i]))
 
     
     if firstrun:
@@ -149,7 +169,7 @@ def run_conversion_simple(input_file, firstrun=False):
     
     just_file_name = os.path.splitext(os.path.split(input_file)[1])[0] + '_'
     output_file_prefix = os.path.join(args.output, just_file_name)
-    write_to_tf_records(allout,0,output_file_prefix)
+    write_to_tf_records(output_data,0,output_file_prefix)
     
 
 

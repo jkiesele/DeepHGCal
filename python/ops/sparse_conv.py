@@ -871,7 +871,7 @@ def sparse_conv_prepare_2Dconv(sparse_dict,
     seed finding based on conv layers applied to a (learnable) distance matrix in 2 dimensions
     '''
     
-    assert len(conv_kernels)==len(conv_filters)
+    # assert len(conv_    kernels)==len(conv_filters)
     
     colours_in, space_global, space_local, num_entries = sparse_dict['all_features'], \
                                                          sparse_dict['spatial_features_global'], \
@@ -940,7 +940,6 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
     feature_layerout=[]
     space_layerout=[]
     seedselector = make_seed_selector(seed_indices)
-    all_features=sprint(all_features, 'all_features_in')
     
     for i in range(nspacetransform):
         
@@ -1007,7 +1006,6 @@ def sparse_conv_seeded(sparse_dict, all_features_in, seed_indices, seed_scaling,
     feature_layerout = tf.concat([all_features,space_layerout,feature_layerout,],axis=-1)
     feature_layerout = tf.layers.dense(feature_layerout/10.,nfilters, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
     feature_layerout = feature_layerout*10.
-    feature_layerout=sprint(feature_layerout, 'feature_layerout')
     
     print('layer '+name+ ' feature_layerout out ', feature_layerout.shape)
     if returnmerged:

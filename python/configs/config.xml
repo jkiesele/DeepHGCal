@@ -1,0 +1,48 @@
+<config>
+    <!-- iom = IO Managers-->
+    <ioms>
+        <io_manager
+            name="basic_dense_io"
+            num_data_dims="9"
+            input_spatial_features_indices="1,2,3"
+            input_spatial_features_local_indices="4,5"
+            input_other_features_indices="0,6"
+            target_indices="7,8"
+        />
+    </ioms>
+    <models>
+        <model
+                name="binning_clustering_alpha_1"
+                class="SparseConvClusteringSpatialMinLoss"
+        />
+    </models>
+    <experiments>
+        <experiment name="conv_vs_sparse">
+            <train
+                    trainer="SparseConvClusteringTrainer"
+                    batch_size="30"
+                    model="sparse_conv_clustering_beta_1"
+                    validate_after="10"
+                    train_files_list="/data/ml/sqasim/data/ClusteringJanBeta/train_files.txt"
+                    validate_files_list="/data/ml/sqasim/data/ClusteringJanBeta/validate_files.txt"
+                    learning_rate="0.001"
+                    io_manager="basic_dense_io"
+                    summary_path="/afs/cern.ch/work/s/sqasim/workspace_2/Comparison_1/SparseConvClustering/beta_1/summary"
+                    model_parameters_save_path="/afs/cern.ch/work/s/sqasim/workspace_2/Comparison_1/SparseConvClustering/beta_1/model"
+            />
+            <test
+                    tester="SparseConvClusteringTrainer"
+                    model="sparse_conv_clustering_beta_1"
+                    test_files_list="/data/ml/sqasim/data/ClusteringJanBeta/test_files.txt"
+                    num_testing_samples="2000"
+                    test_out_path=""
+                    iom="basic_dense_io"
+                    model_parameters_save_path="/afs/cern.ch/work/s/sqasim/workspace_2/Comparison_1/SparseConvClustering/beta_1/model"
+            />
+            <plot
+                    test_out_path=""
+                    graphs_out_path=""
+            />
+        </experiment>
+    </experiments>
+</config>

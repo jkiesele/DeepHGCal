@@ -4,6 +4,8 @@ from ops.sparse_conv import *
 from models.switch_model import SwitchModel
 
 
+
+
 class SparseConvClusteringSeedsTruthAlpha(SparseConvClusteringBase):
 
     def __init__(self, n_space, n_space_local, n_others, n_target_dim, batch_size, max_entries, learning_rate=0.0001):
@@ -90,11 +92,12 @@ class SparseConvClusteringSeedsTruthAlpha(SparseConvClusteringBase):
                                                                                                   2)
 
 
-        return tf.reduce_mean(loss_unreduced_1) * 1000.
-        # return tf.reduce_mean(tf.minimum(loss_unreduced_1, loss_unreduced_2)) * 1000.
+        # return tf.reduce_mean(loss_unreduced_1) * 1000.
+        return tf.reduce_mean(tf.minimum(loss_unreduced_1, loss_unreduced_2)) * 1000.
 
     def _get_loss(self):
         return self.get_loss2()
+
 
     def compute_output_seed_driven(self, _input, in_seed_idxs):
         momentum = 0.9
@@ -120,7 +123,10 @@ class SparseConvClusteringSeedsTruthAlpha(SparseConvClusteringBase):
         for i in range(11):
             feat = sparse_conv_seeded(None, feat, seed_idxs, 1, nfilters=nfilters, nspacefilters=nspacefilters,
                                       nspacetransform=1, nspacedim=nspacedim)  # ,original_dict=_input)
+
+            feat = sprint(feat, 'Xall_features_in')
             feat = tf.layers.batch_normalization(feat, momentum=momentum, training=self.is_training)
+            feat =sprint(feat, 'Xall_features_out')
 
         output = tf.layers.dense(feat, 3, activation=tf.nn.relu)
         output = tf.nn.softmax(output)
