@@ -233,7 +233,22 @@ def sparse_conv_seeded3(vertices_in,
                                        kernel_initializer=NoisyEyeInitializer)
     return feature_layerout
 
-
+def sparse_conv_global_exchange(vertices_in, 
+                                expand_to_dims=-1,
+                                collapse_to_dims=-1):
+    
+    trans_vertices_in = vertices_in
+    if expand_to_dims>0:
+        trans_vertices_in = tf.layers.dense(trans_vertices_in,expand_to_dims,activation=tf.nn.relu)
+        
+    global_summed = tf.reduce_mean(trans_vertices_in, axis=1, keepdims=True)
+    global_summed = tf.tile(global_summed,[1,vertices_in.shape[1],1])
+    vertices_out = tf.concat([vertices_in,global_summed],axis=-1)
+    if collapse_to_dims>0:
+        vertices_out = tf.layers.dense(vertices_out, collapse_to_dims, activation=tf.nn.tanh)
+    
+    return vertices_out
+    
 
 
 def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10, 
