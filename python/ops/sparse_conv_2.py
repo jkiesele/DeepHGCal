@@ -254,7 +254,9 @@ def sparse_conv_global_exchange(vertices_in,
 def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10, 
                                output_all=15, space_transformations=10,
                                merge_neighbours=1,
-                               edge_activation=gauss_of_lin):
+                               edge_activation=gauss_of_lin,
+                               indexing=None,
+                               ):
     
     assert merge_neighbours <= num_neighbors
     global _sparse_conv_naming_index
@@ -292,6 +294,14 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     orig_edges = edges
     for f in output_all:
         #interpret distances in a different way -> dense on edges (with funny activations TBI)
+        if f < 0:
+            #this is a global interaction
+            global_summed = tf.reduce_mean(updated_vertices, axis=1, keepdims=True)
+            global_summed = tf.tile(global_summed,[1,updated_vertices.shape[1],1])
+            updated_vertices = tf.concat([updated_vertices,global_summed],axis=-1)
+            continue
+        
+        
         edges = tf.layers.dense(tf.concat([orig_edges,edges], axis=-1), 
                                 edges.shape[-1],activation=edge_activation,
                                 kernel_initializer = NoisyEyeInitializer)
