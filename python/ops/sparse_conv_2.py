@@ -303,10 +303,10 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
         gathered_space = tf.gather_nd(trans_space, indexing)
         gathered_space = gathered_space[:,0:cut_at,0:merge_neighbours,:]
         gathered_space = tf.reduce_mean(gathered_space, axis=2)
-        tf.concat([gathered_space,gathered_feat],axis=-1) 
+        updated_vertices = tf.concat([gathered_space,gathered_feat],axis=-1) 
         
     else:
-        tf.concat([trans_space,updated_vertices],axis=-1)
+        updated_vertices = tf.concat([trans_space,updated_vertices],axis=-1)
         
     return updated_vertices
 
