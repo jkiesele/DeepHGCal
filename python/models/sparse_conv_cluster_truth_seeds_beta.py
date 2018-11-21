@@ -20,18 +20,24 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
         self.is_training = True
         self.log_energy = False
         self.log_loss = False
-        self.is_energy_weighted_loss = False
         self.seed_talk = True
+        self.sqrt_energy = True
+        self.loss_energy_function = tf.sqrt
 
-    def set_log_modes(self, log_energy, log_loss):
+    def set_input_energy_log(self, log_energy):
         self.log_energy = log_energy
-        self.log_loss = log_loss
+
+    def set_loss_energy_function(self, loss_energy_funtion):
+        """
+        Sets the loss energy function to use for loss scaling
+
+        :param loss_energy_function: The function to call on energy values
+        :return:
+        """
+        self.loss_energy_function = loss_energy_funtion
 
     def set_training(self, is_training):
         self.is_training = is_training
-
-    def set_energy_weighted_loss(self, is_energy_weighted_loss):
-        self.is_energy_weighted_loss = is_energy_weighted_loss
 
     def set_seed_talk(self, seed_talk):
         self.seed_talk=seed_talk
@@ -59,42 +65,33 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
         print('num_entries', num_entries.shape)
         energy = self._placeholder_other_features[:, :, 0]
-        sqrt_energy = tf.sqrt(energy)
+
+        if callable(self.loss_energy_function):
+            loss_energy = self.loss_energy_function(energy)
+        else:
+            raise RuntimeError("Error in loss energy function")
 
         prediction = self._graph_output
         targets = self._placeholder_targets
-        targets_loss = targets
-
-        if self.is_energy_weighted_loss:
-            prediction = energy[:, :, tf.newaxis] * prediction
-            targets_loss = energy[:, :, tf.newaxis] * targets
-
-        if self.log_loss:
-            prediction = tf.log(1 + prediction)
-            targets_loss = tf.log(1 + targets)
 
         maxlen = self.max_entries
         # if self.use_seeds:
         #    energy=energy[:,0:-1]
         #    targets = targets[:,0:-1,:]
 
-        diff_sq_1 = (prediction[:, :, 0:2] - targets_loss) ** 2 * tf.cast(
+        diff_sq_1 = (prediction[:, :, 0:2] - targets) ** 2 * tf.cast(
             tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
-            tf.newaxis], tf.float32) * sqrt_energy[:, :, tf.newaxis]
-        diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) / tf.reduce_sum(sqrt_energy, axis=-1)
+            tf.newaxis], tf.float32) * loss_energy[:, :, tf.newaxis]
+        diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) / tf.reduce_sum(loss_energy, axis=-1)
         loss_unreduced_1 = (diff_sq_1 / tf.cast(num_entries, tf.float32)) * tf.cast(
             num_entries != 0, tf.float32)
-        if self.is_energy_weighted_loss:
-            loss_unreduced_1 = loss_unreduced_1 / tf.reduce_sum(energy, axis=1)
 
-        diff_sq_2 = (prediction[:, :, 0:2] - (1 - targets_loss)) ** 2 * tf.cast(
+        diff_sq_2 = (prediction[:, :, 0:2] - (1 - targets)) ** 2 * tf.cast(
             tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
-            tf.newaxis], tf.float32) * sqrt_energy[:, :, tf.newaxis]
-        diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) / tf.reduce_sum(sqrt_energy, axis=-1)
+            tf.newaxis], tf.float32) * loss_energy[:, :, tf.newaxis]
+        diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) / tf.reduce_sum(loss_energy, axis=-1)
         loss_unreduced_2 = (diff_sq_2 / tf.cast(num_entries, tf.float32)) * tf.cast(
             num_entries != 0, tf.float32)
-        if self.is_energy_weighted_loss:
-            loss_unreduced_1 = loss_unreduced_1 / tf.reduce_sum(energy, axis=1)
 
         shower_indices = tf.argmin(
             tf.concat((loss_unreduced_1[:, tf.newaxis], loss_unreduced_2[:, tf.newaxis]), axis=-1), axis=-1)

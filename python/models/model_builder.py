@@ -12,6 +12,7 @@ from models.sparse_conv_cluster_make_neighbors_new import SparseConvClusteringMa
 from models.sparse_conv_cluster_bare_baseline import SparseConvClusteringBareBaselineAlpha
 from models.sparse_conv_cluster_truth_seeds_beta import SparseConvClusteringSeedsTruthBeta
 from models.binning_cluster_beta import BinningClusteringBeta
+import tensorflow as tf
 
 
 class ModelBuilder:
@@ -37,29 +38,26 @@ class ModelBuilder:
     def decrypt_model(self, name):
         if name == 'truth_seeds_log_loss':
             model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
-            model.set_log_modes(False, True)
-            model.set_energy_weighted_loss(True)
+            model.set_input_energy_log(False)
+            model.set_loss_energy_function(lambda x: tf.log(x+1))
             return model
         elif name == "truth_seeds_log_energy_log_loss":
             model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
-            model.set_log_modes(True, True)
-            model.set_energy_weighted_loss(True)
+            model.set_input_energy_log(True)
+            model.set_loss_energy_function(lambda x: tf.log(x+1))
             return model
         elif name == "truth_seeds_log_energy":
             model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
-            model.set_log_modes(True, False)
-            model.set_energy_weighted_loss(True)
-            return model
-        elif name == "truth_seeds_energy_weighted":
-            model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
-            model.set_log_modes(False, False)
-            model.set_energy_weighted_loss(True)
+            model.set_input_energy_log(True)
             return model
         elif name == "truth_seeds_seed_talk_off":
             model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
-            model.set_log_modes(False, False)
-            model.set_energy_weighted_loss(False)
+            model.set_input_energy_log(False)
             model.set_seed_talk(False)
+            return model
+        elif name == "truth_seeds_normal_energy":
+            model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
+            model.set_loss_energy_function(tf.identity)
             return model
         else:
             raise RuntimeError("Can't find model")
