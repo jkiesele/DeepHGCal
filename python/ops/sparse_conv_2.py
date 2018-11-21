@@ -103,9 +103,9 @@ def create_edges(vertices_a, vertices_b, zero_is_one_weight=False, n_properties=
     #BxVxF
     expanded_vertices_a = tf.expand_dims(vertices_a, axis=1)
     expanded_vertices_b = tf.expand_dims(vertices_b, axis=2)
-    raw_difference = expanded_vertices_a - expanded_vertices_b
+    raw_difference = expanded_vertices_a - expanded_vertices_b # Bx1xVxF - BxVx1xF = B x V x V x F
     #calculate explicitly rotational symmetric on
-    edges = add_rot_symmetric_distance(raw_difference)
+    edges = add_rot_symmetric_distance(raw_difference) # BxVxVx(F+1)
     
     if n_properties>0:
         edges = edges[:,:,:,0:n_properties]
@@ -121,8 +121,9 @@ def apply_edges(vertices, edges, reduce_sum=True, flatten=True):
     edges = tf.expand_dims(edges,axis=3)
     vertices = tf.expand_dims(vertices,axis=1)
     vertices = tf.expand_dims(vertices,axis=4)
-    
-    out = edges*vertices
+
+    out = edges*vertices # [BxVxV'x1xF] x [Bx1xV'xF'x1] = [BxVxV'xFxF']
+
     if reduce_sum:
         out = tf.reduce_sum(out,axis=2)/float(int(out.shape[2]))
     if flatten:
@@ -184,17 +185,17 @@ def sparse_conv_seeded3(vertices_in,
     #for later
     _sparse_conv_naming_index+=1
     
-    seedselector = make_batch_selection(seed_indices)
+    seedselector = make_batch_selection(seed_indices) # To select seeds from all the features using gather_nd
     
-    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim)
-    
-    seed_trans_space = tf.gather_nd(trans_space,seedselector)
-    
-    edges = create_edges(trans_space,seed_trans_space,n_properties=use_edge_properties)
-    
-    trans_vertices = tf.layers.dense(vertices_in,nfilters,activation=tf.nn.relu)
-    
-    expanded_collapsed = apply_edges(trans_vertices, edges, reduce_sum=True, flatten=True)
+    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim) # Just a couple of dense layers
+
+    seed_trans_space = tf.gather_nd(trans_space,seedselector) # Select seeds from transformed space
+
+    edges = create_edges(trans_space,seed_trans_space,n_properties=use_edge_properties) # BxVxV'xF
+
+    trans_vertices = tf.layers.dense(vertices_in,nfilters,activation=tf.nn.relu) # Just dense again
+
+    expanded_collapsed = apply_edges(trans_vertices, edges, reduce_sum=True, flatten=True) # [BxVxF]
    
     #add back seed features
     seed_all_features = tf.gather_nd(trans_vertices,seedselector)
@@ -219,7 +220,7 @@ def sparse_conv_seeded3(vertices_in,
     print('expanded_collapsed',expanded_collapsed.shape)
     
     #propagate back, transposing the edges does the trick, now they point from Nseeds to Nvertices
-    edges = tf.transpose(edges, perm=[0,2, 1,3])
+    edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
     expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
     if compress_before_propagate:
         expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.tanh,

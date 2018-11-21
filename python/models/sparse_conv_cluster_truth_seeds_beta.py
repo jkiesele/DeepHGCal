@@ -18,9 +18,23 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
 
         self.fixed_seeds = None
         self.is_training = True
+        self.log_energy = False
+        self.log_loss = False
+        self.is_energy_weighted_loss = False
+        self.seed_talk = True
+
+    def set_log_modes(self, log_energy, log_loss):
+        self.log_energy = log_energy
+        self.log_loss = log_loss
 
     def set_training(self, is_training):
         self.is_training = is_training
+
+    def set_energy_weighted_loss(self, is_energy_weighted_loss):
+        self.is_energy_weighted_loss = is_energy_weighted_loss
+
+    def set_seed_talk(self, seed_talk):
+        self.seed_talk=seed_talk
 
     def make_placeholders(self):
         self._placeholder_space_features = tf.placeholder(dtype=tf.float32,
@@ -39,7 +53,7 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
         return self._placeholder_space_features, self._placeholder_space_features_local, self._placeholder_other_features, \
                self._placeholder_targets, self._placeholder_num_entries, self._placeholder_seed_indices
 
-    def get_loss2(self):
+    def _get_loss(self):
         assert self._graph_output.shape[2] == 3
 
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
@@ -49,25 +63,38 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
 
         prediction = self._graph_output
         targets = self._placeholder_targets
+        targets_loss = targets
+
+        if self.is_energy_weighted_loss:
+            prediction = energy[:, :, tf.newaxis] * prediction
+            targets_loss = energy[:, :, tf.newaxis] * targets
+
+        if self.log_loss:
+            prediction = tf.log(1 + prediction)
+            targets_loss = tf.log(1 + targets)
 
         maxlen = self.max_entries
         # if self.use_seeds:
         #    energy=energy[:,0:-1]
         #    targets = targets[:,0:-1,:]
 
-        diff_sq_1 = (prediction[:, :, 0:2] - targets) ** 2 * tf.cast(
+        diff_sq_1 = (prediction[:, :, 0:2] - targets_loss) ** 2 * tf.cast(
             tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
             tf.newaxis], tf.float32) * sqrt_energy[:, :, tf.newaxis]
         diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) / tf.reduce_sum(sqrt_energy, axis=-1)
         loss_unreduced_1 = (diff_sq_1 / tf.cast(num_entries, tf.float32)) * tf.cast(
             num_entries != 0, tf.float32)
+        if self.is_energy_weighted_loss:
+            loss_unreduced_1 = loss_unreduced_1 / tf.reduce_sum(energy, axis=1)
 
-        diff_sq_2 = (prediction[:, :, 0:2] - (1 - targets)) ** 2 * tf.cast(
+        diff_sq_2 = (prediction[:, :, 0:2] - (1 - targets_loss)) ** 2 * tf.cast(
             tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
             tf.newaxis], tf.float32) * sqrt_energy[:, :, tf.newaxis]
         diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) / tf.reduce_sum(sqrt_energy, axis=-1)
         loss_unreduced_2 = (diff_sq_2 / tf.cast(num_entries, tf.float32)) * tf.cast(
             num_entries != 0, tf.float32)
+        if self.is_energy_weighted_loss:
+            loss_unreduced_1 = loss_unreduced_1 / tf.reduce_sum(energy, axis=1)
 
         shower_indices = tf.argmin(
             tf.concat((loss_unreduced_1[:, tf.newaxis], loss_unreduced_2[:, tf.newaxis]), axis=-1), axis=-1)
@@ -95,8 +122,6 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
         return tf.reduce_mean(loss_unreduced_1) * 1000.
         # return tf.reduce_mean(tf.minimum(loss_unreduced_1, loss_unreduced_2)) * 1000.
 
-    def _get_loss(self):
-        return self.get_loss2()
 
 
     def compute_output_seed_driven(self, _input, in_seed_idxs):
@@ -113,7 +138,8 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
         feat = sparse_conv_collapse(net)
         for i in range(8):
             feat = sparse_conv_seeded3(feat, seed_idxs, nfilters=nfilters, nspacefilters=nspacefilters,
-                                      nspacedim=nspacedim)  # ,original_dict=_input)
+                                      nspacedim=nspacedim, seed_talk=self.seed_talk)  # ,original_dict=_input)
+            print(feat.shape)
 
 
         output = tf.layers.dense(feat, 3, activation=tf.nn.relu)
@@ -122,7 +148,8 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
 
     def _compute_output(self):
         feat = self._placeholder_other_features
-        print("feat", feat.shape)
+        if self.log_energy:
+            feat = tf.concat((tf.log(feat[:,:,0][:,:,tf.newaxis]+1), feat[:,:,1][:,:,tf.newaxis]), axis=2)
         space_feat = self._placeholder_space_features
         local_space_feat = self._placeholder_space_features_local
         num_entries = self._placeholder_num_entries

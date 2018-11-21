@@ -91,8 +91,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
         seed_idxs = in_seed_idxs
 
-        nfilters=24
-        nspacefilters=64
+        nfilters=22
+        nspacefilters=30
         nspacedim=4
         
         
@@ -108,21 +108,28 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                        seed_talk=True,
                        compress_before_propagate=True,
                        use_edge_properties=4)
+
+
+        output = tf.layers.dense(feat, 3, activation=tf.nn.relu)
+        output = tf.nn.softmax(output)
+        #
+        # feat = sparse_conv_seeded3(feat,
+        #                seed_idxs,
+        #                nfilters=nspacedim,
+        #                nspacefilters=nspacefilters,
+        #                nspacedim=nspacedim,
+        #                seed_talk=True,
+        #                use_edge_properties=1)
+        # print(feat.shape)
+        # 0/0
+        #
+        # #feat = tf.Print(feat, [feat[0,2146,:]], 'space last layer ',summarize=30)
+        #
+        # feat = get_distance_weight_to_seeds(feat,seed_idxs,
+        #                                       dimensions = 3,
+        #                                       add_zeros = 1)
         
-        feat = sparse_conv_seeded3(feat, 
-                       seed_idxs, 
-                       nfilters=nspacedim, 
-                       nspacefilters=nspacefilters, 
-                       nspacedim=nspacedim, 
-                       seed_talk=True,
-                       use_edge_properties=1)
-        #feat = tf.Print(feat, [feat[0,2146,:]], 'space last layer ',summarize=30)    
-        
-        feat = get_distance_weight_to_seeds(feat,seed_idxs,
-                                              dimensions = 3, 
-                                              add_zeros = 1)
-        
-        return feat
+        return output
         
     def compute_output_full_adjecency(self,_input):
         
@@ -208,9 +215,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         #simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
         #output=self.compute_output_seed_driven(net,seeds)#self._placeholder_seed_indices)
-        output = self.compute_output_seed_driven_neighbours(net,seeds)
+        # output = self.compute_output_seed_driven_neighbours(net,seeds)
         #output = self.compute_output_neighbours(net,self._placeholder_seed_indices)
-        #output=self.compute_output_seed_driven(_input,self._placeholder_seed_indices)
+        output=self.compute_output_seed_driven(net,self._placeholder_seed_indices)
         #output=self.compute_output_full_adjecency(_input)
         
         output = tf.nn.softmax(output)
