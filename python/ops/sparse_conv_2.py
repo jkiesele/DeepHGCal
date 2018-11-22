@@ -233,13 +233,30 @@ def sparse_conv_seeded3(vertices_in,
                                        kernel_initializer=NoisyEyeInitializer)
     return feature_layerout
 
-
+def sparse_conv_global_exchange(vertices_in, 
+                                expand_to_dims=-1,
+                                collapse_to_dims=-1):
+    
+    trans_vertices_in = vertices_in
+    if expand_to_dims>0:
+        trans_vertices_in = tf.layers.dense(trans_vertices_in,expand_to_dims,activation=tf.nn.relu)
+        
+    global_summed = tf.reduce_mean(trans_vertices_in, axis=1, keepdims=True)
+    global_summed = tf.tile(global_summed,[1,vertices_in.shape[1],1])
+    vertices_out = tf.concat([vertices_in,global_summed],axis=-1)
+    if collapse_to_dims>0:
+        vertices_out = tf.layers.dense(vertices_out, collapse_to_dims, activation=tf.nn.tanh)
+    
+    return vertices_out
+    
 
 
 def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10, 
                                output_all=15, space_transformations=10,
                                merge_neighbours=1,
-                               edge_activation=gauss_of_lin):
+                               edge_activation=gauss_of_lin,
+                               indexing=None,
+                               ):
     
     assert merge_neighbours <= num_neighbors
     global _sparse_conv_naming_index
@@ -277,6 +294,14 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     orig_edges = edges
     for f in output_all:
         #interpret distances in a different way -> dense on edges (with funny activations TBI)
+        if f < 0:
+            #this is a global interaction
+            global_summed = tf.reduce_mean(updated_vertices, axis=1, keepdims=True)
+            global_summed = tf.tile(global_summed,[1,updated_vertices.shape[1],1])
+            updated_vertices = tf.concat([updated_vertices,global_summed],axis=-1)
+            continue
+        
+        
         edges = tf.layers.dense(tf.concat([orig_edges,edges], axis=-1), 
                                 edges.shape[-1],activation=edge_activation,
                                 kernel_initializer = NoisyEyeInitializer)
@@ -311,5 +336,24 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     return updated_vertices
 
 
+def max_pool_on_last_dimensions(vertices_in, skip_first_features, n_output_vertices):
+    
+    all_features = vertices_in[:,:,skip_first_features:-1]
+    
+    _, I = tf.nn.top_k(tf.reduce_max(all_features, axis=2), n_output_vertices)
+    I = tf.expand_dims(I, axis=2)
+
+    batch_range = tf.expand_dims(tf.expand_dims(tf.range(0, vertices_in.shape[0]), axis=1), axis=1)
+    batch_range = tf.tile(batch_range, [1,n_output_vertices, 1])
+    _indexing_tensor = tf.concat([batch_range, I], axis=2)
+    
+    return tf.gather_nd(vertices_in, _indexing_tensor)
+    
+    
+    
+    
+    
+    
+    
     
     
