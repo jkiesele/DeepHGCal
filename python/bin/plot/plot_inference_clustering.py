@@ -100,7 +100,7 @@ print("Y-Test", max(energy_values), np.min(energy_values))
 
 
 def get_mean_variance_histograms(energy_values, histogram_values_resolution):
-    nbins=30
+    nbins=20
     min_value = np.min(energy_values)
     max_value = np.max(energy_values)
 
@@ -131,7 +131,7 @@ def get_mean_variance_histograms(energy_values, histogram_values_resolution):
 
 
 def diff_2d_plot(energy_values, histogram_values_resolution):
-    nbins=30
+    nbins=10
     energy_values_1 = energy_values[0::2]
     energy_values_2 = energy_values[1::2]
     min_energy, max_energy = np.min(energy_values), np.max(energy_values)
@@ -142,6 +142,7 @@ def diff_2d_plot(energy_values, histogram_values_resolution):
     bin_indices_y = np.minimum((energy_values_2 - min_energy)*nbins/(max_energy-min_energy), nbins-1).astype(np.int64)
 
     mean_2d = np.zeros((nbins,nbins), dtype=np.float32)
+    variance_2d = np.zeros((nbins,nbins), dtype=np.float32)
     count_2d = np.zeros((nbins,nbins), dtype=np.int64)
 
     for i in range(len(energy_values_1)):
@@ -152,14 +153,19 @@ def diff_2d_plot(energy_values, histogram_values_resolution):
 
     mean_2d /= count_2d
 
+    for i in range(len(energy_values_1)):
+        variance_2d[bin_indices_x[i], bin_indices_y[i]] += float(histogram_values_resolution[i*2] - mean_2d[bin_indices_x[i], bin_indices_y[i]])**2
+        variance_2d[bin_indices_y[i], bin_indices_x[i]] += float(histogram_values_resolution[i*2+1] - mean_2d[bin_indices_y[i], bin_indices_x[i]])**2
+
+    variance_2d = variance_2d/(count_2d-1)
     mean_2d = np.flip(mean_2d, axis=0)
     count_2d = np.flip(count_2d, axis=0)
 
-    return mean_2d, count_2d, energy_values_x
+    return mean_2d, variance_2d, count_2d, energy_values_x
 
 
 resolution_mean_fo_energy, resolution_variance_fo_energy, energy_values_x, count = get_mean_variance_histograms(energy_values, histogram_values_resolution)
-mean_2d, count_2d, energy_values_x_2d = diff_2d_plot(energy_values, histogram_values_resolution)
+mean_2d, variance_2d, count_2d, energy_values_x_2d = diff_2d_plot(energy_values, histogram_values_resolution)
 
 output_string = str(("Resolution mean:", mean, "Resolution variance :", variance, "Loss mean:", loss_mean, "Loss variance:", loss_variance))
 
@@ -206,9 +212,19 @@ fig = plt.figure(1)
 cax = plt.imshow(mean_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
 plt.xlabel("Shower 1 energy")
 plt.ylabel("Shower 2 energy")
-plt.title("Resolution")
+plt.title("Response (mean)")
 cbar = fig.colorbar(cax)
-plt.savefig(os.path.join(config['test_out_path'], 'mean_resolution_2d_fo_energy.png'))
+plt.savefig(os.path.join(config['test_out_path'], 'response_mean_2d_fo_energy.png'))
+
+
+plt.clf()
+fig = plt.figure(1)
+cax = plt.imshow(variance_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
+plt.xlabel("Shower 1 energy")
+plt.ylabel("Shower 2 energy")
+plt.title("Response (variance)")
+cbar = fig.colorbar(cax)
+plt.savefig(os.path.join(config['test_out_path'], 'response_variance_2d_fo_energy.png'))
 
 
 plt.clf()

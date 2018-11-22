@@ -12,6 +12,7 @@ from models.sparse_conv_cluster_make_neighbors_new import SparseConvClusteringMa
 from models.sparse_conv_cluster_bare_baseline import SparseConvClusteringBareBaselineAlpha
 from models.sparse_conv_cluster_truth_seeds_beta import SparseConvClusteringSeedsTruthBeta
 from models.binning_cluster_beta import BinningClusteringBeta
+from models.binning_cluster_gamma import BinningClusteringGamma
 import tensorflow as tf
 
 
