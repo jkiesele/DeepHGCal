@@ -283,7 +283,11 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     else:
         trans_space = vertices_in[:,:,0:space_transformations[-1]]
 
-    indexing, _ = indexing_tensor_2(trans_space, num_neighbors)
+    indexing = None
+    if train_space==False and space_transformations[-1] <= 3:
+        indexing, _ = indexing_tensor_2(trans_space[0:1,:,:], num_neighbors, n_batch=trans_space.shape[0])
+    else:
+        indexing, _ = indexing_tensor_2(trans_space, num_neighbors)
     
     neighbour_space = tf.gather_nd(trans_space, indexing)
     
