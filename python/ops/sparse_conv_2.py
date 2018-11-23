@@ -256,6 +256,8 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
                                merge_neighbours=1,
                                edge_activation=gauss_of_lin,
                                indexing=None,
+                               edge_transformations=None,
+                               train_space=True
                                ):
     
     assert merge_neighbours <= num_neighbors
@@ -269,14 +271,17 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     
     
     trans_space = vertices_in
-    for i in range(len(space_transformations)):
-        if i< len(space_transformations)-1:
-            trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=open_tanh,
-                                       kernel_initializer=NoisyEyeInitializer)
-            trans_space*=10.
-        else:
-            trans_space = tf.layers.dense(trans_space,space_transformations[i],activation=None,
-                                       kernel_initializer=NoisyEyeInitializer)
+    if train_space:
+        for i in range(len(space_transformations)):
+            if i< len(space_transformations)-1:
+                trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=open_tanh,
+                                           kernel_initializer=NoisyEyeInitializer)
+                trans_space*=10.
+            else:
+                trans_space = tf.layers.dense(trans_space,space_transformations[i],activation=None,
+                                           kernel_initializer=NoisyEyeInitializer)
+    else:
+        trans_space = vertices_in[:,:,0:space_transformations[-1]]
 
     indexing, _ = indexing_tensor_2(trans_space, num_neighbors)
     
@@ -289,10 +294,14 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     #edges = apply_distance_weight(edges)
     edges = tf.expand_dims(edges,axis=3)
     
+    if edge_transformations is not None:
+        edge_transformations = make_sequence(edge_transformations)
+        assert len(edge_transformations) == len(output_all)
         
     updated_vertices = vertices_in
     orig_edges = edges
-    for f in output_all:
+    for i in range(len(output_all)):
+        f = output_all[i]
         #interpret distances in a different way -> dense on edges (with funny activations TBI)
         if f < 0:
             #this is a global interaction
@@ -302,7 +311,12 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
             continue
         
         
-        edges = tf.layers.dense(tf.concat([orig_edges,edges], axis=-1), 
+        concat_edges = tf.concat([orig_edges,edges],axis=-1)
+        if edge_transformations is not None:
+            concat_edges = tf.layers.dense(concat_edges, edge_transformations[i],
+                                           activation=edge_activation)
+            
+        edges = tf.layers.dense(concat_edges, 
                                 edges.shape[-1],activation=edge_activation,
                                 kernel_initializer = NoisyEyeInitializer)
         
@@ -316,22 +330,7 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
                                            f, activation=tf.nn.relu) 
 
 
-    if merge_neighbours>1:
-        rest = int(vertices_in.shape[1])%merge_neighbours
-        if rest == 0:
-            rest=merge_neighbours
-        cut_at = int((int(vertices_in.shape[1])+merge_neighbours-rest)/merge_neighbours)
-        gathered_feat = tf.gather_nd(updated_vertices, indexing)
-        gathered_feat = gathered_feat[:,0:cut_at,0:merge_neighbours,:]
-        gathered_feat = tf.reshape(gathered_feat, [gathered_feat.shape[0],gathered_feat.shape[1],-1])
-        #do dimension averaging
-        gathered_space = tf.gather_nd(trans_space, indexing)
-        gathered_space = gathered_space[:,0:cut_at,0:merge_neighbours,:]
-        gathered_space = tf.reduce_mean(gathered_space, axis=2)
-        updated_vertices = tf.concat([gathered_space,gathered_feat],axis=-1) 
-        
-    else:
-        updated_vertices = tf.concat([trans_space,updated_vertices],axis=-1)
+    updated_vertices = tf.concat([trans_space,updated_vertices],axis=-1)
         
     return updated_vertices
 
