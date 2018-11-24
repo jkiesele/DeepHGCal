@@ -1,6 +1,6 @@
 import tensorflow as tf
 from models.sparse_conv_clustering_base import SparseConvClusteringBase
-from ops.sparse_conv import *
+from ops.sparse_conv_2 import *
 from models.switch_model import SwitchModel
 
 
@@ -33,13 +33,12 @@ class SparseConvClusteringMakeNeighborsNew(SparseConvClusteringBase):
         return self._placeholder_space_features, self._placeholder_space_features_local, self._placeholder_other_features, \
                self._placeholder_targets, self._placeholder_num_entries, self._placeholder_seed_indices
 
-    def get_loss2(self):
+    def _get_loss(self):
         assert self._graph_output.shape[2] == 3
 
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
         print('num_entries', num_entries.shape)
-        energy = self._placeholder_other_features[:, :, 0]
-        sqrt_energy = tf.sqrt(energy)
+        energy = loss_energy = self._placeholder_other_features[:, :, 0]
 
         prediction = self._graph_output
         targets = self._placeholder_targets
@@ -51,15 +50,15 @@ class SparseConvClusteringMakeNeighborsNew(SparseConvClusteringBase):
 
         diff_sq_1 = (prediction[:, :, 0:2] - targets) ** 2 * tf.cast(
             tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
-            tf.newaxis], tf.float32) * sqrt_energy[:, :, tf.newaxis]
-        diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) / tf.reduce_sum(sqrt_energy, axis=-1)
+            tf.newaxis], tf.float32) * loss_energy[:, :, tf.newaxis]
+        diff_sq_1 = tf.reduce_sum(diff_sq_1, axis=[-1, -2]) / tf.reduce_sum(loss_energy, axis=-1)
         loss_unreduced_1 = (diff_sq_1 / tf.cast(num_entries, tf.float32)) * tf.cast(
             num_entries != 0, tf.float32)
 
         diff_sq_2 = (prediction[:, :, 0:2] - (1 - targets)) ** 2 * tf.cast(
             tf.sequence_mask(num_entries, maxlen=self.max_entries)[:, :,
-            tf.newaxis], tf.float32) * sqrt_energy[:, :, tf.newaxis]
-        diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) / tf.reduce_sum(sqrt_energy, axis=-1)
+            tf.newaxis], tf.float32) * loss_energy[:, :, tf.newaxis]
+        diff_sq_2 = tf.reduce_sum(diff_sq_2, axis=[-1, -2]) / tf.reduce_sum(loss_energy, axis=-1)
         loss_unreduced_2 = (diff_sq_2 / tf.cast(num_entries, tf.float32)) * tf.cast(
             num_entries != 0, tf.float32)
 
@@ -77,56 +76,35 @@ class SparseConvClusteringMakeNeighborsNew(SparseConvClusteringBase):
         perf2 = tf.reduce_sum(prediction[:, :, 1] * energy, axis=[-1]) / tf.reduce_sum(sorted_target[:, :, 1] * energy,
                                                                                        axis=[-1])
 
+        self._histogram_resolution = tf.summary.histogram("histogram_resolution_tboard", tf.concat((perf1, perf2), axis=0))
+
         mean_resolution, variance_resolution = tf.nn.moments(tf.concat((perf1, perf2), axis=0), axes=0)
 
         self.mean_resolution = tf.clip_by_value(mean_resolution, 0.2, 2)
         self.variance_resolution = tf.clip_by_value(variance_resolution, 0, 1) / tf.clip_by_value(mean_resolution, 0.2,
                                                                                                   2)
-
         return tf.reduce_mean(loss_unreduced_1) * 1000.
-        return tf.reduce_mean(tf.minimum(loss_unreduced_1, loss_unreduced_2)) * 1000.
 
-    def _get_loss(self):
-        return self.get_loss2()
-
-    def compute_output_neighbours(self, _input, seeds):
-        momentum = 0.9
-
-        propagrate_ahead = True
-
+    def compute_output_neighbours(self, _input):
         net = _input
-        net = sparse_conv_add_simple_seed_labels(net, seeds)
-        net = sparse_conv_batchnorm(net, momentum=momentum)
-        out = []
-        neta, netb = sparse_conv_split_batch(net, int(float(int(net['all_features'].shape[0])) / 2))
-        nets = [neta, netb]
 
-        # for i in range(len(nets)):
-        #    with tf.device("/job:localhost/replica:0/task:0/device:GPU:"+str(i)):
-        #        with tf.variable_scope('netscope',reuse=tf.AUTO_REUSE) as vscope:
-        #            net = nets[i]
-        net = sparse_conv_mix_colours_to_space(net)
-        net = sparse_conv_make_neighbors2(net, num_neighbors=16, output_all=[16 for i in range(16)],
-                                          space_transformations=[16, 4],
-                                          propagrate_ahead=propagrate_ahead,
-                                          strict_global_space=False,
-                                          name="1")
-        net = sparse_conv_batchnorm(net, momentum=momentum)
+        net = sparse_conv_normalise(net)
 
-        net = sparse_conv_mix_colours_to_space(net)
-        net = sparse_conv_make_neighbors2(net, num_neighbors=8, output_all=[16 for i in range(20)],
-                                          space_transformations=[16, 4],
-                                          propagrate_ahead=propagrate_ahead,
-                                          strict_global_space=False,
-                                          name="2")
-        net = sparse_conv_batchnorm(net, momentum=momentum)
+        net = sparse_conv_collapse(net)
 
-        flatout = sparse_conv_collapse(net)
-        flatout = tf.layers.dense(flatout, 3, activation=tf.nn.relu)
+        net = sparse_conv_make_neighbors2(net, num_neighbors=16, output_all=[16,16,-1,16,16,16,16,16,16],
+                                          space_transformations=[16, 4])
+        net = sparse_conv_make_neighbors2(net, num_neighbors=16, output_all=[16,16,-1,16,16,16,16,16,16],
+                                          space_transformations=[16, 4])
+        net = sparse_conv_make_neighbors2(net, num_neighbors=16, output_all=[16,16,-1,16,16,16,16,16,16],
+                                          space_transformations=[16, 4])
+        net = sparse_conv_make_neighbors2(net, num_neighbors=16, output_all=[16,16,-1,16,16,16,16,16,16],
+                                          space_transformations=[16, 4])
+
+        flatout = tf.layers.dense(net, 3, activation=tf.nn.relu)
         flatout = tf.nn.softmax(flatout)
-        out.append(flatout)
 
-        output = tf.concat(out, axis=0)
+        output = tf.concat(flatout, axis=0)
         return output
 
     def _compute_output(self):
@@ -137,20 +115,11 @@ class SparseConvClusteringMakeNeighborsNew(SparseConvClusteringBase):
         num_entries = self._placeholder_num_entries
         n_batch = space_feat.shape[0]
 
-        seed_idxs = None
-
-        seeds = self._placeholder_seed_indices
-        seeds = tf.transpose(seeds, [1, 0])
-        seeds = tf.random_shuffle(seeds)
-        seeds = tf.transpose(seeds, [1, 0])
-        # seeds = self._placeholder_seed_indices
-        print('seeds', seeds.shape)
-
         _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
 
         simple_input = tf.concat([space_feat, local_space_feat, feat], axis=-1)
-        output = self.compute_output_neighbours(_input, seeds)  # self._placeholder_seed_indices)
+        output = self.compute_output_neighbours(_input)  # self._placeholder_seed_indices)
         self._graph_temp = tf.reduce_sum(output[:, :, :], axis=1) / 2679.
 
         return output

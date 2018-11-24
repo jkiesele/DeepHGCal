@@ -23,6 +23,7 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
         self.seed_talk = True
         self.sqrt_energy = True
         self.loss_energy_function = tf.sqrt
+        self.min_loss_mode = False
 
     def set_input_energy_log(self, log_energy):
         self.log_energy = log_energy
@@ -58,6 +59,9 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
     def get_placeholders(self):
         return self._placeholder_space_features, self._placeholder_space_features_local, self._placeholder_other_features, \
                self._placeholder_targets, self._placeholder_num_entries, self._placeholder_seed_indices
+
+    def set_min_loss_mode(self, min_loss_mode):
+        self.min_loss_mode = min_loss_mode
 
     def _get_loss(self):
         assert self._graph_output.shape[2] == 3
@@ -114,10 +118,8 @@ class SparseConvClusteringSeedsTruthBeta(SparseConvClusteringBase):
         self.mean_resolution = tf.clip_by_value(mean_resolution, 0.2, 2)
         self.variance_resolution = tf.clip_by_value(variance_resolution, 0, 1) / tf.clip_by_value(mean_resolution, 0.2,
                                                                                                   2)
-
-
-        return tf.reduce_mean(loss_unreduced_1) * 1000.
-        # return tf.reduce_mean(tf.minimum(loss_unreduced_1, loss_unreduced_2)) * 1000.
+        return tf.reduce_mean(loss_unreduced_1) * 1000. if not self.min_loss_mode else tf.reduce_mean(
+            tf.minimum(loss_unreduced_1, loss_unreduced_2)) * 1000.
 
 
 

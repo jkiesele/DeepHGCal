@@ -32,7 +32,7 @@ def sparse_conv_collapse(sparse_dict):
                                                                                  sparse_dict['spatial_features_local'], \
                                                                                  sparse_dict['num_entries']
     return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)                                                                             
-    
+
 
 
 def sprint(tensor,pstr):

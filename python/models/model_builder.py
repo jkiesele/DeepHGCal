@@ -14,6 +14,7 @@ from models.sparse_conv_cluster_truth_seeds_beta import SparseConvClusteringSeed
 from models.binning_cluster_beta import BinningClusteringBeta
 from models.binning_cluster_gamma import BinningClusteringGamma
 import tensorflow as tf
+from models.sparse_conv_constant_neighbors_alpha import SparseConvConstantNeighborsAlpha
 
 
 class ModelBuilder:
@@ -59,6 +60,10 @@ class ModelBuilder:
         elif name == "truth_seeds_normal_energy":
             model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
             model.set_loss_energy_function(tf.identity)
+            return model
+        elif name == "truth_seeds_min_loss":
+            model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
+            model.set_min_loss_mode(True)
             return model
         else:
             raise RuntimeError("Can't find model")

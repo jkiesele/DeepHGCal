@@ -42,14 +42,13 @@ with open(os.path.join(config['test_out_path'], 'inference_output_files.txt')) a
             data=pickle.load(f)
             for j in data:
                 input, num_entries, output = j
-                output = output[:,0:2]
+                output = np.nan_to_num(output[:,0:2])
 
                 spatial = input[:, spatial_features_indices]
                 targets = input[:, target_indices]
                 energy = input[:,other_features_indices][:,0]
 
                 num_entries = float(np.asscalar(num_entries))
-
 
                 diff_sq_1 = (output - targets) ** 2 * energy[:, np.newaxis]  # TODO: Multiply by sequence mask
                 loss_1 = ((1/num_entries)*np.sum(diff_sq_1) / np.sum(energy, axis=-1)) * float(num_entries!=0)
@@ -143,25 +142,31 @@ def diff_2d_plot(energy_values, histogram_values_resolution):
 
     mean_2d = np.zeros((nbins,nbins), dtype=np.float32)
     variance_2d = np.zeros((nbins,nbins), dtype=np.float32)
-    count_2d = np.zeros((nbins,nbins), dtype=np.int64)
+    freq_2d = np.zeros((nbins,nbins), dtype=np.int64)
 
     for i in range(len(energy_values_1)):
-        mean_2d[bin_indices_x[i], bin_indices_y[i]] += histogram_values_resolution[i*2]
-        mean_2d[bin_indices_y[i], bin_indices_x[i]] += histogram_values_resolution[i*2+1]
-        count_2d[bin_indices_x[i], bin_indices_y[i]] += 1
-        count_2d[bin_indices_y[i], bin_indices_x[i]] += 1
+        mean_2d[bin_indices_y[i], bin_indices_x[i]] += histogram_values_resolution[i*2]
+        mean_2d[bin_indices_x[i], bin_indices_y[i]] += histogram_values_resolution[i*2+1]
+        freq_2d[bin_indices_y[i], bin_indices_x[i]] += 1
+        freq_2d[bin_indices_x[i], bin_indices_y[i]] += 1
 
-    mean_2d /= count_2d
+    mean_2d /= freq_2d
 
     for i in range(len(energy_values_1)):
         variance_2d[bin_indices_x[i], bin_indices_y[i]] += float(histogram_values_resolution[i*2] - mean_2d[bin_indices_x[i], bin_indices_y[i]])**2
-        variance_2d[bin_indices_y[i], bin_indices_x[i]] += float(histogram_values_resolution[i*2+1] - mean_2d[bin_indices_y[i], bin_indices_x[i]])**2
+        # variance_2d[bin_indices_y[i], bin_indices_x[i]] += float(histogram_values_resolution[i*2+1] - mean_2d[bin_indices_y[i], bin_indices_x[i]])**2
 
-    variance_2d = variance_2d/(count_2d-1)
+    variance_2d = variance_2d/(freq_2d-1)
+
+    mean_2d[freq_2d == 0] = 0
+    variance_2d[freq_2d == 0] = 0
+
     mean_2d = np.flip(mean_2d, axis=0)
-    count_2d = np.flip(count_2d, axis=0)
+    freq_2d = np.flip(freq_2d, axis=0)
+    variance_2d = np.flip(variance_2d, axis=0)
 
-    return mean_2d, variance_2d, count_2d, energy_values_x
+
+    return mean_2d, variance_2d, freq_2d, energy_values_x
 
 
 resolution_mean_fo_energy, resolution_variance_fo_energy, energy_values_x, count = get_mean_variance_histograms(energy_values, histogram_values_resolution)
@@ -212,7 +217,7 @@ fig = plt.figure(1)
 cax = plt.imshow(mean_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
 plt.xlabel("Shower 1 energy")
 plt.ylabel("Shower 2 energy")
-plt.title("Response (mean)")
+plt.title("Response of shower 1 (mean)")
 cbar = fig.colorbar(cax)
 plt.savefig(os.path.join(config['test_out_path'], 'response_mean_2d_fo_energy.png'))
 
@@ -222,7 +227,7 @@ fig = plt.figure(1)
 cax = plt.imshow(variance_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
 plt.xlabel("Shower 1 energy")
 plt.ylabel("Shower 2 energy")
-plt.title("Response (variance)")
+plt.title("Response of shower 1 (variance)")
 cbar = fig.colorbar(cax)
 plt.savefig(os.path.join(config['test_out_path'], 'response_variance_2d_fo_energy.png'))
 

@@ -1,14 +1,14 @@
 import tensorflow as tf
 from models.sparse_conv_clustering_base import SparseConvClusteringBase
-from ops.sparse_conv import *
+from ops.sparse_conv_2 import *
 from models.switch_model import SwitchModel
 import readers.indices_calculated as ic
 
 
-class BinningClusteringGamma(SparseConvClusteringBase):
+class SparseConvConstantNeighborsAlpha(SparseConvClusteringBase):
 
     def __init__(self, n_space, n_space_local, n_others, n_target_dim, batch_size, max_entries, learning_rate=0.0001):
-        super(BinningClusteringGamma, self).__init__(n_space, n_space_local, n_others, n_target_dim, batch_size,
+        super(SparseConvConstantNeighborsAlpha, self).__init__(n_space, n_space_local, n_others, n_target_dim, batch_size,
                                                      max_entries,
                                                      learning_rate)
         self.weight_weights = []
@@ -100,51 +100,33 @@ class BinningClusteringGamma(SparseConvClusteringBase):
         # net = tf.concat((net, self._placeholder_space_features_local), axis=2)
 
         # TODO: Will cause problems with batch size of 1
+        feat = self._placeholder_other_features
+        space_feat = self._placeholder_space_features
+        local_space_feat = self._placeholder_space_features_local
+        num_entries = self._placeholder_num_entries
+        n_batch = space_feat.shape[0]
 
-        binned_input = self.construct_conversion_ops()
+        _input = construct_sparse_io_dict(feat, space_feat, local_space_feat,
+                                          tf.squeeze(num_entries))
 
-        # 8x8x25x64
-        x = binned_input
+        feat = sparse_conv_collapse(_input)
 
-        x = tf.layers.conv3d(0.001 * x, 50, [1, 1, 1], activation=tf.nn.leaky_relu, padding='same')
-        x = tf.layers.conv3d(x, 50, [1, 1, 1], activation=tf.nn.leaky_relu, padding='same')
-        x = tf.layers.conv3d(x, 50, [1, 1, 1], activation=tf.nn.leaky_relu, padding='same')
-        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 32, [1, 1, 5], activation=tf.nn.relu, padding='same')  # 8x8x25x32
+        transformations = [16, -1, 16, 16, -1, 16] * 2
+        edge_transformations = None  # [32,-1,32,32,-1,32]
 
-        y = tf.layers.max_pooling3d(x, (2, 2, 2), 2)  # 4x4x12x32
-        y = tf.layers.conv3d(y, 32, [1, 1, 4], activation=tf.nn.relu, padding='same')  # 4x4x12x32
-        y = tf.layers.max_pooling3d(y, (1, 1, 3), (1,1,3))  # 4x4x4x32
-        y = tf.layers.conv3d(y, 16, [2, 2, 1], activation=tf.nn.relu, padding='same')  # 4x4x4x32
-        y = tf.layers.max_pooling3d(y, (2, 2, 1), (2,2,1))  # 2x2x4x16≈
-        y = tf.layers.conv3d_transpose(y, 16, [2, 2, 1], [2,2,1], activation=tf.nn.relu, padding='same')  # 4x4x4x16
-        y = tf.layers.conv3d_transpose(y, 16, [1, 1, 2], [1,1,2], activation=tf.nn.relu, padding='same')  # 4x4x8x16
-        y = tf.layers.conv3d_transpose(y, 16, [2, 2, 1], [2,2,1], activation=tf.nn.relu, padding='same')  # 8x8x8x16
-        y = tf.layers.conv3d_transpose(y, 8, [1, 1, 3], [1,1,3], activation=tf.nn.relu, padding='same')  # 4x4x8x16
-        y = tf.pad(y, tf.constant([[0, 0], [0, 0], [0, 0], [0, 1], [0, 0]]))
+        feat = sparse_conv_make_neighbors2(feat, num_neighbors=24,
+                                           output_all=transformations,
+                                           edge_transformations=edge_transformations,
+                                           edge_activation=gauss_times_linear,
+                                           space_transformations=[3],
+                                           train_space=False)
 
-        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 24, [1, 1, 5], activation=tf.nn.relu, padding='same')
+        feat = tf.layers.dense(feat, 3, activation=tf.nn.relu)
+        feat = tf.nn.softmax(feat)
 
-        x = tf.concat((x,y), axis=-1)
+        self._graph_temp = feat
 
-        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 32, [1, 1, 5], strides=(1, 1, 1), activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
-
-        x = tf.layers.conv3d(x, 32, [1, 1, 5], strides=(1, 1, 1), activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 32, [1, 1, 5], strides=(1, 1, 1), activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 32, [2, 2, 1], activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 48, [1, 1, 3], activation=tf.nn.relu, padding='same')
-
-        x = tf.reshape(x, [self.batch_size, 8, 8, 25, 16, 3])
-        output = tf.gather_nd(x, self.indexing_array)
-        output = tf.nn.softmax(output)
-
-        self._graph_temp = output
-
-        return output
+        return feat
 
     def get_variable_scope(self):
         return 'sparse_conv_clustering_spatial1'
