@@ -122,7 +122,7 @@ def apply_edges(vertices, edges, reduce_sum=True, flatten=True):
     vertices = tf.expand_dims(vertices,axis=1)
     vertices = tf.expand_dims(vertices,axis=4)
 
-    out = edges*vertices # [BxVxV'x1xF] x [Bx1xV'xF'x1] = [BxVxV'xFxF']
+    out = edges*vertices # [BxVxV'x1xF] x [Bx1xV'xF'x1] = [BxVxV'xF'xF]
 
     if reduce_sum:
         out = tf.reduce_sum(out,axis=2)/float(int(out.shape[2]))

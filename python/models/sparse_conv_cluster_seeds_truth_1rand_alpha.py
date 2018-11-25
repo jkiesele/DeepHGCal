@@ -1,6 +1,6 @@
 import tensorflow as tf
 from models.sparse_conv_clustering_base import SparseConvClusteringBase
-from ops.sparse_conv import *
+from ops.sparse_conv_2 import *
 from models.switch_model import SwitchModel
 
 
@@ -94,22 +94,19 @@ class SparseConvClusteringSeedsTruthPlusOneRandomAlpha(SparseConvClusteringBase)
         return self.get_loss2()
 
     def compute_output_seed_driven(self, _input, in_seed_idxs):
-        momentum = 0.9
-        _input = sparse_conv_batchnorm(_input, momentum=momentum, training=self.is_training)
-
         net = _input
-
+        net = sparse_conv_normalise(net)
         # anyway uses everything
         # net = sparse_conv_mix_colours_to_space(net)
-        nfilters = 24
-        nspacefilters = 32
+        nfilters = 20
+        nspacefilters = 28
         nspacedim = 4
 
         feat = sparse_conv_collapse(net)
-        for i in range(11):
-            feat = sparse_conv_seeded(None, feat, in_seed_idxs, 1, nfilters=nfilters, nspacefilters=nspacefilters,
-                                      nspacetransform=1, nspacedim=nspacedim)  # ,original_dict=_input)
-            feat = tf.layers.batch_normalization(feat, momentum=momentum, training=self.is_training)
+        for i in range(8):
+            feat = sparse_conv_seeded3(feat, in_seed_idxs, nfilters=nfilters, nspacefilters=nspacefilters,
+                                      nspacedim=nspacedim, seed_talk=True)  # ,original_dict=_input)
+            print(feat.shape)
 
         output = tf.layers.dense(feat, 3, activation=tf.nn.relu)
         output = tf.nn.softmax(output)

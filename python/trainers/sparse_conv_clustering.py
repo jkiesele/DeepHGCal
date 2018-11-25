@@ -196,7 +196,7 @@ class SparseConvClusteringTrainer:
         if self.from_scratch:
             self.clean_summary_dir()
 
-        inputs_feed = self.reader_factory.get_class(self.reader_type)(self.test_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
+        inputs_feed = self.reader_factory.get_class(self.reader_type)(self.test_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds(shuffle=False)
 
         inference_streamer = InferenceOutputStreamer(output_path=self.test_out_path, cache_size=100)
         inference_streamer.start_thread()

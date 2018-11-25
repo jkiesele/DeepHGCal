@@ -16,7 +16,7 @@ class FixNumEntriesReader(DataAndNumEntriesReader):
         parsed_features = tf.parse_single_example(example_proto, keys_to_features)
         return parsed_features['data']
 
-    def get_feeds(self):
+    def get_feeds(self, shuffle=True):
         """
         Returns the feeds (data, num_entries)
 
@@ -33,7 +33,8 @@ class FixNumEntriesReader(DataAndNumEntriesReader):
         file_paths = [x.strip() for x in content]
         dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
         dataset = dataset.map(self._parse_function)
-        dataset = dataset.shuffle(buffer_size=self.num_batch * 3 if self.shuffle_size is None else self.shuffle_size)
+        if shuffle:
+            dataset = dataset.shuffle(buffer_size=self.num_batch * 3 if self.shuffle_size is None else self.shuffle_size)
         dataset = dataset.repeat(None if self.repeat else 1)
         dataset = dataset.batch(self.num_batch)
         iterator = dataset.make_one_shot_iterator()

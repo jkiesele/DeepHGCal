@@ -13,8 +13,6 @@ import configparser as cp
 from libs.plots import plot_clustering
 from matplotlib import cm
 
-
-
 parser = argparse.ArgumentParser(description='Plot clustering model output')
 parser.add_argument('input', help="Path to the config file which was used to train")
 parser.add_argument('config', help="Config section within the config file")
@@ -83,7 +81,6 @@ with open(os.path.join(config['test_out_path'], 'inference_output_files.txt')) a
                 # plot_clustering(spatial=spatial, energy=energy, prediction=output, fig=a)
                 # plot_clustering(spatial=spatial, energy=energy, prediction=sorted_target, fig=b)
                 # print("%05.5f %05.5f %05.5f %05.5f" % (loss_1, loss_2, perf1, perf2))
-                #3
                 # plt.show()
 
                 index+=1
@@ -121,7 +118,7 @@ def get_mean_variance_histograms(energy_values, histogram_values_resolution):
     for i in range(len(energy_values)):
         square_difference[bin_index[i]] += float(histogram_values_resolution[i] - mean_resolution_values[bin_index[i]])**2
 
-    varaince_resolution_values = square_difference / (count-1)
+    varaince_resolution_values = square_difference / (count)
 
     # mean_resolution_values[(count-1)==0]=0
     # mean_resolution_values[(count)==0]=0
@@ -153,10 +150,10 @@ def diff_2d_plot(energy_values, histogram_values_resolution):
     mean_2d /= freq_2d
 
     for i in range(len(energy_values_1)):
-        variance_2d[bin_indices_x[i], bin_indices_y[i]] += float(histogram_values_resolution[i*2] - mean_2d[bin_indices_x[i], bin_indices_y[i]])**2
-        # variance_2d[bin_indices_y[i], bin_indices_x[i]] += float(histogram_values_resolution[i*2+1] - mean_2d[bin_indices_y[i], bin_indices_x[i]])**2
+        variance_2d[bin_indices_y[i], bin_indices_x[i]] += float(histogram_values_resolution[i*2] - mean_2d[bin_indices_y[i], bin_indices_x[i]])**2
+        variance_2d[bin_indices_x[i], bin_indices_y[i]] += float(histogram_values_resolution[i*2+1] - mean_2d[bin_indices_x[i], bin_indices_y[i]])**2
 
-    variance_2d = variance_2d/(freq_2d-1)
+    variance_2d = variance_2d/(freq_2d)
 
     mean_2d[freq_2d == 0] = 0
     variance_2d[freq_2d == 0] = 0
@@ -172,7 +169,10 @@ def diff_2d_plot(energy_values, histogram_values_resolution):
 resolution_mean_fo_energy, resolution_variance_fo_energy, energy_values_x, count = get_mean_variance_histograms(energy_values, histogram_values_resolution)
 mean_2d, variance_2d, count_2d, energy_values_x_2d = diff_2d_plot(energy_values, histogram_values_resolution)
 
-output_string = str(("Resolution mean:", mean, "Resolution variance :", variance, "Loss mean:", loss_mean, "Loss variance:", loss_variance))
+accuracy = float(np.sum((np.array(histogram_values_resolution)>0.7) & (np.array(histogram_values_resolution)<1.3)))/float(np.size(np.array(histogram_values_resolution)))
+variance_from_1 = np.mean((np.array(histogram_values_resolution)-1)**2)
+
+output_string = str(("Resolution mean:", mean, "Resolution variance :", variance, "Loss mean:", loss_mean, "Loss variance:", loss_variance, "Accuracy", accuracy, "Variance from 1", variance_from_1))
 
 print("Samples tested", np.alen(histogram_values_resolution)/2)
 print(output_string)
