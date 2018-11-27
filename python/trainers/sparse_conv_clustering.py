@@ -4,6 +4,7 @@ import os
 import configparser as cp
 from libs.helpers import get_num_parameters
 from models.model_builder import ModelBuilder
+import subprocess
 
 from readers import ReaderFactory
 from inference import InferenceOutputStreamer
@@ -83,6 +84,12 @@ class SparseConvClusteringTrainer:
         print("Beginning to train network with parameters", get_num_parameters(self.model.get_variable_scope()))
         placeholders = self. model.get_placeholders()
 
+        if self.from_scratch:
+            subprocess.call("mkdir -p %s"%(self.summary_path), shell=True)
+            subprocess.call("mkdir -p %s"%(self.test_out_path), shell=True)
+
+            with open(self.model_path + '_code.py', 'w') as f:
+                f.write(self.model.get_code())
 
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
@@ -175,8 +182,6 @@ class SparseConvClusteringTrainer:
                     self.saver_sparse.save(sess, self.model_path)
                     with open(self.model_path + '.txt', 'w') as f:
                         f.write(str(iteration_number))
-                    with open(self.model_path + '_code.py', 'w') as f:
-                        f.write(self.model.get_code())
 
             # Stop the threads
             coord.request_stop()
