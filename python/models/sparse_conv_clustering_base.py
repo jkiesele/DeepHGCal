@@ -1,6 +1,8 @@
 import tensorflow as tf
 from models.model import Model
 from ops.sparse_conv import *
+import inspect
+import sys
 
 
 class SparseConvClusteringBase(Model):
@@ -102,3 +104,7 @@ class SparseConvClusteringBase(Model):
 
             self._graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self._graph_loss)
             self._graph_summaries_validation = tf.summary.merge([self._graph_summary_loss_validation])
+
+    def get_code(self):
+        return inspect.getsource(sys.modules[__name__])
+

@@ -3,7 +3,7 @@ import os
 import sys
 import argparse
 import matplotlib as mpl
-mpl.use('Agg')
+# mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import math
@@ -12,6 +12,8 @@ import pickle
 import configparser as cp
 from libs.plots import plot_clustering
 from matplotlib import cm
+from matplotlib.colors import LogNorm
+
 
 parser = argparse.ArgumentParser(description='Plot clustering model output')
 parser.add_argument('input', help="Path to the config file which was used to train")
@@ -234,7 +236,7 @@ plt.savefig(os.path.join(config['test_out_path'], 'response_variance_2d_fo_energ
 
 plt.clf()
 fig = plt.figure(1)
-cax = plt.imshow(count_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
+cax = plt.imshow(count_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)], )
 plt.xlabel("Shower 1 energy")
 plt.ylabel("Shower 2 energy")
 plt.title("Frequency")

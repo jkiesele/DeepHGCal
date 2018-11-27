@@ -175,6 +175,8 @@ class SparseConvClusteringTrainer:
                     self.saver_sparse.save(sess, self.model_path)
                     with open(self.model_path + '.txt', 'w') as f:
                         f.write(str(iteration_number))
+                    with open(self.model_path + '_code.py', 'w') as f:
+                        f.write(self.model.get_code())
 
             # Stop the threads
             coord.request_stop()

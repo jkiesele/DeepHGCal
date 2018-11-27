@@ -11,7 +11,7 @@ class DataAndNumEntriesReader:
         self.num_data_dims = num_data_dims
         self.num_batch = num_batch
 
-    def get_feeds(self):
+    def get_feeds(self, shuffle=True):
         def _parse_function(example_proto):
             keys_to_features = {
                 'data': tf.FixedLenFeature((self.num_max_entries, self.num_data_dims), tf.float32),
@@ -25,7 +25,8 @@ class DataAndNumEntriesReader:
         file_paths = [x.strip() for x in content]
         dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
         dataset = dataset.map(_parse_function)
-        dataset = dataset.shuffle(buffer_size=self.num_batch * 3 if self.shuffle_size is None else self.shuffle_size)
+        if shuffle:
+            dataset = dataset.shuffle(buffer_size=self.num_batch * 3 if self.shuffle_size is None else self.shuffle_size)
         dataset = dataset.repeat(None if self.repeat else 1)
         dataset = dataset.batch(self.num_batch)
         iterator = dataset.make_one_shot_iterator()

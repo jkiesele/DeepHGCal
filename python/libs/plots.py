@@ -28,11 +28,15 @@ def plot_clustering(spatial, energy, prediction, threshold=0.0001, fig=None):
     shower_2_energy_sizes = np.log(shower_2_energy+0.1)*5
 
 
+    energy_sizes = np.log(energy+0.1)*5
+
+
     if fig is None:
         fig = plt.figure()
     ax = Axes3D(fig)
-    ax.scatter(shower_1_spatial[:,2],shower_1_spatial[:,0],shower_1_spatial[:,1], s=shower_1_energy_sizes, color='red')
-    ax.scatter(shower_2_spatial[:,2],shower_2_spatial[:,0],shower_2_spatial[:,1], s=shower_2_energy_sizes, color='blue')
+    jet = plt.get_cmap('PiYG')
+
+    ax.scatter(spatial[:,2],spatial[:,0],spatial[:,1], s=energy_sizes, c=prediction[:, 0], cmap=jet)
     ax.set_xbound(min_s[2], max_s[2])
     ax.set_ybound(min_s[0], max_s[0])
     ax.set_zbound(min_s[1], max_s[1])
