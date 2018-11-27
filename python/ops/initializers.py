@@ -17,7 +17,7 @@ class NoisyEyeInitializer(Initializer):
     dtype: The data type. Only floating point types are supported.
   """
 
-  def __init__(self, low=-0.01, up=0.01, seed=None, dtype=tf.float32):
+  def __init__(self, low=-0.1, up=0.1, seed=None, dtype=tf.float32):
     self.low = low
     self.high = up
     self.seed = seed

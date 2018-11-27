@@ -32,7 +32,7 @@ def sparse_conv_collapse(sparse_dict):
                                                                                  sparse_dict['spatial_features_local'], \
                                                                                  sparse_dict['num_entries']
     return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)                                                                             
-
+    
 
 
 def sprint(tensor,pstr):
@@ -99,14 +99,18 @@ def add_rot_symmetric_distance(raw_difference):
     return edges
     
 
-def create_edges(vertices_a, vertices_b, zero_is_one_weight=False, n_properties=-1):
+def create_edges(vertices_a, vertices_b, zero_is_one_weight=False, n_properties=-1, norotation=False):
     #BxVxF
     expanded_vertices_a = tf.expand_dims(vertices_a, axis=1)
     expanded_vertices_b = tf.expand_dims(vertices_b, axis=2)
     raw_difference = expanded_vertices_a - expanded_vertices_b # Bx1xVxF - BxVx1xF = B x V x V x F
     #calculate explicitly rotational symmetric on
-    edges = add_rot_symmetric_distance(raw_difference) # BxVxVx(F+1)
-    
+    edges = None
+    if not norotation:
+        edges = add_rot_symmetric_distance(raw_difference) # BxVxVx(F+1)
+    else: 
+        edges = raw_difference
+        
     if n_properties>0:
         edges = edges[:,:,:,0:n_properties]
     return apply_distance_weight(edges,zero_is_one_weight)
@@ -122,7 +126,7 @@ def apply_edges(vertices, edges, reduce_sum=True, flatten=True):
     vertices = tf.expand_dims(vertices,axis=1)
     vertices = tf.expand_dims(vertices,axis=4)
 
-    out = edges*vertices # [BxVxV'x1xF] x [Bx1xV'xF'x1] = [BxVxV'xF'xF]
+    out = edges*vertices # [BxVxV'x1xF] x [Bx1xV'xF'x1] = [BxVxV'xFxF']
 
     if reduce_sum:
         out = tf.reduce_sum(out,axis=2)/float(int(out.shape[2]))
@@ -234,20 +238,69 @@ def sparse_conv_seeded3(vertices_in,
     return feature_layerout
 
 def sparse_conv_global_exchange(vertices_in, 
+                                aggregate_function=tf.reduce_mean,
                                 expand_to_dims=-1,
-                                collapse_to_dims=-1):
+                                collapse_to_dims=-1,
+                                learn_global_node_placement_dimensions=None):
     
     trans_vertices_in = vertices_in
     if expand_to_dims>0:
         trans_vertices_in = tf.layers.dense(trans_vertices_in,expand_to_dims,activation=tf.nn.relu)
+    
+    global_summed = None    
+    if learn_global_node_placement_dimensions is not None:
+        trans_vertices_in_space = trans_vertices_in[:,:,0:learn_global_node_placement_dimensions]
+        global_node_placement = tf.reduce_mean(trans_vertices_in_space,axis=1, keepdims=True)
+        edges = create_edges(trans_vertices_in_space, global_node_placement,
+                             norotation=True)
+        edges = gauss_times_linear(edges)
+        global_summed = apply_edges(trans_vertices_in, edges, reduce_sum=True, flatten=True)
         
-    global_summed = tf.reduce_mean(trans_vertices_in, axis=1, keepdims=True)
+        
+    else: 
+        global_summed = tf.reduce_mean(trans_vertices_in, axis=1, keepdims=True)
+        
     global_summed = tf.tile(global_summed,[1,vertices_in.shape[1],1])
     vertices_out = tf.concat([vertices_in,global_summed],axis=-1)
     if collapse_to_dims>0:
-        vertices_out = tf.layers.dense(vertices_out, collapse_to_dims, activation=tf.nn.tanh)
+        vertices_out = tf.layers.dense(vertices_out, collapse_to_dims, activation=tf.nn.relu)
     
     return vertices_out
+    
+    
+def sparse_conv_moving_seeds(vertices_in, 
+                             n_filters, 
+                             n_seeds, 
+                             n_seed_dimensions,
+                             dimension_activation = open_tanh):
+    
+    # globally transoform in space, or select the first n_seed_dimensions?
+    trans_global_vertices = tf.layers.dense(vertices_in,n_seed_dimensions,
+                                            kernel_initializer=NoisyEyeInitializer)
+    #create a space transform for each seed
+    seed_positions = []
+    for s in range(n_seeds):
+        #relu activation to 'cut' parts
+        seed_position = tf.layers.dense(trans_global_vertices,n_seed_dimensions,activation=dimension_activation,
+                                        kernel_initializer=NoisyEyeInitializer)
+        seed_position = tf.reduce_mean(seed_position,axis=1,keepdims=True)
+        seed_positions.append(seed_position)
+    
+    seed_positions =  tf.concat(seed_positions,axis=1)
+    print('seed_positions',seed_positions.shape)
+    
+    #now the rest is standard seeded, but with radial properties only
+    #using Gaussian kernel
+    edges = create_edges(trans_global_vertices,seed_positions,n_properties=1,zero_is_one_weight=True)
+    
+    expanded_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True)
+    edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
+    expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
+    expanded_collapsed = tf.concat([vertices_in,expanded_collapsed],axis=-1)
+    expanded_collapsed = tf.layers.dense(expanded_collapsed,n_filters, activation=open_tanh,
+                                         kernel_initializer=NoisyEyeInitializer)
+    
+    return expanded_collapsed
     
 
 
@@ -262,6 +315,7 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     
     assert merge_neighbours <= num_neighbors
     global _sparse_conv_naming_index
+    space_initializer = None #NoisyEyeInitializer
     
     #for later
     _sparse_conv_naming_index+=1
@@ -275,11 +329,12 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
         for i in range(len(space_transformations)):
             if i< len(space_transformations)-1:
                 trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=open_tanh,
-                                           kernel_initializer=NoisyEyeInitializer)
+                                           kernel_initializer=space_initializer)
                 trans_space*=10.
             else:
-                trans_space = tf.layers.dense(trans_space,space_transformations[i],activation=None,
-                                           kernel_initializer=NoisyEyeInitializer)
+                trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=open_tanh,
+                                           kernel_initializer=space_initializer)
+                trans_space*=10.
     else:
         trans_space = vertices_in[:,:,0:space_transformations[-1]]
 
@@ -322,7 +377,7 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
             
         edges = tf.layers.dense(concat_edges, 
                                 edges.shape[-1],activation=edge_activation,
-                                kernel_initializer = NoisyEyeInitializer)
+                                kernel_initializer = space_initializer)
         
         vertex_with_neighbours = tf.gather_nd(updated_vertices, indexing)
         vertex_with_neighbours = tf.expand_dims(vertex_with_neighbours,axis=4)
@@ -337,6 +392,33 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     updated_vertices = tf.concat([trans_space,updated_vertices],axis=-1)
         
     return updated_vertices
+
+
+
+def sparse_conv_edge_conv(vertices_in, num_neighbors=30, 
+                      mpl_layers=[64,64,64],
+                      aggregation_function = tf.reduce_max,
+                      share_keyword=None #TBI
+                      ):
+    
+    trans_space = vertices_in
+    indexing, _ = indexing_tensor_2(trans_space, num_neighbors)
+    #change indexing to be not self-referential
+    neighbour_space = tf.gather_nd(vertices_in, indexing)
+    
+    expanded_trans_space = tf.expand_dims(trans_space, axis=2)
+    expanded_trans_space = tf.tile(expanded_trans_space,[1,1,num_neighbors,1])
+    
+    diff = expanded_trans_space - neighbour_space
+    edge = tf.concat([expanded_trans_space,diff], axis=-1)
+    
+    for f in mpl_layers:
+        edge = tf.layers.dense(edge, f, activation=tf.nn.relu)
+    
+    vertex_out = aggregation_function(edge,axis=2)
+    
+    return vertex_out
+    
 
 
 def max_pool_on_last_dimensions(vertices_in, skip_first_features, n_output_vertices):
