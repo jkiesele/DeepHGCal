@@ -411,6 +411,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             output = self.compute_output_moving_seeds_all(net,self._placeholder_seed_indices)
         elif self.get_variable_scope() == 'only_global_exchange':
             output = self.compute_output_only_global_exchange(net,self._placeholder_seed_indices)
+        else:
+            output = tf.layers.dense(sparse_conv_collapse(net),3)
             
         #output=self.compute_output_seed_driven(net,self._placeholder_seed_indices)
         #output=self.compute_output_full_adjecency(_input)

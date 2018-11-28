@@ -59,6 +59,7 @@ class SparseConvClusteringTrainer:
 
     def initialize_test(self):
         self.model = ModelBuilder(self.config).get_model()
+        self.model.config_name = self.config_name
         try:
             self.model.set_training(False)
         except AttributeError:
@@ -205,9 +206,6 @@ class SparseConvClusteringTrainer:
         graph_summary_validation = self.model.get_summary_validation()
         graph_output = self.model.get_compute_graphs()
         graph_temp = self.model.get_temp()
-
-        if self.from_scratch:
-            self.clean_summary_dir()
 
         inputs_feed = self.reader_factory.get_class(self.reader_type)(self.test_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds(shuffle=False)
 
