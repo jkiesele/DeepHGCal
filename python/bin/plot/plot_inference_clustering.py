@@ -3,7 +3,7 @@ import os
 import sys
 import argparse
 import matplotlib as mpl
-# mpl.use('Agg')
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import math
@@ -216,7 +216,7 @@ plt.savefig(os.path.join(config['test_out_path'], 'fo_energy.png'))
 
 plt.clf()
 fig = plt.figure(1)
-cax = plt.imshow(mean_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)])
+cax = plt.imshow(mean_2d, interpolation='nearest', extent=[np.min(energy_values_x_2d), np.max(energy_values_x_2d), np.min(energy_values_x_2d), np.max(energy_values_x_2d)], vmin=0, vmax=5)
 plt.xlabel("Shower 1 energy")
 plt.ylabel("Shower 2 energy")
 plt.title("Response of shower 1 (mean)")
