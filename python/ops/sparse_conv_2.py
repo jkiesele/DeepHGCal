@@ -272,7 +272,7 @@ def sparse_conv_moving_seeds(vertices_in,
                              n_filters, 
                              n_seeds, 
                              n_seed_dimensions,
-                             dimension_activation = open_tanh):
+                             dimension_activation = tf.nn.relu):
     
     # globally transoform in space, or select the first n_seed_dimensions?
     trans_global_vertices = tf.layers.dense(vertices_in,n_seed_dimensions,
@@ -297,7 +297,7 @@ def sparse_conv_moving_seeds(vertices_in,
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
     expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
     expanded_collapsed = tf.concat([vertices_in,expanded_collapsed],axis=-1)
-    expanded_collapsed = tf.layers.dense(expanded_collapsed,n_filters, activation=open_tanh,
+    expanded_collapsed = tf.layers.dense(expanded_collapsed,n_filters, activation=tf.nn.relu,
                                          kernel_initializer=NoisyEyeInitializer)
     
     return expanded_collapsed

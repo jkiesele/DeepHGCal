@@ -81,8 +81,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         print('diff_sq_a',diff_sq_a.shape)
         
-        loss_a = tf.reduce_sum(diff_sq_a * energies[:,:,0],axis=1) / energy_a
-        loss_b = tf.reduce_sum(diff_sq_b * energies[:,:,1],axis=1) / energy_b
+        loss_a = tf.reduce_sum(diff_sq_a * sqrt_energies[:,:,0],axis=1) / sqrt_energy_a
+        loss_b = tf.reduce_sum(diff_sq_b * sqrt_energies[:,:,1],axis=1) / sqrt_energy_b
         
         print('loss_a',loss_a.shape)
         
