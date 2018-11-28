@@ -17,7 +17,10 @@ class SparseConvClusteringBase(Model):
         self.max_entries = max_entries
         self.learning_rate = learning_rate
         self.use_seeds=False
+        self.is_train = tf.placeholder(tf.bool, name="is_train");
+        
 
+        
     def initialize(self):
         if self.initialized:
             print("Already initialized")

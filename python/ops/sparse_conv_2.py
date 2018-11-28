@@ -3,7 +3,7 @@ from .neighbors import euclidean_squared,indexing_tensor, indexing_tensor_2, sor
 from ops.nn import *
 import numpy as np
 from .initializers import NoisyEyeInitializer
-from .activations import gauss_of_lin, gauss_times_linear, sinc, open_tanh
+from .activations import gauss_of_lin, gauss_times_linear, sinc, open_tanh, asymm_falling
 import math
 
 ###helper functions
@@ -99,7 +99,8 @@ def add_rot_symmetric_distance(raw_difference):
     return edges
     
 
-def create_edges(vertices_a, vertices_b, zero_is_one_weight=False, n_properties=-1, norotation=False):
+def create_edges(vertices_a, vertices_b, zero_is_one_weight=False, n_properties=-1, norotation=False,
+                 apply_activation=True):
     #BxVxF
     expanded_vertices_a = tf.expand_dims(vertices_a, axis=1)
     expanded_vertices_b = tf.expand_dims(vertices_b, axis=2)
@@ -113,7 +114,10 @@ def create_edges(vertices_a, vertices_b, zero_is_one_weight=False, n_properties=
         
     if n_properties>0:
         edges = edges[:,:,:,0:n_properties]
-    return apply_distance_weight(edges,zero_is_one_weight)
+    if apply_activation:   
+        return apply_distance_weight(edges,zero_is_one_weight)
+    else:
+        return edges
     
     
 def apply_edges(vertices, edges, reduce_sum=True, flatten=True): 
@@ -272,17 +276,19 @@ def sparse_conv_moving_seeds(vertices_in,
                              n_filters, 
                              n_seeds, 
                              n_seed_dimensions,
-                             dimension_activation = tf.nn.relu):
+                             use_edge_properties=-1):
+    
     
     # globally transoform in space, or select the first n_seed_dimensions?
-    trans_global_vertices = tf.layers.dense(vertices_in,n_seed_dimensions,
-                                            kernel_initializer=NoisyEyeInitializer)
+    trans_global_vertices = vertices_in[:,:,0:n_seed_dimensions] # tf.layers.dense(vertices_in,n_seed_dimensions,
+    #                                        kernel_initializer=NoisyEyeInitializer,
+    #                                        activation=open_tanh)
     #create a space transform for each seed
     seed_positions = []
     for s in range(n_seeds):
         #relu activation to 'cut' parts
-        seed_position = tf.layers.dense(trans_global_vertices,n_seed_dimensions,activation=dimension_activation,
-                                        kernel_initializer=NoisyEyeInitializer)
+        seed_position = tf.layers.dense(vertices_in,n_seed_dimensions,
+                                        activation=tf.nn.relu)
         seed_position = tf.reduce_mean(seed_position,axis=1,keepdims=True)
         seed_positions.append(seed_position)
     
@@ -291,15 +297,23 @@ def sparse_conv_moving_seeds(vertices_in,
     
     #now the rest is standard seeded, but with radial properties only
     #using Gaussian kernel
-    edges = create_edges(trans_global_vertices,seed_positions,n_properties=1,zero_is_one_weight=True)
+    edges = create_edges(trans_global_vertices,seed_positions,n_properties=-1,zero_is_one_weight=False,
+                         norotation=False,apply_activation=False)
+    if use_edge_properties==1:
+        edges = gauss_of_lin(edges[:,:,:,0:1])
+    elif use_edge_properties>1:
+        edges = tf.concat([gauss_of_lin(edges[:,:,:,0:1]),asymm_falling(edges[:,:,:,1:use_edge_properties])/10. ],axis=-1)
+    elif use_edge_properties<0:
+        edges = tf.concat([gauss_of_lin(edges[:,:,:,0:1]),asymm_falling(edges[:,:,:,1:])/10. ],axis=-1)
     
+    print('sparse_conv_moving_seeds: edges ', edges.shape)
     expanded_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True)
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
     expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
     expanded_collapsed = tf.concat([vertices_in,expanded_collapsed],axis=-1)
-    expanded_collapsed = tf.layers.dense(expanded_collapsed,n_filters, activation=tf.nn.relu,
+    expanded_collapsed = tf.layers.dense(expanded_collapsed,n_filters, activation=open_tanh,
                                          kernel_initializer=NoisyEyeInitializer)
-    
+    print('sparse_conv_moving_seeds out',expanded_collapsed.shape)
     return expanded_collapsed
     
 
@@ -433,6 +447,7 @@ def max_pool_on_last_dimensions(vertices_in, skip_first_features, n_output_verti
     _indexing_tensor = tf.concat([batch_range, I], axis=2)
     
     return tf.gather_nd(vertices_in, _indexing_tensor)
+    
     
     
     
