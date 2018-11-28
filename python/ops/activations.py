@@ -8,6 +8,9 @@ def gauss_of_lin(x):
 def gauss_times_linear(x):
     return tf.exp(-6.*tf.sqrt(tf.abs(x)+1e-4))*x*3.*36 
 
+def asymm_falling(x):
+    return tf.exp(-2.*x*x)*x*2.
+
 def sinc(x):
     return tf.sin(x)/x
 
