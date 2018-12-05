@@ -328,19 +328,14 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         nfilters=42
         npropagate=8
         nspacefilters=128
-        depth = 6
+        depth = 11
         
         
         feat = sparse_conv_collapse(_input)
         feat_list = []
-        
+        n_seeds = 4
         seeds=None
         for i in range(depth):
-            n_seeds = 2
-            if i>0:
-                n_seeds=2
-            if i>1:
-                n_seeds=3
 
             feat,seeds = sparse_conv_moving_seeds4(feat, 
                              n_filters=nfilters, 
@@ -348,12 +343,13 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                              n_seeds=n_seeds, 
                              n_seed_dimensions=nspacedim,
                              seed_filters=[],
-                             compress_before_propagate=False,
-                             edge_multiplicity=edge_multi)
+                             out_filters=[],
+                             weight_filters=[],
+                             edge_multiplicity=1)
             
-            #feat_list.append(feat)
+            feat_list.append(feat)
         
-        #feat =  tf.concat(feat_list,axis=-1)
+        feat =  tf.concat(feat_list,axis=-1)
         print('all feat',feat.shape)
         feat = tf.layers.dense(feat,32, activation=tf.nn.relu)
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
@@ -388,17 +384,11 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         return feat  
     
-    def compute_output_moving_seeds4_alt2(self,_input,seeds,nspacedim,edge_multi=1):
-        
-        nfilters=32
-        npropagate=4
-        depth = 15
-        
+    def compute_output_moving_seeds4_generic(self,_input,seeds,nspacedim,edge_multi=1,depth=15,nfilters=32,n_seeds=4,npropagate=4):
         
         feat = sparse_conv_collapse(_input)
-        feat_list = []
-        n_seeds=4
         seeds=None
+        feat_list=[]
         for i in range(depth):
             feat,seeds = sparse_conv_moving_seeds4(feat, 
                              n_filters=nfilters, 
@@ -406,13 +396,12 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                              n_seeds=n_seeds, 
                              n_seed_dimensions=nspacedim,
                              seed_filters=[],
-                             compress_before_propagate=False,
+                             out_filters=[],
                              edge_multiplicity=edge_multi)
             
             feat_list.append(feat)
         
         feat =  tf.concat(feat_list,axis=-1)
-        print('all feat',feat.shape)
         feat = tf.layers.dense(feat,32, activation=tf.nn.relu)
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         return feat   
@@ -497,7 +486,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         net = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
         
-        net = sparse_conv_normalise(net,log_energy=False)
+        net = sparse_conv_normalise(net,log_energy=True)
         #net = sparse_conv_add_simple_seed_labels(net,seeds)
         
         #simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
@@ -536,6 +525,46 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             
         elif self.get_variable_scope() == 'moving_seeds4_alt2':
             output = self.compute_output_moving_seeds4_alt2(net,seeds,4,edge_multi=1) #
+            
+            
+        elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d6_f32_s12_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=3,
+                                                               edge_multi=1,
+                                                               depth=6,
+                                                               nfilters=32,
+                                                               n_seeds=12,
+                                                               npropagate=8)
+                
+        elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d15_f32_s4_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=3,
+                                                               edge_multi=1,
+                                                               depth=15,
+                                                               nfilters=32,
+                                                               n_seeds=4,
+                                                               npropagate=8)
+            
+            
+        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d6_f32_s12_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=4,
+                                                               edge_multi=1,
+                                                               depth=6,
+                                                               nfilters=32,
+                                                               n_seeds=12,
+                                                               npropagate=8)
+                
+        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=4,
+                                                               edge_multi=1,
+                                                               depth=15,
+                                                               nfilters=32,
+                                                               n_seeds=4,
+                                                               npropagate=8)
+            
+        
             
             
         elif self.get_variable_scope() == 'only_global_exchange':
