@@ -15,9 +15,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self.use_seeds = True
         self.mean_sqrt_resolution=None
         self.variance_sqrt_resolution=None
-        
+        self.total_loss = None
         self.fixed_seeds=None
-        self.momentum = 0.8
+        self.momentum = 0.1
         self.varscope='sparse_conv_clustering_spatial1'
         
         
@@ -39,7 +39,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
 
     def get_loss2(self):
-        assert self._graph_output.shape[2] == 3
+        assert self._graph_output.shape[2] >= 2
 
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
         print('num_entries',num_entries.shape)
@@ -81,8 +81,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         print('diff_sq_a',diff_sq_a.shape)
         
-        loss_a = tf.reduce_sum(diff_sq_a * energies[:,:,0],axis=1) / energy_a
-        loss_b = tf.reduce_sum(diff_sq_b * energies[:,:,1],axis=1) / energy_b
+        loss_a = tf.reduce_sum(diff_sq_a * sqrt_energies[:,:,0],axis=1) / (sqrt_energy_a)
+        loss_b = tf.reduce_sum(diff_sq_b * sqrt_energies[:,:,1],axis=1) / (sqrt_energy_b)
+        
+        old_loss = (tf.reduce_sum(diff_sq_a * sqrt_energies[:,:,0],axis=1) + tf.reduce_sum(diff_sq_b * sqrt_energies[:,:,1],axis=1))/(sqrt_energy_a+sqrt_energy_b)
         
         print('loss_a',loss_a.shape)
         
@@ -98,6 +100,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         self.mean_resolution, self.variance_resolution = self.normalise_response(total_response)
         
+        self.total_loss = tf.reduce_mean(total_loss)
         
         sqrt_response_a = tf.reduce_sum(prediction[:,:,0]*sqrt_energies[:,:,0], axis=1) / sqrt_energy_a
         sqrt_response_b = tf.reduce_sum(prediction[:,:,1]*sqrt_energies[:,:,1], axis=1) / sqrt_energy_b
@@ -106,7 +109,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         self.mean_sqrt_resolution, self.variance_sqrt_resolution = self.normalise_response(sqrt_total_response)    
 
-        return tf.reduce_mean(total_loss)
+        return tf.reduce_mean(old_loss) #+ tf.reduce_mean(0.1*tf.abs(1-self.mean_resolution)+0.1*self.variance_resolution)
 
     def _get_loss(self):
         
@@ -120,7 +123,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
         seed_idxs = in_seed_idxs
 
-        nfilters=22
+        nfilters=24
         nspacefilters=30
         nspacedim=4
         
@@ -140,23 +143,6 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
 
 
         output = tf.layers.dense(feat, 3, activation=tf.nn.relu)
-        output = tf.nn.softmax(output)
-        #
-        # feat = sparse_conv_seeded3(feat,
-        #                seed_idxs,
-        #                nfilters=nspacedim,
-        #                nspacefilters=nspacefilters,
-        #                nspacedim=nspacedim,
-        #                seed_talk=True,
-        #                use_edge_properties=1)
-        # print(feat.shape)
-        # 0/0
-        #
-        # #feat = tf.Print(feat, [feat[0,2146,:]], 'space last layer ',summarize=30)
-        #
-        # feat = get_distance_weight_to_seeds(feat,seed_idxs,
-        #                                       dimensions = 3,
-        #                                       add_zeros = 1)
         
         return output
         
@@ -281,8 +267,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
     def compute_output_only_global_exchange(self,_input,seed_idxs):
         
         feat = sparse_conv_collapse(_input)
-        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,
-                                                 center=False)
+        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,center=False)
         global_feat = []
         depth = 13
         for i in range(depth):
@@ -291,8 +276,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                                                collapse_to_dims=42,
                                                learn_global_node_placement_dimensions=3)
             
-            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,
-                                                 center=False)
+            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,center=False)
             print('feat '+str(i), feat.shape)
             if i%2 or i==depth-1:
                 global_feat.append(feat)
@@ -305,58 +289,166 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         return feat
         
             
-    def compute_output_moving_seeds(self,_input,seeds):
+    def compute_output_moving_seeds3(self,_input,seeds,nspacedim,edge_multi=1):
+        
+        nfilters=32
+        nspacefilters=64
+        depth = 6
         
         
         feat = sparse_conv_collapse(_input)
-        
-        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,
-                                                 center=False)
         feat_list = []
-        depth = 8
+        
+        seeds=None
         for i in range(depth):
-            feat = sparse_conv_moving_seeds(feat, 
-                             n_filters=64, 
-                             n_seeds=2, 
-                             n_seed_dimensions=4,
-                             use_edge_properties=1)
-            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,
-                                                 center=False)
-            if i%3==0 or i == depth-1:
-                feat_list.append(feat)
-        
-        feat =  tf.concat(feat_list,axis=-1)
-        print('all feat',feat.shape)
-        feat = tf.layers.dense(feat,42, activation=tf.nn.relu)
-        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
-        return feat
-        
-    def compute_output_moving_seeds_all(self,_input,seeds):
-        
-        
-        feat = sparse_conv_collapse(_input)
-        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,
-                                                 center=False)
-        feat_list = []
-        depth = 8
-        for i in range(depth):
-            feat = sparse_conv_moving_seeds(feat, 
-                             n_filters=26, 
-                             n_seeds=2, 
-                             n_seed_dimensions=4,
-                             use_edge_properties=3)
-            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,
-                                                 center=False)
-            if i%3==0 or i == depth-1:
-                feat_list.append(feat)
-        
-        feat =  tf.concat(feat_list,axis=-1)
-        print('all feat',feat.shape)
-        feat = tf.layers.dense(feat,42, activation=tf.nn.relu)
-        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
-        return feat
-        
+            n_seeds = 1
+            if i>0:
+                n_seeds=2
+            if i>1:
+                n_seeds=3
+
+            feat,seeds = sparse_conv_moving_seeds3(feat, 
+                             n_filters=nfilters, 
+                             n_seeds=n_seeds, 
+                             n_seed_dimensions=nspacedim,
+                             seed_filters=[],
+                             compress_before_propagate=True,
+                             edge_multiplicity=edge_multi)
             
+            #feat_list.append(feat)
+        
+        #feat =  tf.concat(feat_list,axis=-1)
+        print('all feat',feat.shape)
+        feat = tf.layers.dense(feat,42, activation=tf.nn.relu)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        return feat
+    
+    def compute_output_moving_seeds4(self,_input,seeds,nspacedim,edge_multi=1):
+        
+        nfilters=42
+        npropagate=8
+        nspacefilters=128
+        depth = 11
+        
+        
+        feat = sparse_conv_collapse(_input)
+        feat_list = []
+        n_seeds = 4
+        seeds=None
+        for i in range(depth):
+
+            feat,seeds = sparse_conv_moving_seeds4(feat, 
+                             n_filters=nfilters, 
+                             n_propagate=npropagate,
+                             n_seeds=n_seeds, 
+                             n_seed_dimensions=nspacedim,
+                             seed_filters=[],
+                             out_filters=[],
+                             weight_filters=[],
+                             edge_multiplicity=1)
+            
+            feat_list.append(feat)
+        
+        feat =  tf.concat(feat_list,axis=-1)
+        print('all feat',feat.shape)
+        feat = tf.layers.dense(feat,32, activation=tf.nn.relu)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        return feat
+    
+    def compute_output_moving_seeds4_alt(self,_input,seeds,nspacedim,edge_multi=1):
+        
+        nfilters=32
+        npropagate=4
+        depth = 9
+        
+        
+        feat = sparse_conv_collapse(_input)
+        feat_list = []
+        n_seeds=4
+        seeds=None
+        for i in range(depth):
+            feat,seeds = sparse_conv_moving_seeds4(feat, 
+                             n_filters=nfilters, 
+                             n_propagate=npropagate,
+                             n_seeds=n_seeds, 
+                             n_seed_dimensions=nspacedim,
+                             seed_filters=[],
+                             compress_before_propagate=False,
+                             edge_multiplicity=edge_multi)
+            
+            feat_list.append(feat)
+        
+        feat =  tf.concat(feat_list,axis=-1)
+        print('all feat',feat.shape)
+        feat = tf.layers.dense(feat,32, activation=tf.nn.relu)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        return feat  
+    
+    def compute_output_moving_seeds4_generic(self,_input,seeds,nspacedim,edge_multi=1,depth=15,nfilters=32,n_seeds=4,npropagate=4):
+        
+        feat = sparse_conv_collapse(_input)
+        seeds=None
+        feat_list=[]
+        for i in range(depth):
+            feat,seeds = sparse_conv_moving_seeds4(feat, 
+                             n_filters=nfilters, 
+                             n_propagate=npropagate,
+                             n_seeds=n_seeds, 
+                             n_seed_dimensions=nspacedim,
+                             seed_filters=[],
+                             out_filters=[],
+                             edge_multiplicity=edge_multi)
+            
+            feat_list.append(feat)
+        
+        feat =  tf.concat(feat_list,axis=-1)
+        feat = tf.layers.dense(feat,32, activation=tf.nn.relu)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        return feat   
+       
+    def compute_output_moving_seeds_all_generic(self,_input,seeds,nspacedim,edge_multi,only_forward = False):
+        
+        nfilters=24
+        nspacefilters=64
+        depth = 5
+        
+        if edge_multi>1:
+            nfilters=16
+        
+        feat = sparse_conv_collapse(_input)
+        feat_list = []
+        
+        seeds=None
+        for i in range(depth):
+            n_seeds = 1
+            multi=4
+            if i>0:
+                n_seeds=2
+                multi=edge_multi
+            if i>=2:
+                n_seeds=4
+            feat, seeds = sparse_conv_moving_seeds2(feat, 
+                             n_filters=nfilters, 
+                             n_spacefilters=nspacefilters, 
+                             n_seed_dimensions=nspacedim, 
+                             n_seeds=n_seeds, 
+                             use_edge_properties=1,
+                             compress_before_propagate=True,
+                             seed_talk=True,
+                             seed_positions=seeds,
+                             edge_multiplicity=multi,
+                             add_back_original = not only_forward)
+            #feat = tf.Print(feat,[feat],'feat '+str(i), summarize=24)
+            #feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum,
+            #                                     center=False)
+            #if i%2==0 or i == depth-1:
+            feat_list.append(feat)
+        
+        feat =  tf.concat(feat_list,axis=-1)
+        print('all feat',feat.shape)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        return feat
+             
 
     def _compute_output(self):
         
@@ -394,8 +486,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         net = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
         
-        net = sparse_conv_normalise(net,log_energy=False)
-        net = sparse_conv_add_simple_seed_labels(net,seeds)
+        net = sparse_conv_normalise(net,log_energy=True)
+        #net = sparse_conv_add_simple_seed_labels(net,seeds)
         
         #simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
         #output=self.compute_output_seed_driven(net,seeds)#self._placeholder_seed_indices)
@@ -405,18 +497,86 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             output = self.compute_output_dgcnn(net,self._placeholder_seed_indices)
         elif self.get_variable_scope() == 'moving_seeds':
             output = self.compute_output_moving_seeds(net,self._placeholder_seed_indices)
-        elif self.get_variable_scope() == 'moving_seeds_all':
-            output = self.compute_output_moving_seeds_all(net,self._placeholder_seed_indices)
-        elif self.get_variable_scope() == 'moving_seeds_all2':
-            output = self.compute_output_moving_seeds_all(net,self._placeholder_seed_indices)
+        elif self.get_variable_scope() == 'moving_seeds_dim3':
+            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,3,1)
+        elif self.get_variable_scope() == 'moving_seeds_dim4':
+            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,4,1)
+        elif self.get_variable_scope() == 'moving_seeds_dim4_only_forward':
+            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,4,1,True)
+        elif self.get_variable_scope() == 'moving_seeds_dim3_2':
+            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,5,2)
+        elif self.get_variable_scope() == 'moving_seeds_dim4_2':
+            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,6,2)
+            
+        elif self.get_variable_scope() == 'moving_seeds3_dim4':
+            output = self.compute_output_moving_seeds3(net,seeds,4,edge_multi=1)
+            
+        elif self.get_variable_scope() == 'moving_seeds4_dim4':
+            output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=1)
+            
+        elif self.get_variable_scope() == 'moving_seeds4_dim4_2':
+            output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=2)
+            
+        elif self.get_variable_scope() == 'moving_seeds4_dim4_v100':
+            output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=1)
+            
+        elif self.get_variable_scope() == 'moving_seeds4_alt_dim4':
+            output = self.compute_output_moving_seeds4_alt(net,seeds,4,edge_multi=1) #compute_output_moving_seeds4_alt2
+            
+        elif self.get_variable_scope() == 'moving_seeds4_alt2':
+            output = self.compute_output_moving_seeds4_alt2(net,seeds,4,edge_multi=1) #
+            
+            
+        elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d6_f32_s12_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=3,
+                                                               edge_multi=1,
+                                                               depth=6,
+                                                               nfilters=32,
+                                                               n_seeds=12,
+                                                               npropagate=8)
+                
+        elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d15_f32_s4_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=3,
+                                                               edge_multi=1,
+                                                               depth=15,
+                                                               nfilters=32,
+                                                               n_seeds=4,
+                                                               npropagate=8)
+            
+            
+        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d6_f32_s12_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=4,
+                                                               edge_multi=1,
+                                                               depth=6,
+                                                               nfilters=32,
+                                                               n_seeds=12,
+                                                               npropagate=8)
+                
+        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8':
+            output = self.compute_output_moving_seeds4_generic(net,seeds,
+                                                               nspacedim=4,
+                                                               edge_multi=1,
+                                                               depth=15,
+                                                               nfilters=32,
+                                                               n_seeds=4,
+                                                               npropagate=8)
+            
+        
+            
+            
         elif self.get_variable_scope() == 'only_global_exchange':
             output = self.compute_output_only_global_exchange(net,self._placeholder_seed_indices)
+        elif self.get_variable_scope() == 'seed_driven':
+            output = self.compute_output_seed_driven(net, self._placeholder_seed_indices)
         else:
             output = tf.layers.dense(sparse_conv_collapse(net),3)
             
         #output=self.compute_output_seed_driven(net,self._placeholder_seed_indices)
         #output=self.compute_output_full_adjecency(_input)
-        
+        output = tf.layers.dense(output,2)
         output = tf.nn.softmax(output)
         
         self._graph_temp = tf.reduce_sum(output[:,:,:], axis=1)/2679.
@@ -449,7 +609,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                                                       tf.summary.scalar('mean-res', self.mean_resolution), 
                                                       tf.summary.scalar('variance-res', self.variance_resolution),
                                                       tf.summary.scalar('mean-res-sqrt', self.mean_sqrt_resolution), 
-                                                      tf.summary.scalar('variance-res-sqrt', self.variance_sqrt_resolution)])
+                                                      tf.summary.scalar('variance-res-sqrt', self.variance_sqrt_resolution), 
+                                                      tf.summary.scalar('fraction-loss', self.total_loss)])
 
             self._graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self._graph_loss)
             self._graph_summaries_validation = tf.summary.merge([self._graph_summary_loss_validation])
