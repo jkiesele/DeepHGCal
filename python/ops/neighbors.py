@@ -19,15 +19,12 @@ def euclidean_squared(A, B):
     assert (A.dtype == tf.float32 or A.dtype == tf.float64) and (B.dtype == tf.float32 or B.dtype == tf.float64)
     assert len(shape_A) == 3 and len(shape_B) == 3
     assert shape_A[0] == shape_B[0]# and shape_A[1] == shape_B[1]
-    
-    #just exploit broadcasting
-    B_trans = tf.transpose(tf.expand_dims(B,axis=3), perm=[0, 3, 1, 2])
-    A_exp = tf.expand_dims(A,axis=2)
-    diff = A_exp-B_trans
-    distance = tf.reduce_sum(tf.square(diff),axis=-1)
-    #to avoid rounding problems and keep it strict positive
-    distance= tf.abs(distance)
-    return distance
+
+    # Finds euclidean distance using property (a-b)^2 = a^2 + b^2 - 2ab
+    sub_factor = -2 * tf.matmul(A, tf.transpose(B, perm=[0, 2, 1]))  # -2ab term
+    dotA = tf.expand_dims(tf.reduce_sum(A * A, axis=2), axis=2)  # a^2 term
+    dotB = tf.expand_dims(tf.reduce_sum(B * B, axis=2), axis=1)  # b^2 term
+    return tf.abs(sub_factor + dotA + dotB)
 
 
 
