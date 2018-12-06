@@ -15,6 +15,7 @@ from models.binning_cluster_beta import BinningClusteringBeta
 from models.binning_cluster_gamma import BinningClusteringGamma
 import tensorflow as tf
 from models.sparse_conv_constant_neighbors_alpha import SparseConvConstantNeighborsAlpha
+from models.binning_seed_finder_alpha import BinningSeedFinderAlpha
 
 
 class ModelBuilder:
