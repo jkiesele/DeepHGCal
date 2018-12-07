@@ -23,6 +23,10 @@ class BinningSeedFinderAlpha(SparseConvClusteringBase):
         self.sqrt_energy = True
         self.loss_energy_function = tf.sqrt
         self.min_loss_mode = False
+        self.seed_target_l2 = False
+
+    def set_seed_target_l2(self, l2):
+        self.seed_target_l2 = l2
 
     def set_input_energy_log(self, log_energy):
         self.log_energy = log_energy
@@ -76,7 +80,36 @@ class BinningSeedFinderAlpha(SparseConvClusteringBase):
 
         return tf.concat((target_column_1, target_column_2, target_column_3), axis=2)
 
+
+    def make_seed_targets_l2(self):
+        indices_shower_1 = tf.concat((tf.range(self.batch_size, dtype=tf.int64)[..., tf.newaxis], self._placeholder_seed_indices[:, 0][..., tf.newaxis]), axis=1)
+        indices_shower_2 = tf.concat((tf.range(self.batch_size, dtype=tf.int64)[..., tf.newaxis], self._placeholder_seed_indices[:, 1][..., tf.newaxis]), axis=1)
+
+        return tf.gather_nd(self._placeholder_space_features, indices_shower_1), tf.gather_nd(self._placeholder_space_features, indices_shower_2)
+
+
+    def _get_loss_l2(self):
+        assert self._graph_output.shape[1] == 6
+
+        num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
+        print('num_entries', num_entries.shape)
+
+        p1, p2 = self._graph_output[:, 0:3], self._graph_output[:, 3:6]
+
+        t1, t2 = self.make_seed_targets_l2()
+
+        loss = (t1-p2)**2 + (t2-p2)**2
+        self._graph_accuracy = 1
+
+        loss = tf.reduce_mean(loss)
+
+        return loss
+
+
     def _get_loss(self):
+        if self.seed_target_l2:
+            return self._get_loss_l2()
+
         assert self._graph_output.shape[2] == 3
 
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
@@ -101,6 +134,9 @@ class BinningSeedFinderAlpha(SparseConvClusteringBase):
 
 
     def _compute_output(self):
+        if self.seed_target_l2:
+            return self._compute_output_l2()
+
         # # nl_all = tf.layers.dense(tf.scalar_mul(0.001, self._placeholder_all_features), units=8, activation=tf.nn.relu)
         # # nl_all = tf.layers.dense(nl_all, units=8, activation=tf.nn.relu)
         # # nl_all = tf.layers.dense(nl_all, units=8, activation=tf.nn.relu)
@@ -132,15 +168,57 @@ class BinningSeedFinderAlpha(SparseConvClusteringBase):
         x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
         x = tf.layers.conv3d(x, 32, [1, 1, 5], strides=(1,1,1), activation=tf.nn.relu, padding='same')
         x = tf.layers.conv3d(x, 32, [2, 2, 1], activation=tf.nn.relu, padding='same')
-        x = tf.layers.conv3d(x, 48, [1, 1, 3], activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 48 if not self.seed_target_l2 else 96, [1, 1, 3], activation=tf.nn.relu, padding='same')
 
-
-        x = tf.reshape(x, [self.batch_size, 8, 8, 25, 16, 3])
+        x = tf.reshape(x, [self.batch_size, 8, 8, 25, 16, 3 if not self.seed_target_l2 else 6])
         output = tf.gather_nd(x, self.indexing_array)
 
         self._graph_temp = output
 
         return output
+
+
+    def _compute_output_l2(self):
+        # # nl_all = tf.layers.dense(tf.scalar_mul(0.001, self._placeholder_all_features), units=8, activation=tf.nn.relu)
+        # # nl_all = tf.layers.dense(nl_all, units=8, activation=tf.nn.relu)
+        # # nl_all = tf.layers.dense(nl_all, units=8, activation=tf.nn.relu)
+        #
+        # # TODO: Remove it later after regenerating the data, this only picks energy (or do something similar)
+        # net = self._placeholder_all_features
+        # net = tf.concat((net, self._placeholder_space_features_local), axis=2)
+
+        # TODO: Will cause problems with batch size of 1
+
+        binned_input = self.construct_conversion_ops()
+
+        # 8x8x25x64
+        x = binned_input
+
+        x = tf.layers.conv3d(0.001 * x, 50, [1, 1, 1], activation=tf.nn.leaky_relu, padding='same')
+        x = tf.layers.conv3d(x, 50, [1, 1, 1], activation=tf.nn.leaky_relu, padding='same')
+        x = tf.layers.conv3d(x, 50, [1, 1, 1], activation=tf.nn.leaky_relu, padding='same')
+        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 32, [1, 1, 5], activation=tf.nn.relu, padding='same')
+
+        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 32, [1, 1, 5], activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 32, [1, 1, 5], strides=(1,1,1), activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 32, [3, 3, 1], activation=tf.nn.relu, padding='same')
+
+        x = tf.layers.conv3d(x, 32, [1, 1, 5], strides=(2,2,3), activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 32, [2, 2, 1], activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 64, [1, 1, 3], strides=(2,2,3), activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 64, [2, 2, 1], strides=(2,2,3), activation=tf.nn.relu, padding='same')
+        x = tf.layers.conv3d(x, 64, [1, 1, 3], activation=tf.nn.relu, padding='same')
+        x = tf.layers.flatten(x)
+        x = tf.layers.dense(x, units=48, activation=tf.nn.relu)
+        x = tf.layers.dense(x, units=48, activation=tf.nn.relu)
+        x = tf.layers.dense(x, units=6, activation=None)
+
+        self._graph_temp = x
+
+        return x
 
     def get_variable_scope(self):
         return 'sparse_conv_clustering_spatial1'

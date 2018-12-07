@@ -16,6 +16,7 @@ from models.binning_cluster_gamma import BinningClusteringGamma
 import tensorflow as tf
 from models.sparse_conv_constant_neighbors_alpha import SparseConvConstantNeighborsAlpha
 from models.binning_seed_finder_alpha import BinningSeedFinderAlpha
+from models.clustering_dgcnn import DynamicGraphCnnAlpha
 
 
 class ModelBuilder:
@@ -65,6 +66,10 @@ class ModelBuilder:
         elif name == "truth_seeds_min_loss":
             model = SparseConvClusteringSeedsTruthBeta(*self.arguments_tuple)
             model.set_min_loss_mode(True)
+            return model
+        elif name == 'BinningSeedFinderAlpha_L2':
+            model = BinningSeedFinderAlpha(*self.arguments_tuple)
+            model.set_seed_target_l2(True)
             return model
         else:
             raise RuntimeError("Can't find model")

@@ -5,6 +5,8 @@ import configparser as cp
 from libs.helpers import get_num_parameters
 from models.model_builder import ModelBuilder
 import subprocess
+import ops
+import shutil
 
 from readers import ReaderFactory
 from inference import InferenceOutputStreamer
@@ -90,9 +92,15 @@ class SparseConvClusteringTrainer:
         if self.from_scratch:
             subprocess.call("mkdir -p %s"%(self.summary_path), shell=True)
             subprocess.call("mkdir -p %s"%(self.test_out_path), shell=True)
-
+            subprocess.call("mkdir -p %s"%(os.path.join(self.test_out_path, 'ops')), shell=True)
             with open(self.model_path + '_code.py', 'w') as f:
                 f.write(self.model.get_code())
+
+            ops_parent = os.path.dirname(ops.__file__)
+            for ops_file in os.listdir(ops_parent):
+                if not ops_file.endswith('.py'):
+                    continue
+                shutil.copy(os.path.join(ops_parent, ops_file), os.path.join(self.test_out_path, 'ops'))
 
         graph_loss = self.model.get_losses()
         graph_optmiser = self.model.get_optimizer()
