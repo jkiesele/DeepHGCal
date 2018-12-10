@@ -3,7 +3,7 @@ from .neighbors import euclidean_squared,indexing_tensor, indexing_tensor_2, sor
 from ops.nn import *
 import numpy as np
 from .initializers import NoisyEyeInitializer
-from .activations import gauss_of_lin, gauss_times_linear, sinc, open_tanh, asymm_falling
+from .activations import gauss_of_lin, gauss_times_linear, sinc, open_tanh, asymm_falling, gauss, multi_dim_edge_activation
 import math
 
 ###helper functions
@@ -132,7 +132,7 @@ def create_edges(vertices_a, vertices_b, zero_is_one_weight=False, n_properties=
     else:
         return edges
     
-def sparse_conv_multipl_dense(in_tensor, nfilters, activation=None, kernel_initializer=None, name=None):
+def sparse_conv_multipl_dense(in_tensor, nfilters, activation=None, kernel_initializer=tf.glorot_normal_initializer, name=None):
     global _sparse_conv_naming_index
     _sparse_conv_naming_index+=1
     if name is None:
@@ -145,18 +145,17 @@ def sparse_conv_multipl_dense(in_tensor, nfilters, activation=None, kernel_initi
     bias_shape = broadcast_shape + [nfilters]
     
     print('in_tensor.shape', in_tensor.shape)
-    weights = tf.get_variable(name+"_weights", [nfilters*int(in_tensor.shape[-1])],dtype=tf.float32,
-                                        initializer=kernel_initializer)/10.
+    weights = tf.get_variable(name+"_weights", [nfilters,int(in_tensor.shape[-1])],dtype=tf.float32,
+                                        initializer=kernel_initializer())/10.
+
     weights = tf.reshape(weights, weights_shape)
     
     print('weights',weights.shape)
     
     bias = tf.get_variable(name+"_bias", [nfilters],dtype=tf.float32,
-                                        initializer=tf.zeros_initializer)    
+                                        initializer=tf.zeros_initializer())    
     
     expanded_in_tensor = tf.expand_dims(in_tensor, axis=-2)
-
-    weights = tf.tile(weights, batch_etc+[1,1])
     
     print('weights',weights.shape)
     
@@ -201,14 +200,15 @@ def create_active_edges(vertices_a, vertices_b, name,multiplier=1):
     return edges
     
     
-def apply_edges(vertices, edges, reduce_sum=True, flatten=True): 
+def apply_edges(vertices, edges, reduce_sum=True, flatten=True,expand_first_vertex_dim=True): 
     '''
     edges are naturally BxVxV'xF
     vertices are BxVxF'  or BxV'xF'
     This function returns BxVxF'' if flattened and summed
     '''
     edges = tf.expand_dims(edges,axis=3)
-    vertices = tf.expand_dims(vertices,axis=1)
+    if expand_first_vertex_dim:
+        vertices = tf.expand_dims(vertices,axis=1)
     vertices = tf.expand_dims(vertices,axis=4)
 
     out = edges*vertices # [BxVxV'x1xF] x [Bx1xV'xF'x1] = [BxVxV'xFxF']
@@ -450,7 +450,8 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
                                edge_activation=gauss_of_lin,
                                indexing=None,
                                edge_transformations=None,
-                               train_space=True
+                               train_space=True,
+                               train_global_space=False,
                                ):
     
     assert merge_neighbours <= num_neighbors
@@ -465,6 +466,10 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
     
     
     trans_space = vertices_in
+    
+    if train_global_space:
+        trans_space = trans_space[0:1,:,:]
+        trans_space = tf.concat([trans_space[:,:,0:3],trans_space[:,:,4:]],axis=-1)
     if train_space:
         for i in range(len(space_transformations)):
             if i< len(space_transformations)-1:
@@ -475,12 +480,14 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
                 trans_space = tf.layers.dense(trans_space/10.,space_transformations[i],activation=open_tanh,
                                            kernel_initializer=space_initializer)
                 trans_space*=10.
+                
     else:
         trans_space = vertices_in[:,:,0:space_transformations[-1]]
 
     indexing = None
-    if train_space==False and space_transformations[-1] <= 3:
+    if train_global_space:
         indexing, _ = indexing_tensor_2(trans_space[0:1,:,:], num_neighbors, n_batch=trans_space.shape[0])
+        trans_space = tf.tile(trans_space,[vertices_in.shape[0],1,1])
     else:
         indexing, _ = indexing_tensor_2(trans_space, num_neighbors)
     
@@ -538,7 +545,8 @@ def sparse_conv_make_neighbors2(vertices_in, num_neighbors=10,
 def sparse_conv_edge_conv(vertices_in, num_neighbors=30, 
                       mpl_layers=[64,64,64],
                       aggregation_function = tf.reduce_max,
-                      share_keyword=None #TBI
+                      share_keyword=None, #TBI,
+                      edge_activation=None
                       ):
     
     trans_space = vertices_in
@@ -554,7 +562,10 @@ def sparse_conv_edge_conv(vertices_in, num_neighbors=30,
     
     for f in mpl_layers:
         edge = tf.layers.dense(edge, f, activation=tf.nn.relu)
-    
+        
+    if edge_activation is not None:
+        edge = edge_activation(edge)
+        
     vertex_out = aggregation_function(edge,axis=2)
     
     return vertex_out
@@ -576,7 +587,8 @@ def max_pool_on_last_dimensions(vertices_in, skip_first_features, n_output_verti
     
 
 def create_active_edges2(vertices_a, vertices_b, name,multiplier=1,skew_and_var=None,fixed_frequency=-1,
-                         no_activation=False, return_rot=False):
+                         no_activation=False, return_rot=False,
+                         fixed_field=False):
     '''
     learnable:
     -global scaler for receptive field in Y with Y: BxYxVxF
@@ -616,11 +628,16 @@ def create_active_edges2(vertices_a, vertices_b, name,multiplier=1,skew_and_var=
         frequency_scaler = tf.expand_dims(tf.concat(frequency_scaler, axis=1),axis=2)
        
     rot_symm = get_rot_symmetric_distance(edges)
+    
+    if fixed_field:
+        rec_field_scaler=1.
+        
     if no_activation:
         if return_rot:
             return rec_field_scaler*edges, rot_symm
         else:
             return rec_field_scaler*edges
+    
         
     elif fixed_frequency<0:
         edges = tf.exp(-(rec_field_scaler*edges)**2.)*tf.cos(frequency_scaler* edges)
@@ -702,10 +719,11 @@ def sparse_conv_moving_seeds4(vertices_in,
                              n_propagate,
                              n_seeds, 
                              n_seed_dimensions,
+                             weight_filters=[],
                              seed_filters=[],
                              out_filters=[],
-                             weight_filters=[],
-                             edge_multiplicity=1):
+                             edge_multiplicity=1,
+                             add_egde_info=False):
     
     global _sparse_conv_naming_index
     _sparse_conv_naming_index += 1
@@ -726,14 +744,15 @@ def sparse_conv_moving_seeds4(vertices_in,
         weights = tf.layers.dense(vertices_in, 1, activation=tf.nn.relu)+1e-4
         weight_sum = tf.reduce_sum(weights,axis=1,keepdims=True)
         
-        max_position = select_based_on(transformed_vertex_positions, tf.reduce_max(weights,axis=1), n_select=1)
+        max_position = select_based_on(transformed_vertex_positions, tf.reshape(weights, [weights.shape[0],weights.shape[1]]), n_select=1)
+        min_position = select_based_on(transformed_vertex_positions, -tf.reshape(weights, [weights.shape[0],weights.shape[1]]), n_select=1)
         mean_position = tf.reduce_sum(transformed_vertex_positions * weights,axis=1, keepdims=True)/weight_sum
         diff_to_mean = transformed_vertex_positions-mean_position
         pos_sq = diff_to_mean **2
         var_position  = tf.reduce_sum(pos_sq * weights,axis=1, keepdims=True)/weight_sum
         skew_position  = tf.reduce_sum(pos_sq * diff_to_mean * weights,axis=1, keepdims=True)/weight_sum
         
-        seed_position = tf.concat([max_position,mean_position,var_position,skew_position],axis=-1)
+        seed_position = tf.concat([max_position,min_position,mean_position,var_position,skew_position],axis=-1)
         seed_position = tf.layers.dense(seed_position,n_seed_dimensions,activation=tf.nn.tanh)
         
         seed_positions.append(seed_position)
@@ -751,13 +770,20 @@ def sparse_conv_moving_seeds4(vertices_in,
     
     expanded_collapsed = apply_edges(propagate_features, collapse_edges, reduce_sum=True, flatten=True)
       
-      
+    
     for f in seed_filters:
         expanded_collapsed = tf.layers.dense(expanded_collapsed, f, activation=tf.nn.relu)
         
     expand_edges = tf.transpose(expand_edges, perm=[0,2, 1,3]) # [BxVxV'xF]
     expanded_collapsed = apply_edges(expanded_collapsed, expand_edges, reduce_sum=False, flatten=True)
-            
+    
+    #also add back the distance to the aggregator 'aka edges' as information
+    #and make this part a bit deeper.  
+    if add_egde_info:
+        collapse_edges = tf.transpose(collapse_edges, perm=[0,2, 1,3])
+        collapse_edges = tf.reshape(collapse_edges, [collapse_edges.shape[0], collapse_edges.shape[1],-1])
+        expanded_collapsed = tf.concat([collapse_edges,expanded_collapsed],axis=-1)
+    
     expanded_collapsed = tf.concat([vertices_in,expanded_collapsed],axis=-1)
 
     for f in out_filters:
@@ -771,14 +797,356 @@ def sparse_conv_moving_seeds4(vertices_in,
     
     
     
+def sparse_conv_moving_seeds6(vertices_in, 
+                             n_filters, 
+                             n_propagate,
+                             n_seeds, 
+                             n_seed_dimensions,
+                             weight_filters=[],
+                             seed_filters=[],
+                             out_filters=[],
+                             edge_multiplicity=1,
+                             add_egde_info=False):
+    
+    global _sparse_conv_naming_index
+    _sparse_conv_naming_index += 1
+    this_name = "sparse_conv_moving_seeds3_"+str(_sparse_conv_naming_index)
+    
+    transformed_vertex_positions = tf.layers.dense(vertices_in, n_seed_dimensions, activation=tf.nn.tanh,
+                                    kernel_initializer=NoisyEyeInitializer)
+    pass_through_vertex_features = tf.layers.dense(vertices_in, n_seed_dimensions+n_propagate, activation=tf.nn.tanh,
+                                                   kernel_initializer=None)
+    propagate_features =  []
+
+    seed_positions=[] 
+    
+    skew_and_var=[]
+    for i in range(n_seeds):
+        prop_feat = tf.expand_dims(tf.layers.dense(vertices_in, n_propagate, activation=tf.nn.relu),axis=1)
+        propagate_features.append(prop_feat)
+        
+        weights = tf.layers.dense(vertices_in, 1, activation=tf.nn.relu)+1e-4
+        weight_sum = tf.reduce_sum(weights,axis=1,keepdims=True)
+        
+        max_position = select_based_on(transformed_vertex_positions, tf.reshape(weights, [weights.shape[0],weights.shape[1]]), n_select=1)
+        mean_position = tf.reduce_sum(transformed_vertex_positions * weights,axis=1, keepdims=True)/weight_sum
+        diff_to_mean = transformed_vertex_positions-mean_position
+        pos_sq = diff_to_mean **2
+        var_position  = tf.reduce_sum(pos_sq * weights,axis=1, keepdims=True)/weight_sum
+        skew_position  = tf.reduce_sum(pos_sq * diff_to_mean * weights,axis=1, keepdims=True)/weight_sum
+        
+        seed_position = tf.concat([max_position,mean_position,var_position,skew_position],axis=-1)
+        seed_position = tf.layers.dense(seed_position,n_seed_dimensions,activation=tf.nn.tanh)
+        
+        seed_positions.append(seed_position)
+        skew_and_var.append(tf.concat([mean_position,var_position,skew_position],axis=-1))
+    
+    propagate_features = tf.concat(propagate_features,axis=1)
+    seed_positions = tf.concat(seed_positions, axis=1)
+    skew_and_var = tf.concat(skew_and_var, axis=1)
+    
+    edges, rot_edge = create_active_edges2(transformed_vertex_positions,seed_positions,
+                                multiplier=edge_multiplicity,name=this_name,
+                                skew_and_var=None,fixed_frequency=0,
+                                return_rot=True,no_activation=True)
+    
+    collapse_edges = gauss_of_lin(edges)
+    expand_edges = gauss_of_lin(rot_edge)
+    
+    expanded_collapsed = apply_edges(propagate_features, collapse_edges, 
+                                     reduce_sum=True, flatten=True, 
+                                     expand_first_vertex_dim=False)
+
+    expand_edges = tf.transpose(expand_edges, perm=[0,2, 1,3]) # [BxVxV'xF]
+    expanded_collapsed = apply_edges(expanded_collapsed, expand_edges, reduce_sum=False, flatten=False)
+    
+    print('expanded_collapsed',expanded_collapsed.shape)
+    expanded_collapsed = tf.reduce_max(expanded_collapsed, axis=2)
+    expanded_collapsed = tf.reshape(expanded_collapsed,[expanded_collapsed.shape[0],
+                                                        expanded_collapsed.shape[1],-1])
     
     
+    expanded_collapsed = tf.concat([pass_through_vertex_features,expanded_collapsed],axis=-1)
+        
+    expanded_collapsed = tf.layers.dense(expanded_collapsed,n_filters, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
     
+    print('sparse_conv_moving_seeds5 out',expanded_collapsed.shape)
+    return expanded_collapsed, seed_positions
+
     
     
     
     
 
+    
+def half_nodes(x): 
+    nodes = int(int(x.shape[-1])/2)
+    if nodes<1:
+        nodes = 1  
+    return  tf.layers.dense(x, nodes , activation=tf.nn.relu)
+    
+
+    
+def sparse_conv_moving_seeds5(vertices_in, 
+                             n_filters, 
+                             n_propagate,
+                             n_seeds, 
+                             n_seed_dimensions,
+                             weight_filters=[],
+                             edge_multiplicity=1,
+                             add_egde_info=False):   
+    
+    global _sparse_conv_naming_index
+    _sparse_conv_naming_index += 1
+    this_name = "sparse_conv_moving_seeds6_"+str(_sparse_conv_naming_index)
+    
+    transformed_vertex_positions = tf.layers.dense(vertices_in, n_seed_dimensions, activation=tf.nn.relu,
+                                    kernel_initializer=NoisyEyeInitializer)
+    
+    propagate_features =  tf.layers.dense(vertices_in, n_propagate, activation=tf.nn.relu)
+    
+    seed_positions=[] 
+    skew_and_var=[]
+    for i in range(n_seeds):
+        weight_input = vertices_in
+        for f in weight_filters:
+            weight_input = tf.layers.dense(weight_input, f, activation=tf.nn.relu)
+        
+        weights = tf.layers.dense(vertices_in, 1, activation=tf.nn.relu)+1e-4
+        print('weights',weights.shape)
+        weight_sum = tf.reduce_sum(weights,axis=1,keepdims=True)
+        
+        max_position = select_based_on(transformed_vertex_positions, 
+                                       tf.reshape(weights, [weights.shape[0],weights.shape[1]]), 
+                                       n_select=1)
+        mean_position = tf.reduce_sum(transformed_vertex_positions * weights,axis=1, keepdims=True)/weight_sum
+        diff_to_mean = transformed_vertex_positions-mean_position
+        pos_sq = diff_to_mean **2
+        var_position  = tf.reduce_sum(pos_sq * weights,axis=1, keepdims=True)/weight_sum
+        skew_position  = tf.reduce_sum(pos_sq * diff_to_mean * weights,axis=1, keepdims=True)/weight_sum
+        
+        seed_position = tf.concat([max_position,mean_position,var_position,skew_position],axis=-1)
+        seed_position = tf.layers.dense(seed_position,seed_position.shape[-1]*2,activation=tf.nn.relu)
+        seed_position = tf.layers.dense(seed_position,seed_position.shape[-1],activation=tf.nn.relu)
+        seed_position = tf.layers.dense(seed_position,n_seed_dimensions,activation=tf.nn.relu)
+        
+        seed_positions.append(seed_position)
+        skew_and_var.append(tf.concat([mean_position,var_position,skew_position],axis=-1))
+    
+    seed_positions = tf.concat(seed_positions, axis=1)
+    skew_and_var = tf.concat(skew_and_var, axis=1)
+    
+    edges, rot_edge = create_active_edges2(transformed_vertex_positions,seed_positions,
+                                multiplier=edge_multiplicity,
+                                name=this_name,
+                                skew_and_var=skew_and_var,
+                                fixed_frequency=0,
+                                return_rot=True,
+                                no_activation=True,
+                                fixed_field=False)
+    
+    collapse_edges = gauss(edges)
+    expand_edges = gauss(rot_edge)
+    
+    expanded_collapsed = apply_edges(propagate_features, collapse_edges, reduce_sum=True, flatten=False)
+    
+    expanded_collapsed = tf.transpose(expanded_collapsed,[0,1,3,2])
+    
+    print('applied edges       ',expanded_collapsed.shape)
+        
+    expanded_collapsed = half_nodes(expanded_collapsed)
+    
+    print('compressed features ',expanded_collapsed.shape)
+    
+    expanded_collapsed = tf.transpose(expanded_collapsed,[0,1,3,2])
+    
+    expanded_collapsed = half_nodes(expanded_collapsed)
+        
+    print('compressed dim      ',expanded_collapsed.shape)
+    
+    expanded_collapsed = tf.reshape(expanded_collapsed,[expanded_collapsed.shape[0],expanded_collapsed.shape[1],-1])
+     
+    expand_edges = tf.transpose(expand_edges, perm=[0,2, 1,3]) # [BxVxV'xF]
+    
+    expanded_collapsed = apply_edges(expanded_collapsed, expand_edges, reduce_sum=False, flatten=False)
+    
+    print('applied to V       ',expanded_collapsed.shape)
+    
+    expanded_collapsed = tf.transpose(expanded_collapsed, perm=[0,1,4,2,3])
+    
+    expanded_collapsed = half_nodes(expanded_collapsed)
+    
+    print('compressed V F     ',expanded_collapsed.shape)
+    
+    expanded_collapsed = tf.reshape(expanded_collapsed,[expanded_collapsed.shape[0],
+                                                        expanded_collapsed.shape[1],
+                                                        expanded_collapsed.shape[2],-1])
+      
+    expanded_collapsed = half_nodes(expanded_collapsed)
+    print('coll and comp. V   ',expanded_collapsed.shape)
+        
+    expanded_collapsed = tf.reshape(expanded_collapsed,[expanded_collapsed.shape[0],expanded_collapsed.shape[1],-1])
+    
+    expanded_collapsed = half_nodes(expanded_collapsed)
+    
+    print('comp. V            ',expanded_collapsed.shape)
+        
+    expanded_collapsed = tf.layers.dense(expanded_collapsed,n_filters, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
+    
+    print('out V              ',expanded_collapsed.shape)
+    
+    return expanded_collapsed, seed_positions 
+    
+    
+    
+
+    
+    
+    
+    
+def sparse_conv_aggregator_simple(vertices_in, 
+                       n_aggregators, 
+                       nfilters, 
+                       npropagate,
+                       nspacefilters=32, 
+                       nspacedim=3, 
+                       compress_before_propagate=True,
+                       use_edge_properties=-1):
+    global _sparse_conv_naming_index
+    '''
+    '''
+    #for later
+    _sparse_conv_naming_index+=1
+    
+    
+    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim) # Just a couple of dense layers
+    
+    trans_vertices = tf.layers.dense(vertices_in,npropagate,activation=tf.nn.relu) # Just dense again
+    
+    seed_positions =[]
+    seed_properties=[]
+    ### create aggregator positions...
+    for i in range(n_aggregators):
+        weights = vertices_in
+        weights = tf.layers.dense(weights, weights.shape[-1], activation=tf.nn.relu)
+        while weights.shape[-1] > 7:
+            weights = half_nodes(weights)
+            print('weights ',weights.shape)
+        weights = tf.layers.dense(weights, 1, activation=tf.nn.relu)
+        weights = tf.reshape(weights, [weights.shape[0],weights.shape[1]])
+        print('weights last',weights.shape)
+        seed_positions.append( select_based_on(trans_space,    weights, n_select=1))
+        seed_properties.append(select_based_on(trans_vertices, weights, n_select=1))
+        
+    
+    seed_trans_space = tf.concat(seed_positions, axis=1)
+    seed_properties  = tf.concat(seed_properties, axis=1)
+    ###
+
+    edges = create_edges(trans_space,seed_trans_space,n_properties=use_edge_properties) # BxVxV'xF
+
+
+    expanded_collapsed = apply_edges(trans_vertices, edges, reduce_sum=True, flatten=True) # [BxVxF]
+    expanded_collapsed = tf.concat([expanded_collapsed,seed_properties],axis=-1)
+   
+    if compress_before_propagate:
+        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.tanh)
+        
+    print('expanded_collapsed',expanded_collapsed.shape)
+    
+    #propagate back, transposing the edges does the trick, now they point from Nseeds to Nvertices
+    edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
+    expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
+    if compress_before_propagate:
+        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.tanh,
+                                             kernel_initializer=NoisyEyeInitializer)
+    
+
+    #combien old features with new ones
+    feature_layerout = tf.concat([vertices_in,trans_space,expanded_collapsed],axis=-1)
+    feature_layerout = tf.layers.dense(feature_layerout,nfilters,activation=tf.nn.tanh,
+                                       kernel_initializer=NoisyEyeInitializer)
+    return feature_layerout
+    
+    
+    
+
+def sparse_conv_make_neighbors_simple(vertices_in, 
+                                      num_neighbors=16, 
+                                      n_filters=[16], 
+                                      n_output=16,
+                                      edge_filters=[64],
+                                      space_transformations=[32],
+                                      train_global_space=False,
+                                      ):
+    
+    assert len(n_filters)
+    global _sparse_conv_naming_index
+    #for later
+    _sparse_conv_naming_index+=1
+    
+    trans_space = vertices_in
+    if train_global_space:
+        trans_space = trans_space[0:1,:,:]
+        trans_space = tf.concat([trans_space[:,:,0:3],trans_space[:,:,4:]],axis=-1) #CHECK
+    
+    for i in range(len(space_transformations)):
+        f = space_transformations[i]
+        space_activation = tf.nn.relu
+        if i == len(space_transformations) - 1:
+            space_activation = None
+        trans_space = tf.layers.dense(trans_space,f,activation=space_activation)
+    
+    print('trans_space',trans_space.shape)
+    
+    if train_global_space:
+        indexing, _ = indexing_tensor_2(trans_space, num_neighbors, n_batch=vertices_in.shape[0])
+        trans_space = tf.tile(trans_space,[vertices_in.shape[0],1,1])
+    else:
+        indexing, _ = indexing_tensor_2(trans_space, num_neighbors)
+
+
+    neighbour_space = tf.gather_nd(trans_space, indexing)
+    
+    #build edges manually
+    expanded_trans_space = tf.expand_dims(trans_space, axis=2)
+    diff = expanded_trans_space - neighbour_space
+    edges = diff #add_rot_symmetric_distance(diff)
+    
+    #maybe not needed with tensordot
+    # BxVxNxD
+    
+    #edges = tf.expand_dims(edges,axis=3)
+    
+    
+    #transform the edges a few times a la edgeconv and then use each output node as multiplier
+    #use tensordot for memory
+    
+    trans_vertices = vertices_in
+    for f in n_filters:
+        trans_vertices = tf.layers.dense(trans_vertices,f,activation=tf.nn.relu)
+        #some dense on the vertex input
+    
+    neighbour_vertices = tf.gather_nd(trans_vertices, indexing)
+    for f in edge_filters:
+        edges = tf.layers.dense(edges,f,activation=tf.nn.relu)
+    print('edges',edges.shape)
+    print('neighbour_vertices',neighbour_vertices.shape)
+    
+    #updated_vertices = tf.einsum('ijkl,abkd->ijld', edges, neighbour_vertices)/float(num_neighbors)
+    edges = tf.expand_dims(edges, axis=4)
+    neighbour_vertices = tf.expand_dims(neighbour_vertices, axis=3)
+    print('edges',edges.shape)
+    print('neighbour_vertices',neighbour_vertices.shape)
+
+    updated_vertices = tf.reshape(neighbour_vertices*edges,[neighbour_vertices.shape[0],neighbour_vertices.shape[1],-1])
+
+    updated_vertices = tf.concat([trans_space,updated_vertices],axis=-1)
+    print('updated_vertices',updated_vertices.shape)
+    return tf.layers.dense(updated_vertices,n_output,activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
+
+    
+    
     
     
     
