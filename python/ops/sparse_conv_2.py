@@ -222,14 +222,14 @@ def apply_edges(vertices, edges, reduce_sum=True, flatten=True,expand_first_vert
 
  
 def apply_space_transform(vertices, units_transform, output_dimensions,
-                          depth=1): 
+                          depth=1,activation=open_tanh): 
     trans_space = vertices
     for i in range(depth):
-        trans_space = tf.layers.dense(trans_space/10.,units_transform,activation=open_tanh,
+        trans_space = tf.layers.dense(trans_space,units_transform,activation=activation,
                                        kernel_initializer=NoisyEyeInitializer)
-        trans_space = trans_space*10.
-    trans_space = tf.layers.dense(trans_space*10.,output_dimensions,activation=None,
-                                  kernel_initializer=NoisyEyeInitializer, use_bias=False)
+        trans_space = trans_space
+    trans_space = tf.layers.dense(trans_space,output_dimensions,activation=None,
+                                  kernel_initializer=NoisyEyeInitializer, use_bias=activation)
     return trans_space
 ########
 
@@ -1009,9 +1009,13 @@ def sparse_conv_aggregator_simple(vertices_in,
                        nfilters, 
                        npropagate,
                        nspacefilters=32, 
-                       nspacedim=3, 
+                       nspacedim=3,
+                       collapse_dropout=-1,
+                       expand_dropout=-1, 
+                       is_training=False,
                        compress_before_propagate=True,
-                       use_edge_properties=-1):
+                       use_edge_properties=-1,
+                       return_aggregators=False):
     global _sparse_conv_naming_index
     '''
     '''
@@ -1019,7 +1023,7 @@ def sparse_conv_aggregator_simple(vertices_in,
     _sparse_conv_naming_index+=1
     
     
-    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim) # Just a couple of dense layers
+    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim,activation=tf.nn.relu) # Just a couple of dense layers
     
     trans_vertices = tf.layers.dense(vertices_in,npropagate,activation=tf.nn.relu) # Just dense again
     
@@ -1048,23 +1052,27 @@ def sparse_conv_aggregator_simple(vertices_in,
 
     expanded_collapsed = apply_edges(trans_vertices, edges, reduce_sum=True, flatten=True) # [BxVxF]
     expanded_collapsed = tf.concat([expanded_collapsed,seed_properties],axis=-1)
-   
+    if collapse_dropout>0:
+        expanded_collapsed = tf.layers.dropout(expanded_collapsed,rate=collapse_dropout,training=is_training)
     if compress_before_propagate:
-        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.tanh)
+        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.relu)
         
     print('expanded_collapsed',expanded_collapsed.shape)
-    
+    if return_aggregators:
+        return expanded_collapsed
     #propagate back, transposing the edges does the trick, now they point from Nseeds to Nvertices
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
     expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
+    if expand_dropout>0:
+        expanded_collapsed = tf.layers.dropout(expanded_collapsed,rate=expand_dropout,training=is_training)
     if compress_before_propagate:
-        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.tanh,
+        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.relu,
                                              kernel_initializer=NoisyEyeInitializer)
     
 
     #combien old features with new ones
     feature_layerout = tf.concat([vertices_in,trans_space,expanded_collapsed],axis=-1)
-    feature_layerout = tf.layers.dense(feature_layerout,nfilters,activation=tf.nn.tanh,
+    feature_layerout = tf.layers.dense(feature_layerout,nfilters,activation=tf.nn.relu,
                                        kernel_initializer=NoisyEyeInitializer)
     return feature_layerout
     

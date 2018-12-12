@@ -501,7 +501,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         return feat   
     
     def compute_output_aggregator_simple(self,
-                                         _input,seeds):
+                                         _input,seeds,dropout=-1):
         
         feat = sparse_conv_collapse(_input)
         
@@ -516,9 +516,14 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                        nfilters=filters[i], 
                        npropagate=filters[i],
                        nspacefilters=32, 
+                       collapse_dropout=dropout,
+                       expand_dropout=dropout, 
+                       is_training=self.is_train,
                        nspacedim=4,
                        use_edge_properties=4)
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+            if dropout>0:
+                feat = tf.layers.dropout(feat, rate=dropout,training=self.is_train)
             feat_list.append(feat)
         
         feat=tf.concat(feat_list,axis=-1)
