@@ -190,7 +190,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         return feat
     
-    def compute_output_dgcnn(self,_input,seeds):
+    def compute_output_dgcnn(self,_input,seeds,dropout=-1.):
         
         self.freeze_bn_after = None
         feat = sparse_conv_collapse(_input)
@@ -200,24 +200,34 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         feat = sparse_conv_edge_conv(feat,40,  [64,64,64])
         feat_g = sparse_conv_global_exchange(feat)
+        
         feat = tf.layers.dense(tf.concat([feat,feat_g],axis=-1),
                                64, activation=tf.nn.relu )
+        
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+        if dropout>0:
+            feat = tf.layers.dropout(feat, rate=dropout,training=self.is_train)
         
         feat1 = sparse_conv_edge_conv(feat,40, [64,64,64])
         feat1_g = sparse_conv_global_exchange(feat1)
         feat1 = tf.layers.dense(tf.concat([feat1,feat1_g],axis=-1),
                                 64, activation=tf.nn.relu )
         feat1 = tf.layers.batch_normalization(feat1,training=self.is_train, momentum=self.momentum)
+        if dropout>0:
+            feat1 = tf.layers.dropout(feat1, rate=dropout,training=self.is_train)
         
         feat2 = sparse_conv_edge_conv(feat1,40,[64,64,64])
         feat2_g = sparse_conv_global_exchange(feat2)
         feat2 = tf.layers.dense(tf.concat([feat2,feat2_g],axis=-1),
                                 64, activation=tf.nn.relu )
         feat2 = tf.layers.batch_normalization(feat2,training=self.is_train,momentum=self.momentum)
+        if dropout>0:
+            feat2 = tf.layers.dropout(feat2, rate=dropout,training=self.is_train)
         
         feat3 = sparse_conv_edge_conv(feat2,40,[64,64,64])
         feat3 = tf.layers.batch_normalization(feat3,training=self.is_train, momentum=self.momentum)
+        if dropout>0:
+            feat3 = tf.layers.dropout(feat3, rate=dropout,training=self.is_train)
         
         #global_feat = tf.layers.dense(feat2,1024,activation=tf.nn.relu)
         #global_feat = max_pool_on_last_dimensions(global_feat, skip_first_features=0, n_output_vertices=1)
@@ -230,7 +240,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         return feat
     
-    def compute_output_neighbours(self,_input,seeds):
+    def compute_output_neighbours(self,_input,seeds,dropout=0.05):
         
         self.freeze_bn_after = None
         feat = sparse_conv_collapse(_input)
@@ -510,14 +520,17 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         feat_list =[]
+        use_do=dropout
         for i in range(len(filters)):
+            if i == len(filters)-1:
+                use_do=-1
             feat = sparse_conv_aggregator_simple(feat, 
                        n_aggregators=aggregators[i], 
                        nfilters=filters[i], 
                        npropagate=filters[i],
                        nspacefilters=32, 
-                       collapse_dropout=dropout,
-                       expand_dropout=dropout, 
+                       collapse_dropout=use_do,
+                       expand_dropout=use_do, 
                        is_training=self.is_train,
                        nspacedim=4,
                        use_edge_properties=4)
@@ -609,10 +622,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         seeds = self._placeholder_seed_indices
         print('seeds',seeds.shape)
         
-        net = construct_sparse_io_dict(feat, space_feat, local_space_feat,
+        net_in = construct_sparse_io_dict(feat, space_feat, local_space_feat,
                                           tf.squeeze(num_entries))
         
-        net = sparse_conv_normalise(net,log_energy=True)
+        net = sparse_conv_normalise(net_in,log_energy=True)
         #net = sparse_conv_add_simple_seed_labels(net,seeds)
         
         #simple_input = tf.concat([space_feat,local_space_feat,feat],axis=-1)
@@ -724,7 +737,11 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                                                                npropagate=24)
         
         elif self.get_variable_scope() == 'aggregator_simple':
-            output = self.compute_output_aggregator_simple(net,seeds)    
+            output = self.compute_output_aggregator_simple(net,seeds) 
+            
+        elif self.get_variable_scope() == 'aggregator_simple_nolog_do':
+            net = sparse_conv_normalise(net_in,log_energy=False)
+            output = self.compute_output_aggregator_simple(net,seeds,dropout=0.05)    
         
         elif self.get_variable_scope() == 'neighbours':
             output = self.compute_output_neighbours(net,seeds)   
