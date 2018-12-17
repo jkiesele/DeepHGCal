@@ -139,7 +139,14 @@ class SparseConvClusteringTrainer:
             print("Starting iterations")
             while iteration_number < self.train_for_iterations:
                 inputs_train = sess.run(list(inputs_feed))
-
+                learning_rate=1
+                if hasattr(self.model, "learningrate_scheduler"):
+                    learning_rate = self.model.learningrate_scheduler.get_lr(iteration_number)
+                else:
+                    learning_rate=self.model.learning_rate
+                if iteration_number==0:
+                    print('learning rate ', learning_rate)
+ 
                 if len(placeholders)==5:
                     inputs_train_dict = {
                         placeholders[0]: inputs_train[0][:, :, self.spatial_features_indices],
@@ -147,7 +154,8 @@ class SparseConvClusteringTrainer:
                         placeholders[2]: inputs_train[0][:, :, self.other_features_indices],
                         placeholders[3]: inputs_train[0][:, :, self.target_indices],
                         placeholders[4]: inputs_train[1],
-                        self.model.is_train: True
+                        self.model.is_train: True,
+                        self.model.learning_rate : learning_rate
                     }
                 else:
                     inputs_train_dict = {
@@ -157,7 +165,8 @@ class SparseConvClusteringTrainer:
                         placeholders[3]: inputs_train[0][:, :, self.target_indices],
                         placeholders[4]: inputs_train[1],
                         placeholders[5]: inputs_train[2],
-                        self.model.is_train: True
+                        self.model.is_train: True,
+                        self.model.learning_rate : learning_rate
                     }
 
                 t, eval_loss, _, eval_summary, eval_output = sess.run([graph_temp, graph_loss, graph_optmiser, graph_summary, graph_output], feed_dict=inputs_train_dict)
@@ -171,7 +180,8 @@ class SparseConvClusteringTrainer:
                             placeholders[2]: inputs_validation[0][:, :, self.other_features_indices],
                             placeholders[3]: inputs_validation[0][:, :, self.target_indices],
                             placeholders[4]: inputs_validation[1],
-                            self.model.is_train: False
+                            self.model.is_train: False,
+                            self.model.learning_rate : learning_rate
                         }
                     else:
                         inputs_validation_dict = {
@@ -181,7 +191,8 @@ class SparseConvClusteringTrainer:
                             placeholders[3]: inputs_validation[0][:, :, self.target_indices],
                             placeholders[4]: inputs_validation[1],
                             placeholders[5]: inputs_validation[2],
-                            self.model.is_train: False
+                            self.model.is_train: False,
+                            self.model.learning_rate : learning_rate
                         }
 
                     eval_loss_validation, eval_summary_validation= sess.run([graph_loss, graph_summary_validation], feed_dict=inputs_validation_dict)
@@ -242,7 +253,8 @@ class SparseConvClusteringTrainer:
                         placeholders[2]: inputs_test[0][:, :, self.other_features_indices],
                         placeholders[3]: inputs_test[0][:, :, self.target_indices],
                         placeholders[4]: inputs_test[1],
-                        self.model.is_train: False
+                        self.model.is_train: False,
+                        self.model.learning_rate : 0
                     }
                 else:
                     inputs_train_dict = {
@@ -252,7 +264,8 @@ class SparseConvClusteringTrainer:
                         placeholders[3]: inputs_test[0][:, :, self.target_indices],
                         placeholders[4]: inputs_test[1],
                         placeholders[5]: inputs_test[2],
-                        self.model.is_train: False
+                        self.model.is_train: False,
+                        self.model.learning_rate : 0
                     }
                 t, eval_loss, eval_output = sess.run([graph_temp, graph_loss, graph_output], feed_dict=inputs_train_dict)
 

@@ -229,7 +229,7 @@ def apply_space_transform(vertices, units_transform, output_dimensions,
                                        kernel_initializer=NoisyEyeInitializer)
         trans_space = trans_space
     trans_space = tf.layers.dense(trans_space,output_dimensions,activation=None,
-                                  kernel_initializer=NoisyEyeInitializer, use_bias=activation)
+                                  kernel_initializer=NoisyEyeInitializer, use_bias=True)
     return trans_space
 ########
 
@@ -1015,7 +1015,14 @@ def sparse_conv_aggregator_simple(vertices_in,
                        is_training=False,
                        compress_before_propagate=True,
                        use_edge_properties=-1,
-                       return_aggregators=False):
+                       return_aggregators=False,
+                       input_aggregators=None,
+                       weighted_aggregator_positions=False):
+    
+    if input_aggregators is not None:
+        print('input_aggregators',input_aggregators.shape)
+        assert int(input_aggregators.shape[1]) >= n_aggregators
+    
     global _sparse_conv_naming_index
     '''
     '''
@@ -1023,7 +1030,7 @@ def sparse_conv_aggregator_simple(vertices_in,
     _sparse_conv_naming_index+=1
     
     
-    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim,activation=tf.nn.relu) # Just a couple of dense layers
+    trans_space = apply_space_transform(vertices_in, nspacefilters,nspacedim,activation=tf.nn.tanh) # Just a couple of dense layers
     
     trans_vertices = tf.layers.dense(vertices_in,npropagate,activation=tf.nn.relu) # Just dense again
     
@@ -1036,11 +1043,36 @@ def sparse_conv_aggregator_simple(vertices_in,
         while weights.shape[-1] > 7:
             weights = half_nodes(weights)
             print('weights ',weights.shape)
-        weights = tf.layers.dense(weights, 1, activation=tf.nn.relu)
-        weights = tf.reshape(weights, [weights.shape[0],weights.shape[1]])
-        print('weights last',weights.shape)
-        seed_positions.append( select_based_on(trans_space,    weights, n_select=1))
-        seed_properties.append(select_based_on(trans_vertices, weights, n_select=1))
+        weights = tf.layers.dense(weights, 1, activation=tf.nn.relu,kernel_initializer=tf.random_normal_initializer(0, 0.1))+1.
+        
+        if weighted_aggregator_positions:
+            weight_sum = tf.reduce_sum(weights,axis=1,keepdims=True)
+        
+            mean_position = tf.reduce_sum(trans_space * weights,axis=1, keepdims=True)/weight_sum
+            diff_to_mean = trans_space-mean_position
+            pos_sq = diff_to_mean **2
+            var_position  = tf.reduce_sum(pos_sq * weights,axis=1, keepdims=True)/weight_sum
+            skew_position  = tf.reduce_sum(pos_sq * diff_to_mean * weights,axis=1, keepdims=True)/weight_sum
+            
+            seed_property = tf.concat([mean_position,var_position,skew_position],axis=-1)
+            print('seed_property',seed_property.shape)
+            seed_position = 2.*tf.layers.dense(seed_property,nspacedim,activation=tf.nn.tanh,
+                                            kernel_initializer=tf.random_normal_initializer(0, 0.1))
+            
+        else:
+            weights = tf.reshape(weights, [weights.shape[0],weights.shape[1]])
+            print('weights last',weights.shape)
+            
+            #input_aggregators
+            seed_position = select_based_on(trans_space,    weights, n_select=1)
+            seed_property = select_based_on(trans_vertices, weights, n_select=1)
+        if input_aggregators is not None:
+            agg = tf.expand_dims(input_aggregators[:,i,:], axis=1)
+            seed_position = tf.layers.dense(tf.concat([seed_position,agg], axis=-1), nspacedim)
+            seed_property = tf.layers.dense(tf.concat([seed_property,agg], axis=-1), npropagate)
+        
+        seed_positions.append(seed_position)
+        seed_properties.append(seed_property)
         
     
     seed_trans_space = tf.concat(seed_positions, axis=1)
@@ -1051,29 +1083,32 @@ def sparse_conv_aggregator_simple(vertices_in,
 
 
     expanded_collapsed = apply_edges(trans_vertices, edges, reduce_sum=True, flatten=True) # [BxVxF]
-    expanded_collapsed = tf.concat([expanded_collapsed,seed_properties],axis=-1)
+    if not weighted_aggregator_positions:
+        expanded_collapsed = tf.concat([expanded_collapsed,seed_properties],axis=-1)
     if collapse_dropout>0:
         expanded_collapsed = tf.layers.dropout(expanded_collapsed,rate=collapse_dropout,training=is_training)
     if compress_before_propagate:
         expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.relu)
         
+    aggregators = expanded_collapsed
     print('expanded_collapsed',expanded_collapsed.shape)
-    if return_aggregators:
-        return expanded_collapsed
     #propagate back, transposing the edges does the trick, now they point from Nseeds to Nvertices
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
     expanded_collapsed = apply_edges(expanded_collapsed, edges, reduce_sum=False, flatten=True)
     if expand_dropout>0:
         expanded_collapsed = tf.layers.dropout(expanded_collapsed,rate=expand_dropout,training=is_training)
     if compress_before_propagate:
-        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.relu,
-                                             kernel_initializer=NoisyEyeInitializer)
+        expanded_collapsed = tf.layers.dense(expanded_collapsed,nfilters, activation=tf.nn.relu)
     
 
     #combien old features with new ones
     feature_layerout = tf.concat([vertices_in,trans_space,expanded_collapsed],axis=-1)
     feature_layerout = tf.layers.dense(feature_layerout,nfilters,activation=tf.nn.relu,
                                        kernel_initializer=NoisyEyeInitializer)
+    
+    if return_aggregators:
+        return feature_layerout, aggregators
+    
     return feature_layerout
     
     
@@ -1121,6 +1156,7 @@ def sparse_conv_make_neighbors_simple(vertices_in,
     diff = expanded_trans_space - neighbour_space
     edges = diff #add_rot_symmetric_distance(diff)
     
+    edges = gauss_of_lin(edges*edges)
     #maybe not needed with tensordot
     # BxVxNxD
     
