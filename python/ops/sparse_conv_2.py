@@ -1191,6 +1191,76 @@ def sparse_conv_make_neighbors_simple(vertices_in,
 
     
     
+
+def sparse_conv_make_neighbors_simple_multipass(vertices_in, 
+                                      num_neighbors=16, 
+                                      n_propagate=8,
+                                      n_filters=[16], 
+                                      n_output=16,
+                                      edge_filters=[64],
+                                      space_transformations=[32],
+                                      train_global_space=False,
+                                      ):
+    
+    assert len(n_filters)
+    global _sparse_conv_naming_index
+    #for later
+    _sparse_conv_naming_index+=1
+    
+    trans_space = vertices_in
+    if train_global_space:
+        trans_space = trans_space[0:1,:,:]
+        trans_space = tf.concat([trans_space[:,:,0:3],trans_space[:,:,4:]],axis=-1) #CHECK
+    
+    for i in range(len(space_transformations)):
+        f = space_transformations[i]
+        space_activation = tf.nn.relu
+        if i == len(space_transformations) - 1:
+            space_activation = None
+        trans_space = tf.layers.dense(trans_space,f,activation=space_activation)
+    
+    print('trans_space',trans_space.shape)
+    
+    if train_global_space:
+        indexing, _ = indexing_tensor_2(trans_space, num_neighbors, n_batch=vertices_in.shape[0])
+        trans_space = tf.tile(trans_space,[vertices_in.shape[0],1,1])
+    else:
+        indexing, _ = indexing_tensor_2(trans_space, num_neighbors)
+
+
+    neighbour_space = tf.gather_nd(trans_space, indexing)
+    
+    #build edges manually
+    expanded_trans_space = tf.expand_dims(trans_space, axis=2)
+    diff = expanded_trans_space - neighbour_space
+    edges = diff #add_rot_symmetric_distance(diff)
+    
+    edges = gauss_of_lin(edges*edges)
+    
+    updated_vertices = tf.layers.dense(vertices_in,n_propagate)
+    edges_orig=edges
+    for i in range(len(n_filters)):
+        trans_vertices = updated_vertices #tf.layers.dense(updated_vertices,n_filters[i],activation=tf.nn.relu)
+        neighbour_vertices = tf.gather_nd(trans_vertices, indexing)
+        edges = tf.layers.dense(edges_orig,edge_filters[i],activation=tf.nn.relu)
+        edges = tf.expand_dims(edges, axis=4)
+        neighbour_vertices = tf.expand_dims(neighbour_vertices, axis=3)
+        vertex_update = tf.reshape(neighbour_vertices*edges,[neighbour_vertices.shape[0],neighbour_vertices.shape[1],-1])
+        updated_vertices = tf.concat([updated_vertices,vertex_update], axis=-1)
+        updated_vertices = tf.layers.dense(updated_vertices,n_filters[i],activation=tf.nn.relu)
+        
+    #some dense on the vertex input
+    
+    updated_vertices = tf.concat([trans_space,updated_vertices],axis=-1)
+    print('updated_vertices',updated_vertices.shape)
+    return tf.layers.dense(updated_vertices,n_output,activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
+
+    
+    
+    
+    
+    
+    
     
     
     

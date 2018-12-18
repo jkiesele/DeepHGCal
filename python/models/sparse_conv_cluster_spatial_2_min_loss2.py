@@ -21,6 +21,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self.varscope='sparse_conv_clustering_spatial1'
         self.freeze_bn_after=None
         self.E_loss=False
+        self.sum_loss=False
         
     def normalise_response(self,total_response):
         mean, variance = tf.nn.moments(total_response, axes=0)
@@ -82,21 +83,25 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         print('diff_sq_a',diff_sq_a.shape)
         
-        loss_a = tf.reduce_sum(diff_sq_a * sqrt_energies[:,:,0],axis=1) / (sqrt_energy_a)
-        loss_b = tf.reduce_sum(diff_sq_b * sqrt_energies[:,:,1],axis=1) / (sqrt_energy_b)
+        e_for_loss = sqrt_energies
+        esum_for_loss_a = sqrt_energy_a
+        esum_for_loss_b = sqrt_energy_b
         
-        loss_a = tf.reduce_sum(diff_sq_a * sqrt_energies[:,:,0],axis=1) / (sqrt_energy_a)
-        loss_b = tf.reduce_sum(diff_sq_b * sqrt_energies[:,:,1],axis=1) / (sqrt_energy_b)
+        if self.E_loss:
+            e_for_loss = energies
+            esum_for_loss_a = energy_a
+            esum_for_loss_b = energy_b
+            
+        
+        loss_a = tf.reduce_sum(diff_sq_a * e_for_loss[:,:,0],axis=1) / (esum_for_loss_a)
+        loss_b = tf.reduce_sum(diff_sq_b * e_for_loss[:,:,1],axis=1) / (esum_for_loss_b)
         
         
-        old_loss = (tf.reduce_sum(diff_sq_a * sqrt_energies[:,:,0],axis=1) + tf.reduce_sum(diff_sq_b * sqrt_energies[:,:,1],axis=1))/(sqrt_energy_a+sqrt_energy_b)
-        
-        old_loss_E = (tf.reduce_sum(diff_sq_a * energies[:,:,0],axis=1) + tf.reduce_sum(diff_sq_b * energies[:,:,1],axis=1))/(energy_a+energy_b)
-        
+        old_loss = (tf.reduce_sum(diff_sq_a * e_for_loss[:,:,0],axis=1) + tf.reduce_sum(diff_sq_b * e_for_loss[:,:,1],axis=1))/(esum_for_loss_a+esum_for_loss_b)
         
         print('loss_a',loss_a.shape)
         
-        total_loss = loss_a + loss_b
+        total_loss = (loss_a + loss_b)/2.
         
         response_a = tf.reduce_sum(prediction[:,:,0]*energy, axis=1) / energy_a
         response_b = tf.reduce_sum(prediction[:,:,1]*energy, axis=1) / energy_b
@@ -118,8 +123,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self.mean_sqrt_resolution, self.variance_sqrt_resolution = self.normalise_response(sqrt_total_response)    
   
   
-        if self.E_loss:
-            return tf.reduce_mean(old_loss_E)
+        if self.sum_loss:
+            return self.total_loss
         return tf.reduce_mean(old_loss) #+ tf.reduce_mean(0.1*tf.abs(1-self.mean_resolution)+0.1*self.variance_resolution)
 
     def _get_loss(self):
@@ -301,6 +306,43 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.dense(feat,64, activation=tf.nn.relu)
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         return feat
+    
+    
+    def compute_output_make_neighbors_simple_multipass(self,_input,seeds,dropout=-0.01):
+        feat = sparse_conv_collapse(_input)
+        feat = tf.layers.batch_normalization(feat,training=self.is_train,momentum=self.momentum)
+        feat_list=[]
+        
+        feat = sparse_conv_make_neighbors_simple_multipass(feat, 
+                                      num_neighbors=16, 
+                                      n_output=32,
+                                      n_propagate=16,
+                                      n_filters=   4*[20], 
+                                      edge_filters=4*[2],
+                                      space_transformations=[64,4],
+                                      train_global_space=False,)
+        feat = sparse_conv_global_exchange(feat)
+        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+        feat = tf.layers.dense(feat,32, activation=tf.nn.tanh)
+        feat_list.append(feat)
+        feat = sparse_conv_make_neighbors_simple_multipass(feat, 
+                                      num_neighbors=16, 
+                                      n_output=32,
+                                      n_propagate=16,
+                                      n_filters=   4*[20], 
+                                      edge_filters=4*[2],
+                                      space_transformations=[32,4],
+                                      train_global_space=False,)
+        #feat = sparse_conv_global_exchange(feat)
+        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+        feat_list.append(feat)
+        
+        
+        feat = tf.concat(feat_list, axis=-1)
+        feat = tf.layers.dense(feat,64, activation=tf.nn.relu)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        return feat
+        
         
     def compute_output_only_global_exchange(self,_input,seed_idxs):
         
@@ -841,11 +883,20 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         elif self.get_variable_scope() == 'neighbours':
             output = self.compute_output_neighbours(net,seeds)   
             
+            
+        elif self.get_variable_scope() == 'neighbours_multipass':
+            output = self.compute_output_make_neighbors_simple_multipass(net,seeds)   
+            
+        elif self.get_variable_scope() == 'neighbours_multipass_Eloss_sumloss':
+            self.E_loss=True
+            self.sum_loss=True
+            output = self.compute_output_make_neighbors_simple_multipass(net,seeds)  
+            
         elif self.get_variable_scope() == 'neighbours_plus_aggregator_simple':
             output = self.compute_output_seed_driven_neighbours(net,seeds)  
             
         elif self.get_variable_scope() == 'moving_seeds_test':
-            output = self.compute_output_seed_driven_neighbours(net,seeds)       
+            output = self.compute_output_make_neighbors_simple_multipass(net,seeds)       
             
             
         elif self.get_variable_scope() == 'only_global_exchange':
