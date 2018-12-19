@@ -96,9 +96,13 @@ class BinningSeedFinderAlpha(SparseConvClusteringBase):
 
         p1, p2 = self._graph_output[:, 0:3], self._graph_output[:, 3:6]
 
+
         t1, t2 = self.make_seed_targets_l2()
 
-        loss = (t1-p2)**2 + (t2-p2)**2
+        self._graph_temp = tf.concat((tf.concat((t1, t2), axis=-1)[...,tf.newaxis], tf.concat((p1, p2), axis=-1)[...,tf.newaxis]), axis=-1)
+
+
+        loss = tf.reduce_sum((t1-p1)**2, axis=-1) + tf.reduce_sum((t2-p2)**2, axis=-1)
         self._graph_accuracy = 1
 
         loss = tf.reduce_mean(loss)
