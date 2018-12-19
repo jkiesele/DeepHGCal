@@ -5,6 +5,41 @@ import inspect
 import sys
 import importlib
 
+class lr_scheduler(object):
+    def __init__(self, lr_dict=[]):
+        
+        self.lr_dict=lr_dict
+        self.lr=1
+        self.next_change=0
+        
+    def check_next(self,iteration):
+        
+        for i in range(len(self.lr_dict)):
+            key = self.lr_dict[i][0]
+            self.next_change = key
+            if key > iteration:
+                print('next change at iteration ',key , 'just changed learning rate to ',self.lr)
+                return
+            self.lr=self.lr_dict[i][1]
+        print('iteration',iteration , 'learning rate at ', self.lr)
+        
+    def get_lr(self,iteration):
+        if iteration >= self.next_change:
+            self.check_next(iteration)
+        return self.lr
+    
+    def create_exponential_wiggle(self, start_lr, end_lr, end_exp_iterations, wiggle_frequency=0.2, n_points=500, scaler=1000):
+        effective_constant_x = 6./float(float(end_exp_iterations)/float(scaler))
+        self.lr_dict = []
+        for i in range(n_points):
+            lr = start_lr * math.exp(- float(i) * effective_constant_x) * (1. + 0.5 * math.cos(wiggle_frequency*float(i))) \
+            + end_lr *(1. + 0.1 * math.cos(wiggle_frequency*float(i)))
+            self.lr_dict.append((int(scaler*i) , lr))
+        print(self.lr_dict)
+            
+    
+
+        
 
 class SparseConvClusteringBase(Model):
     def __init__(self, n_space, n_space_local, n_others, n_target_dim, batch_size, max_entries, learning_rate=0.0001):
@@ -15,7 +50,9 @@ class SparseConvClusteringBase(Model):
         self.n_target_dim = n_target_dim
         self.batch_size = batch_size
         self.max_entries = max_entries
-        self.learning_rate = learning_rate
+        self.learning_rate = tf.placeholder(tf.float32,name='learning_rate')
+        self.start_learning_rate = learning_rate
+        self.learningrate_scheduler = lr_scheduler()
         self.use_seeds=False
         self.is_train = tf.placeholder(tf.bool, name="is_train");
         
