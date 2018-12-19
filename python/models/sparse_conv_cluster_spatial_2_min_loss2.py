@@ -883,6 +883,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         elif self.get_variable_scope() == 'neighbours':
             output = self.compute_output_neighbours(net,seeds)   
             
+        elif self.get_variable_scope() == 'neighbours_sumloss':
+            self.sum_loss=True
+            output = self.compute_output_neighbours(net,seeds)   
+            
             
         elif self.get_variable_scope() == 'neighbours_multipass':
             output = self.compute_output_make_neighbors_simple_multipass(net,seeds)   
