@@ -40,6 +40,24 @@ class SparseConvClusteringTrainer:
         self.num_max_entries = int(self.config['max_entries'])
         self.num_data_dims = int(self.config['num_data_dims'])
 
+        try:
+            self.output_seed_indices = int(self.config['output_seed_indices_in_inference'])==1
+        except KeyError:
+            self.output_seed_indices = False
+        try:
+            self.plotting_input_file_path = self.config['plotting_input_file_path']
+        except KeyError:
+            self.plotting_input_file_path = None
+        if self.plotting_input_file_path is not None:
+            try:
+                self.plot_after = int(self.config['plot_after'])
+            except KeyError:
+                raise RuntimeError("Setting plot after but haven't set the plotting input path")
+        else:
+            self.plot_after = -1
+
+
+
         self.spatial_features_indices = tuple([int(x) for x in (self.config['input_spatial_features_indices']).split(',')])
         self.spatial_features_local_indices = tuple([int(x) for x in (self.config['input_spatial_features_local_indices']).split(',')])
         self.other_features_indices = tuple([int(x) for x in (self.config['input_other_features_indices']).split(',')])
@@ -109,14 +127,14 @@ class SparseConvClusteringTrainer:
         graph_output = self.model.get_compute_graphs()
         graph_temp = self.model.get_temp()
 
+        if self.plot_after!=-1:
+            data_plotting = None # TODO: Load
+
         if self.from_scratch:
             self.clean_summary_dir()
 
         inputs_feed = self.reader_factory.get_class(self.reader_type)(self.training_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
-        inputs_validation_feed = self.reader_factory.get_class(self.reader_type)(self.validation_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds()
-
-        inputs_train_reader = self.reader_factory.get_class(self.reader_type)(self.training_files, self.num_max_entries, self.num_data_dims, self.num_batch)
-        inputs_validation_reader  = self.reader_factory.get_class(self.reader_type)(self.validation_files, self.num_max_entries, self.num_data_dims, self.num_batch)
+        inputs_validation_feed = self.reader_factory.get_class(self.reader_type)(self.validation_files, self.num_max_entries, self.num_data_dims, self.num_batch).get_feeds(shuffle=False)
 
         init = [tf.global_variables_initializer(), tf.local_variables_initializer()]
 
@@ -162,8 +180,14 @@ class SparseConvClusteringTrainer:
 
                 t, eval_loss, _, eval_summary, eval_output = sess.run([graph_temp, graph_loss, graph_optmiser, graph_summary, graph_output], feed_dict=inputs_train_dict)
 
+                if self.plot_after != -1:
+                    if iteration_number % self.plot_after == 0:
+                        pass
+
                 if iteration_number % self.validate_after == 0:
                     inputs_validation = sess.run(list(inputs_validation_feed))
+                    self.inputs_plot=inputs_validation
+
                     if len(placeholders) == 5:
                         inputs_validation_dict = {
                             placeholders[0]: inputs_validation[0][:, :, self.spatial_features_indices],
@@ -258,7 +282,10 @@ class SparseConvClusteringTrainer:
 
                 print("Adding", len(inputs_test[0]), "test results")
                 for i in range(len(inputs_test[0])):
-                    inference_streamer.add((inputs_test[0][i], (inputs_test[1])[i,0], eval_output[i]))
+                    if not self.output_seed_indices:
+                        inference_streamer.add((inputs_test[0][i], (inputs_test[1])[i,0], eval_output[i]))
+                    else:
+                        inference_streamer.add((inputs_test[0][i], (inputs_test[1])[i,0], eval_output[i], inputs_test[2][i]))
 
                 print("Testing - Sample %4d: loss %0.5f" % (iteration_number*self.num_batch, eval_loss))
                 print(t[0])
