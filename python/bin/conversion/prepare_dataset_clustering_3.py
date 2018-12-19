@@ -18,6 +18,7 @@ parser.add_argument('input',
                     help="Path to file which should contain full paths of all the root files on separate lines")
 parser.add_argument('output', help="Path where to produce output files")
 parser.add_argument("--jobs", default=4, help="Number of processes")
+parser.add_argument("--isGamma", default=False, help="Whether only gamma", type=bool)
 args = parser.parse_args()
 
 with open(args.input) as f:
@@ -69,15 +70,19 @@ def run_conversion_simple(input_file, firstrun=False):
     np.set_printoptions(threshold=np.nan)
 
     location = 'B4'
-    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer', 'true_x', 'true_y', 'true_r', 'true_energy']
+    branches = ['rechit_x', 'rechit_y', 'rechit_z', 'rechit_vxy', 'rechit_vz', 'rechit_energy', 'rechit_layer', 'true_x', 'true_y', 'true_r', 'true_energy', 'isGamma']
 
-    types = ['float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64']
+    types = ['float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64', 'int32']
 
-    max_size = [2679 for _ in range(7)] + [1, 1, 1, 1]
+    max_size = [2679 for _ in range(7)] + [1, 1, 1, 1, 1]
 
     nparray, sizes = sparse_hgcal.read_np_array(input_file, location, branches, types, max_size)
 
     print(len(nparray))
+
+    if args.isGamma:
+        isGamma = np.where(nparray[11]==1)
+        nparray = [x[isGamma] for x in nparray]
 
     true_values_1 = np.concatenate([nparray[i][..., np.newaxis] for i in [7, 8, 9, 10]], axis=1)
 

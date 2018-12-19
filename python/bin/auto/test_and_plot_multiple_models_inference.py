@@ -44,7 +44,7 @@ with open(args.configs) as f:
         print()
 
         for file in os.listdir(config['test_out_path']):
-            if file.endswith('.jpg') or file.endswith('.txt') or file.endswith('.png'):
+            if file.endswith('.jpg') or file.endswith('.txt') or file.endswith('.png') or file.endswith('.pdf'):
                 ext = os.path.splitext(file)[-1]
                 directory_path = os.path.join(args.combined, file.replace('.', '_'))
                 if not os.path.exists(directory_path):
