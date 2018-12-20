@@ -1,0 +1,6 @@
+/data/jkiesele/sparseConv_data/2_10_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_110_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_111_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_112_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_113_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_114_out_.tfrecords

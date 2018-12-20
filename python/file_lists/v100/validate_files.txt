@@ -1,0 +1,11 @@
+/data/jkiesele/sparseConv_data/2_0_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_100_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_101_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_102_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_103_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_104_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_105_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_106_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_107_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_108_out_.tfrecords
+/data/jkiesele/sparseConv_data/2_109_out_.tfrecords
