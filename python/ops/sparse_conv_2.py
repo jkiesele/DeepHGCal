@@ -1259,12 +1259,94 @@ def sparse_conv_make_neighbors_simple_multipass(vertices_in,
     
     
     
+def sparse_conv_hidden_aggregators(vertices_in,
+                                   n_aggregators,
+                                   n_filters,
+                                   pre_filters=[],
+                                   n_propagate=-1,
+                                   ):   
+    
+    trans_vertices = vertices_in
+    for f in pre_filters:
+        trans_vertices = tf.layers.dense(trans_vertices,f,activation=tf.nn.relu)
+    
+    if n_propagate>0:
+        vertices_in = tf.layers.dense(vertices_in,n_propagate,activation=None)
+    
+    agg_nodes = tf.layers.dense(trans_vertices,n_aggregators,activation=None) #BxVxNA, vertices_in: BxVxF
+    agg_nodes = gauss_of_lin(agg_nodes)
+    vertices_in = tf.concat([vertices_in,agg_nodes], axis=-1)
+    
+    edges = tf.expand_dims(agg_nodes,axis=3) # BxVxNAx1
+    edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
+    
+    print('edges',edges.shape)
+    print('vertices_in',vertices_in.shape)
+    
+    vertices_in_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True)# [BxNAxF]
+    
+    print('vertices_in_collapsed',vertices_in_collapsed.shape)
+    
+    edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
+    
+    expanded_collapsed = apply_edges(vertices_in_collapsed, edges, reduce_sum=False, flatten=True)# [BxVxF]
+    
+    print('expanded_collapsed',expanded_collapsed.shape)
+    
+    expanded_collapsed = tf.concat([vertices_in,expanded_collapsed,agg_nodes], axis=-1)
+    
+    print('expanded_collapsed2',expanded_collapsed.shape)
+    
+    merged_out = tf.layers.dense(expanded_collapsed,n_filters,activation=tf.nn.tanh)
+    
+    return merged_out
     
     
+def sparse_conv_multi_neighbours(vertices_in,
+                                   n_neighbours,
+                                   n_dimensions,
+                                   n_filters,
+                                   pre_filters=[],
+                                   n_propagate=-1,):
     
     
+    trans_vertices = vertices_in
+    for f in pre_filters:
+        trans_vertices = tf.layers.dense(trans_vertices,f,activation=tf.nn.relu)
     
+    if n_propagate>0:
+        vertices_in = tf.layers.dense(vertices_in,n_propagate,activation=None)
     
+    neighb_dimensions = tf.layers.dense(trans_vertices,n_dimensions,activation=None) #BxVxND, 
+    neighb_dimensions_exp = tf.expand_dims(neighb_dimensions,axis=3) #BxVxNDx1
     
+    out_per_dim = []
+    for d in range(n_dimensions):
+        indexing, _ = indexing_tensor_2(neighb_dimensions_exp[:,:,d,:], n_neighbours)
+        neighbours = tf.gather_nd(vertices_in, indexing)  #BxVxNxF
+        edges = tf.gather_nd(neighb_dimensions[:,:,d:d+1], indexing) #BxVxNx1
+        edges = gauss_of_lin(edges)
+        scaled_feat = edges*neighbours
+        out_per_dim.append(tf.reduce_mean(scaled_feat, axis=2))
+        
+    collapsed = tf.concat(out_per_dim,axis=-1)
+    updated_vertices = tf.concat([vertices_in,collapsed],axis=-1)
+    
+    return tf.layers.dense(updated_vertices,n_filters,activation=tf.nn.relu)
+    
+    #
+    # use a similar reduction to one value to determine neighbour relations 
+    # (but do this for multiple dimensions - say neighbours in x, neighbours in y, .. etc. not in x^2+y^2
+    # that should be as memory inefficient but might bring some perf
+    #
+    
+
+
+
+
+
+
+
+
     
     
