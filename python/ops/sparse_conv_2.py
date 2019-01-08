@@ -1265,7 +1265,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
                                    pre_filters=[],
                                    n_propagate=-1,
                                    ):   
-    
+    vertices_in_orig = vertices_in
     trans_vertices = vertices_in
     for f in pre_filters:
         trans_vertices = tf.layers.dense(trans_vertices,f,activation=tf.nn.relu)
@@ -1293,7 +1293,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
     
     print('expanded_collapsed',expanded_collapsed.shape)
     
-    expanded_collapsed = tf.concat([vertices_in,expanded_collapsed,agg_nodes], axis=-1)
+    expanded_collapsed = tf.concat([vertices_in_orig,expanded_collapsed,agg_nodes], axis=-1)
     
     print('expanded_collapsed2',expanded_collapsed.shape)
     
@@ -1315,7 +1315,7 @@ def sparse_conv_multi_neighbours(vertices_in,
         trans_vertices = tf.layers.dense(trans_vertices,f,activation=tf.nn.relu)
     
     if n_propagate>0:
-        vertices_in = tf.layers.dense(vertices_in,n_propagate,activation=None)
+        vertices_prop = tf.layers.dense(trans_vertices,n_propagate,activation=None)
     
     neighb_dimensions = tf.layers.dense(trans_vertices,n_dimensions,activation=None) #BxVxND, 
     neighb_dimensions_exp = tf.expand_dims(neighb_dimensions,axis=3) #BxVxNDx1
@@ -1323,7 +1323,7 @@ def sparse_conv_multi_neighbours(vertices_in,
     out_per_dim = []
     for d in range(n_dimensions):
         indexing, _ = indexing_tensor_2(neighb_dimensions_exp[:,:,d,:], n_neighbours)
-        neighbours = tf.gather_nd(vertices_in, indexing)  #BxVxNxF
+        neighbours = tf.gather_nd(vertices_prop, indexing)  #BxVxNxF
         edges = tf.gather_nd(neighb_dimensions[:,:,d:d+1], indexing) #BxVxNx1
         edges = gauss_of_lin(edges)
         scaled_feat = edges*neighbours
@@ -1332,7 +1332,7 @@ def sparse_conv_multi_neighbours(vertices_in,
     collapsed = tf.concat(out_per_dim,axis=-1)
     updated_vertices = tf.concat([vertices_in,collapsed],axis=-1)
     
-    return tf.layers.dense(updated_vertices,n_filters,activation=tf.nn.relu)
+    return tf.layers.dense(updated_vertices,n_filters,activation=tf.nn.tanh)
     
     #
     # use a similar reduction to one value to determine neighbour relations 
