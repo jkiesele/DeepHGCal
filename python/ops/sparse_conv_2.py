@@ -1121,6 +1121,7 @@ def sparse_conv_make_neighbors_simple(vertices_in,
                                       edge_filters=[64],
                                       space_transformations=[32],
                                       train_global_space=False,
+                                      individual_filters=False,
                                       ):
     
     assert len(n_filters)
@@ -1307,7 +1308,9 @@ def sparse_conv_multi_neighbours(vertices_in,
                                    n_dimensions,
                                    n_filters,
                                    pre_filters=[],
-                                   n_propagate=-1,):
+                                   n_propagate=-1,
+                                   individual_conv=False,
+                                   total_distance=False):
     
     
     trans_vertices = vertices_in
@@ -1318,21 +1321,34 @@ def sparse_conv_multi_neighbours(vertices_in,
         vertices_prop = tf.layers.dense(trans_vertices,n_propagate,activation=None)
     
     neighb_dimensions = tf.layers.dense(trans_vertices,n_dimensions,activation=None) #BxVxND, 
-    neighb_dimensions_exp = tf.expand_dims(neighb_dimensions,axis=3) #BxVxNDx1
+    
+    def collapse_to_vertex(indexing,distance,vertices,indiv_conv):
+        neighbours = tf.gather_nd(vertices, indexing)  #BxVxNxF
+        distance = tf.expand_dims(distance,axis=3)
+        edges = gauss_of_lin(distance)
+        scaled_feat = edges*neighbours
+        edges_sum = tf.reduce_sum(edges,axis=2)
+        collapsed = tf.reduce_sum(scaled_feat, axis=2)/edges_sum
+        if indiv_conv:
+            collapsed = tf.concat([collapsed, tf.reshape(neighbours,[neighbours.shape[0],neighbours.shape[1],-1])],axis=-1)
+        return collapsed
     
     out_per_dim = []
-    for d in range(n_dimensions):
-        indexing, _ = indexing_tensor_2(neighb_dimensions_exp[:,:,d,:], n_neighbours)
-        neighbours = tf.gather_nd(vertices_prop, indexing)  #BxVxNxF
-        edges = tf.gather_nd(neighb_dimensions[:,:,d:d+1], indexing) #BxVxNx1
-        edges = gauss_of_lin(edges)
-        scaled_feat = edges*neighbours
-        out_per_dim.append(tf.reduce_mean(scaled_feat, axis=2))
-        
+    if total_distance:
+        indexing, distance = indexing_tensor_2(neighb_dimensions, n_neighbours)
+        out_per_dim.append(collapse_to_vertex(indexing,distance,vertices_prop,individual_conv))
+    else:
+        neighb_dimensions_exp = tf.expand_dims(neighb_dimensions,axis=3) #BxVxNDx1
+        for d in range(n_dimensions):
+            indexing, distance = indexing_tensor_2(neighb_dimensions_exp[:,:,d,:], n_neighbours)
+            out_per_dim.append(collapse_to_vertex(indexing,distance,vertices_prop,individual_conv))
+        #make it a weighted mean mean of weighted
+        #add a conv part where IN ADDITION to the weighted mean, the features are ordered by distance (just use neighbouts as they are)
+    
     collapsed = tf.concat(out_per_dim,axis=-1)
     updated_vertices = tf.concat([vertices_in,collapsed],axis=-1)
-    
-    return tf.layers.dense(updated_vertices,n_filters,activation=tf.nn.tanh)
+    print('updated_vertices',updated_vertices.shape)
+    return tf.layers.dense(updated_vertices,n_filters,activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
     
     #
     # use a similar reduction to one value to determine neighbour relations 
