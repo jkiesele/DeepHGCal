@@ -200,7 +200,7 @@ def create_active_edges(vertices_a, vertices_b, name,multiplier=1):
     return edges
     
     
-def apply_edges(vertices, edges, reduce_sum=True, flatten=True,expand_first_vertex_dim=True): 
+def apply_edges(vertices, edges, reduce_sum=True, flatten=True,expand_first_vertex_dim=True, aggregation_function=tf.reduce_max): 
     '''
     edges are naturally BxVxV'xF
     vertices are BxVxF'  or BxV'xF'
@@ -214,7 +214,7 @@ def apply_edges(vertices, edges, reduce_sum=True, flatten=True,expand_first_vert
     out = edges*vertices # [BxVxV'x1xF] x [Bx1xV'xF'x1] = [BxVxV'xFxF']
 
     if reduce_sum:
-        out = tf.reduce_sum(out,axis=2)/float(int(out.shape[2]))
+        out = aggregation_function(out,axis=2)
     if flatten:
         out = tf.reshape(out,shape=[out.shape[0],out.shape[1],-1])
     
@@ -1275,7 +1275,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
         vertices_in = tf.layers.dense(vertices_in,n_propagate,activation=None)
     
     agg_nodes = tf.layers.dense(trans_vertices,n_aggregators,activation=None) #BxVxNA, vertices_in: BxVxF
-    agg_nodes = gauss_of_lin(agg_nodes)
+    agg_nodes = gauss(agg_nodes)
     vertices_in = tf.concat([vertices_in,agg_nodes], axis=-1)
     
     edges = tf.expand_dims(agg_nodes,axis=3) # BxVxNAx1
@@ -1284,7 +1284,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
     print('edges',edges.shape)
     print('vertices_in',vertices_in.shape)
     
-    vertices_in_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True)# [BxNAxF]
+    vertices_in_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True)#,aggregation_function=tf.reduce_mean)# [BxNAxF]
     
     print('vertices_in_collapsed',vertices_in_collapsed.shape)
     
@@ -1327,8 +1327,7 @@ def sparse_conv_multi_neighbours(vertices_in,
         distance = tf.expand_dims(distance,axis=3)
         edges = gauss_of_lin(distance)
         scaled_feat = edges*neighbours
-        edges_sum = tf.reduce_sum(edges,axis=2)
-        collapsed = tf.reduce_sum(scaled_feat, axis=2)/edges_sum
+        collapsed = tf.reduce_max(scaled_feat, axis=2)
         if indiv_conv:
             collapsed = tf.concat([collapsed, tf.reshape(neighbours,[neighbours.shape[0],neighbours.shape[1],-1])],axis=-1)
         return collapsed
