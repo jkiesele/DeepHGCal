@@ -77,7 +77,7 @@ def sparse_conv_normalise(sparse_dict, log_energy=False):
     
     scaled_colours_in = colours_in*1e-4
     if log_energy:
-        scaled_colours_in = tf.log(colours_in+1)/10.
+        scaled_colours_in = tf.log(colours_in+1)
     
     scaled_space_global=tf.concat([tf.expand_dims(space_global[:,:,0]/150.,axis=2),
                                    tf.expand_dims(space_global[:,:,1]/150.,axis=2),
@@ -1331,15 +1331,12 @@ def sparse_conv_multi_neighbours(vertices_in,
                                    n_neighbours,
                                    n_dimensions,
                                    n_filters,
-                                   pre_filters=[],
                                    n_propagate=-1,
                                    individual_conv=False,
                                    total_distance=False):
     
     
     trans_vertices = vertices_in
-    for f in pre_filters:
-        trans_vertices = high_dim_dense(trans_vertices,f,activation=tf.nn.relu)
     
     if n_propagate>0:
         vertices_prop = high_dim_dense(trans_vertices,n_propagate,activation=None)
