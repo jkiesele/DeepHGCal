@@ -6,10 +6,10 @@ import sys
 import importlib
 
 class lr_scheduler(object):
-    def __init__(self, lr_dict=[]):
+    def __init__(self, lr_dict=[], lr=0.0001):
         
         self.lr_dict=lr_dict
-        self.lr=1
+        self.lr=lr
         self.next_change=0
         
     def check_next(self,iteration):
@@ -52,7 +52,7 @@ class SparseConvClusteringBase(Model):
         self.max_entries = max_entries
         self.learning_rate = tf.placeholder(tf.float32,name='learning_rate')
         self.start_learning_rate = learning_rate
-        self.learningrate_scheduler = lr_scheduler()
+        self.learningrate_scheduler = lr_scheduler(lr=learning_rate)
         self.use_seeds=False
         self.is_train = tf.placeholder(tf.bool, name="is_train");
         

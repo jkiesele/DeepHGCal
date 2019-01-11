@@ -17,6 +17,8 @@ import tensorflow as tf
 from models.sparse_conv_constant_neighbors_alpha import SparseConvConstantNeighborsAlpha
 from models.binning_seed_finder_alpha import BinningSeedFinderAlpha
 from models.clustering_dgcnn import DynamicGraphCnnAlpha
+from models.binning_cluster_delta import BinningClusteringDelta
+from models.binning_cluster_epsilon import BinningClusteringEpsilon
 
 
 class ModelBuilder:

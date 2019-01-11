@@ -19,7 +19,7 @@ class DynamicGraphCnnAlpha(SparseConvClusteringBase):
         self.variance_sqrt_resolution = None
         self.total_loss = None
         self.fixed_seeds = None
-        self.momentum = 0.1
+        self.momentum = 0.6
         self.varscope = 'sparse_conv_clustering_spatial1'
 
     def normalise_response(self,total_response):
@@ -122,34 +122,48 @@ class DynamicGraphCnnAlpha(SparseConvClusteringBase):
 
         return self.get_loss2()
 
+    def compute_output_dgcnn(self, _input, seeds, dropout=-1.):
 
-    def compute_output_dgcnn(self, _input, seeds):
-
+        self.freeze_bn_after = None
         feat = sparse_conv_collapse(_input)
 
         feat = tf.layers.dense(feat, 16)  # global transform to 3D
-        # feat = tf.layers.batch_normalization(feat, training=self.is_train, momentum=self.momentum)
+        feat = tf.layers.batch_normalization(feat, training=self.is_train, momentum=self.momentum)
 
-        feat = sparse_conv_edge_conv(feat, 10, [64, 64, 64])
-        # feat_g = sparse_conv_global_exchange(feat)
-        # feat = tf.layers.dense(tf.concat([feat, feat_g], axis=-1),
-        #                        64, activation=tf.nn.relu)
-        # feat = tf.layers.batch_normalization(feat, training=self.is_train, momentum=self.momentum)
+        feat = zero_out_by_energy(feat)
+        feat = sparse_conv_edge_conv(feat, 40, [64, 64, 64])
+        feat_g = sparse_conv_global_exchange(feat)
 
-        feat1 = sparse_conv_edge_conv(feat, 10, [64, 64, 64])
-        # feat1_g = sparse_conv_global_exchange(feat1)
-        # feat1 = tf.layers.dense(tf.concat([feat1, feat1_g], axis=-1),
-        #                         64, activation=tf.nn.relu)
-        # feat1 = tf.layers.batch_normalization(feat1, training=self.is_train, momentum=self.momentum)
+        feat = tf.layers.dense(tf.concat([feat, feat_g], axis=-1),
+                               64, activation=tf.nn.relu)
 
-        feat2 = sparse_conv_edge_conv(feat1, 10, [64, 64, 64])
-        # feat2_g = sparse_conv_global_exchange(feat2)
-        # feat2 = tf.layers.dense(tf.concat([feat2, feat2_g], axis=-1),
-        #                         64, activation=tf.nn.relu)
-        # feat2 = tf.layers.batch_normalization(feat2, training=self.is_train, momentum=self.momentum)
+        feat = tf.layers.batch_normalization(feat, training=self.is_train, momentum=self.momentum)
+        if dropout > 0:
+            feat = tf.layers.dropout(feat, rate=dropout, training=self.is_train)
 
-        feat3 = sparse_conv_edge_conv(feat2, 10, [64, 64, 64])
-        # feat3 = tf.layers.batch_normalization(feat3, training=self.is_train, momentum=self.momentum)
+        feat = zero_out_by_energy(feat)
+        feat1 = sparse_conv_edge_conv(feat, 40, [64, 64, 64])
+        feat1_g = sparse_conv_global_exchange(feat1)
+        feat1 = tf.layers.dense(tf.concat([feat1, feat1_g], axis=-1),
+                                64, activation=tf.nn.relu)
+        feat1 = tf.layers.batch_normalization(feat1, training=self.is_train, momentum=self.momentum)
+        if dropout > 0:
+            feat1 = tf.layers.dropout(feat1, rate=dropout, training=self.is_train)
+
+        feat = zero_out_by_energy(feat)
+        feat2 = sparse_conv_edge_conv(feat1, 40, [64, 64, 64])
+        feat2_g = sparse_conv_global_exchange(feat2)
+        feat2 = tf.layers.dense(tf.concat([feat2, feat2_g], axis=-1),
+                                64, activation=tf.nn.relu)
+        feat2 = tf.layers.batch_normalization(feat2, training=self.is_train, momentum=self.momentum)
+        if dropout > 0:
+            feat2 = tf.layers.dropout(feat2, rate=dropout, training=self.is_train)
+
+        feat = zero_out_by_energy(feat)
+        feat3 = sparse_conv_edge_conv(feat2, 40, [64, 64, 64])
+        feat3 = tf.layers.batch_normalization(feat3, training=self.is_train, momentum=self.momentum)
+        if dropout > 0:
+            feat3 = tf.layers.dropout(feat3, rate=dropout, training=self.is_train)
 
         # global_feat = tf.layers.dense(feat2,1024,activation=tf.nn.relu)
         # global_feat = max_pool_on_last_dimensions(global_feat, skip_first_features=0, n_output_vertices=1)
@@ -157,11 +171,10 @@ class DynamicGraphCnnAlpha(SparseConvClusteringBase):
         # global_feat = tf.tile(global_feat,[1,feat.shape[1],1])
         # print('global_feat',global_feat.shape)
 
-        feat = tf.concat([feat, feat1, feat2, feat3], axis=-1)
+        feat = tf.concat([feat, feat1, feat2, feat_g, feat1_g, feat2_g, feat3], axis=-1)
         feat = tf.layers.dense(feat, 32, activation=tf.nn.relu)
         feat = tf.layers.dense(feat, 3, activation=tf.nn.relu)
         return feat
-
 
     def _compute_output(self):
 
