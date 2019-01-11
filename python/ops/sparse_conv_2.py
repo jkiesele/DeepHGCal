@@ -1340,6 +1340,7 @@ def sparse_conv_multi_neighbours(vertices_in,
     
     if n_propagate>0:
         vertices_prop = high_dim_dense(trans_vertices,n_propagate,activation=None)
+        
     neighb_dimensions = high_dim_dense(trans_vertices,n_dimensions,activation=None) #BxVxND, 
     #neighb_dimensions=sprint(neighb_dimensions,'neighb_dimensions')
     
