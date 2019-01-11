@@ -33,8 +33,10 @@ def sparse_conv_collapse(sparse_dict):
                                                                                  sparse_dict['spatial_features_global'], \
                                                                                  sparse_dict['spatial_features_local'], \
                                                                                  sparse_dict['num_entries']
-    return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)                                                                             
-    
+    return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)
+
+def zero_out_by_energy(net):
+    return tf.cast(tf.not_equal(net[...,0],0), tf.float32)[..., tf.newaxis] * net
 
 
 def sprint(tensor,pstr):
