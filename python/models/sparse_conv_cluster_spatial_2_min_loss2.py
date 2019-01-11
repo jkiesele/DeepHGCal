@@ -22,6 +22,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self.freeze_bn_after=None
         self.E_loss=False
         self.sum_loss=False
+        self.log_loss=False
         
     def normalise_response(self,total_response):
         mean, variance = tf.nn.moments(total_response, axes=0)
@@ -46,7 +47,13 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
         print('num_entries',num_entries.shape)
         energy = self._placeholder_other_features[:, :, 0]
-        sqrt_energy = tf.sqrt(energy)
+        
+        ###
+        sqrt_energy = None
+        if self.log_loss:
+            sqrt_energy = tf.log(energy+1)
+        else:
+            sqrt_energy = tf.sqrt(energy)
         
         prediction = self._graph_output
         targets = self._placeholder_targets
@@ -715,12 +722,13 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         
         aggregators = 11*[4]  
-        filters =     11*[48] 
+        filters =     11*[32] 
         propagate =   11*[20]
         pre_filters = 11*[[]]
         
         feat = sparse_conv_global_exchange(feat)
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+        feat = high_dim_dense(feat,32, activation=tf.nn.tanh)
         feat_list=[]
         for i in range(len(filters)):
             feat = sparse_conv_hidden_aggregators(feat, 
@@ -744,13 +752,13 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         
         feat_list = []
-        feat = tf.layers.dense(feat,32, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
+        feat = high_dim_dense(feat,32, activation=tf.nn.tanh) 
         for f in range(4):      
             feat = sparse_conv_global_exchange(feat)
             feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
             #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
             feat = sparse_conv_multi_neighbours(feat,
-                                       n_neighbours=16,
+                                       n_neighbours=40,
                                        n_dimensions=4,
                                        n_filters=48,
                                        pre_filters=[],
@@ -773,21 +781,21 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         
         feat_list = []
-        feat = tf.layers.dense(feat,32, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
+        feat = high_dim_dense(feat,32, activation=tf.nn.tanh) 
         for f in range(4):      
             feat = sparse_conv_global_exchange(feat)
             feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
             #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
             feat = sparse_conv_multi_neighbours(feat,
-                                       n_neighbours=16,
+                                       n_neighbours=40,
                                        n_dimensions=4,
                                        n_filters=48,
                                        pre_filters=[],
                                        n_propagate=24,
                                        total_distance=True)  
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)  
-            feat = tf.layers.dense(feat,64, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer) 
-            feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
+            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer) 
+            feat = high_dim_dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)   
             feat_list.append(feat)
             #feat = tf.layers.dropout(feat, rate=0.0001, training=self.is_train)
@@ -809,7 +817,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
             #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
             feat = sparse_conv_multi_neighbours(feat,
-                                       n_neighbours=16,
+                                       n_neighbours=40,
                                        n_dimensions=4,
                                        n_filters=48,
                                        pre_filters=[],
@@ -1062,10 +1070,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         self.learningrate_scheduler.create_exponential_wiggle(self.start_learning_rate, 
                                                               self.start_learning_rate/80, 
-                                                              end_exp_iterations=900000,
-                                                              scaler=12500,
+                                                              end_exp_iterations=2000000,
+                                                              scaler=25000,
                                                               wiggle_frequency=0.1,
-                                                              n_points=100) 
+                                                              n_points=50) 
         
         
         

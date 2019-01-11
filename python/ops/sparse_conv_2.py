@@ -33,15 +33,32 @@ def sparse_conv_collapse(sparse_dict):
                                                                                  sparse_dict['spatial_features_global'], \
                                                                                  sparse_dict['spatial_features_local'], \
                                                                                  sparse_dict['num_entries']
-    return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)
+    return tf.concat([spatial_features_global,all_features , spatial_features_local],axis=-1)                                                                             
+    
 
 def zero_out_by_energy(net):
-    return tf.cast(tf.not_equal(net[...,0],0), tf.float32)[..., tf.newaxis] * net
+    return tf.cast(tf.not_equal(net[...,3],0), tf.float32)[..., tf.newaxis] * net
+
+
+### maybe conv
+def high_dim_dense(inputs,nodes,**kwargs):
+    if len(inputs.shape) == 3:
+        return tf.layers.conv1d(inputs, nodes, kernel_size=(1), strides=(1), padding='valid', 
+                                **kwargs)
+        
+    if len(inputs.shape) == 4:
+        return tf.layers.conv2d(inputs, nodes, kernel_size=(1,1), strides=(1,1), padding='valid', 
+                                **kwargs)
+        
+    if len(inputs.shape) == 5:
+        return tf.layers.conv3d(inputs, nodes, kernel_size=(1,1,1), strides=(1,1,1), padding='valid', 
+                                **kwargs)
+
 
 
 def sprint(tensor,pstr):
-    return tensor
-    return tf.Print(tensor,[tensor],pstr,summarize=300)
+    #return tensor
+    return tf.Print(tensor,[tensor],pstr,summarize=20)
 
 def make_sequence(nfilters):
     isseq=(not hasattr(nfilters, "strip") and
@@ -1278,6 +1295,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
     
     agg_nodes = tf.layers.dense(trans_vertices,n_aggregators,activation=None) #BxVxNA, vertices_in: BxVxF
     agg_nodes = gauss(agg_nodes)
+    #agg_nodes=sprint(agg_nodes,"agg_nodes")
     vertices_in = tf.concat([vertices_in,agg_nodes], axis=-1)
     
     edges = tf.expand_dims(agg_nodes,axis=3) # BxVxNAx1
@@ -1287,7 +1305,10 @@ def sparse_conv_hidden_aggregators(vertices_in,
     print('vertices_in',vertices_in.shape)
     
     vertices_in_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True)#,aggregation_function=tf.reduce_mean)# [BxNAxF]
+    vertices_in_mean_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True ,aggregation_function=tf.reduce_mean)# [BxNAxF]
     
+    #vertices_in_collapsed = sprint(vertices_in_collapsed,'vertices_in_collapsed')
+    #vertices_in_collapsed= tf.concat([vertices_in_collapsed,vertices_in_mean_collapsed],axis=-1 )
     print('vertices_in_collapsed',vertices_in_collapsed.shape)
     
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
@@ -1295,12 +1316,13 @@ def sparse_conv_hidden_aggregators(vertices_in,
     expanded_collapsed = apply_edges(vertices_in_collapsed, edges, reduce_sum=False, flatten=True)# [BxVxF]
     
     print('expanded_collapsed',expanded_collapsed.shape)
-    
+    #expanded_collapsed = sprint(expanded_collapsed,'expanded_collapsed')
     expanded_collapsed = tf.concat([vertices_in_orig,expanded_collapsed,agg_nodes], axis=-1)
     
     print('expanded_collapsed2',expanded_collapsed.shape)
     
-    merged_out = tf.layers.dense(expanded_collapsed,n_filters,activation=tf.nn.tanh)
+    #merged_out = tf.layers.dense(expanded_collapsed,n_filters,activation=tf.nn.tanh)
+    merged_out = high_dim_dense(expanded_collapsed,n_filters,activation=tf.nn.tanh)
     
     return merged_out
     
@@ -1317,17 +1339,25 @@ def sparse_conv_multi_neighbours(vertices_in,
     
     trans_vertices = vertices_in
     for f in pre_filters:
-        trans_vertices = tf.layers.dense(trans_vertices,f,activation=tf.nn.relu)
+        trans_vertices = high_dim_dense(trans_vertices,f,activation=tf.nn.relu)
     
     if n_propagate>0:
-        vertices_prop = tf.layers.dense(trans_vertices,n_propagate,activation=None)
-    
-    neighb_dimensions = tf.layers.dense(trans_vertices,n_dimensions,activation=None) #BxVxND, 
+        vertices_prop = high_dim_dense(trans_vertices,n_propagate,activation=None)
+    neighb_dimensions = high_dim_dense(trans_vertices,n_dimensions,activation=None) #BxVxND, 
+    #neighb_dimensions=sprint(neighb_dimensions,'neighb_dimensions')
     
     def collapse_to_vertex(indexing,distance,vertices,indiv_conv):
         neighbours = tf.gather_nd(vertices, indexing)  #BxVxNxF
         distance = tf.expand_dims(distance,axis=3)
-        edges = gauss_of_lin(distance)
+        if not total_distance:
+            distance = distance*1e5
+        else:
+            distance = distance*10.
+        #distance = sprint(distance,'distance')
+        #don't take the origin vertex - will be mixed later
+        edges = gauss_of_lin(distance)[:,:,1:,:]
+        edges = sprint(edges,'edges')
+        neighbours = neighbours[:,:,1:,:]
         scaled_feat = edges*neighbours
         collapsed = tf.reduce_max(scaled_feat, axis=2)
         if indiv_conv:
@@ -1349,7 +1379,7 @@ def sparse_conv_multi_neighbours(vertices_in,
     collapsed = tf.concat(out_per_dim,axis=-1)
     updated_vertices = tf.concat([vertices_in,collapsed],axis=-1)
     print('updated_vertices',updated_vertices.shape)
-    return tf.layers.dense(updated_vertices,n_filters,activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer)
+    return high_dim_dense(updated_vertices,n_filters,activation=tf.nn.tanh)
     
     #
     # use a similar reduction to one value to determine neighbour relations 

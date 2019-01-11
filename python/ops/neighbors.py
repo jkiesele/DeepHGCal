@@ -65,7 +65,7 @@ def nearest_neighbor_matrix_2(spatial_features, k=10):
 
     D = euclidean_squared(spatial_features, spatial_features)
     D, N = tf.nn.top_k(-D, k)
-    return N, D
+    return N, -D
 
 
 def indexing_tensor(spatial_features, k=10):
