@@ -1284,6 +1284,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
                                    n_filters,
                                    pre_filters=[],
                                    n_propagate=-1,
+                                   plus_mean=False
                                    ):   
     vertices_in_orig = vertices_in
     trans_vertices = vertices_in
@@ -1308,7 +1309,8 @@ def sparse_conv_hidden_aggregators(vertices_in,
     vertices_in_mean_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True ,aggregation_function=tf.reduce_mean)# [BxNAxF]
     
     #vertices_in_collapsed = sprint(vertices_in_collapsed,'vertices_in_collapsed')
-    #vertices_in_collapsed= tf.concat([vertices_in_collapsed,vertices_in_mean_collapsed],axis=-1 )
+    if plus_mean:
+        vertices_in_collapsed= tf.concat([vertices_in_collapsed,vertices_in_mean_collapsed],axis=-1 )
     print('vertices_in_collapsed',vertices_in_collapsed.shape)
     
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
@@ -1333,7 +1335,8 @@ def sparse_conv_multi_neighbours(vertices_in,
                                    n_filters,
                                    n_propagate=-1,
                                    individual_conv=False,
-                                   total_distance=False):
+                                   total_distance=False,
+                                   plus_mean=False):
     
     
     trans_vertices = vertices_in
@@ -1354,10 +1357,13 @@ def sparse_conv_multi_neighbours(vertices_in,
         #distance = sprint(distance,'distance')
         #don't take the origin vertex - will be mixed later
         edges = gauss_of_lin(distance)[:,:,1:,:]
-        edges = sprint(edges,'edges')
+        #edges = sprint(edges,'edges')
         neighbours = neighbours[:,:,1:,:]
         scaled_feat = edges*neighbours
         collapsed = tf.reduce_max(scaled_feat, axis=2)
+        collapsed_mean = tf.reduce_mean(scaled_feat,axis=2)
+        if plus_mean:
+            collapsed = tf.concat([collapsed,collapsed_mean],axis=-1)
         if indiv_conv:
             collapsed = tf.concat([collapsed, tf.reshape(neighbours,[neighbours.shape[0],neighbours.shape[1],-1])],axis=-1)
         return collapsed
