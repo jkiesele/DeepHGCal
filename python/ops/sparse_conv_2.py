@@ -591,9 +591,9 @@ def sparse_conv_edge_conv(vertices_in, num_neighbors=30,
     
 
 
-def max_pool_on_last_dimensions(vertices_in, skip_first_features, n_output_vertices):
+def max_pool_on_last_dimensions(vertices_in, n_output_vertices):
     
-    all_features = vertices_in[:,:,skip_first_features:-1]
+    all_features = vertices_in
     
     _, I = tf.nn.top_k(tf.reduce_max(all_features, axis=2), n_output_vertices)
     I = tf.expand_dims(I, axis=2)
