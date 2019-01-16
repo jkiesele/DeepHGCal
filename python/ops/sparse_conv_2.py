@@ -1392,11 +1392,35 @@ def sparse_conv_multi_neighbours(vertices_in,
     #
     
 
+def sparse_conv_multi_neighbours_reference(vertices_in,
+                                   n_neighbours,
+                                   n_dimensions,
+                                   n_filters,
+                                   n_propagate=-1):
+    
+    return sparse_conv_multi_neighbours(vertices_in,
+                                   n_neighbours,
+                                   n_dimensions,
+                                   n_filters,
+                                   n_propagate=n_propagate,
+                                   individual_conv=False,
+                                   total_distance=True,
+                                   plus_mean=True)
 
 
 
-
-
+def sparse_conv_hidden_aggregators_reference(vertices_in,
+                                   n_aggregators,
+                                   n_filters,
+                                   n_propagate=-1
+                                   ):
+    return sparse_conv_hidden_aggregators(vertices_in,
+                                   n_aggregators,
+                                   n_filters,
+                                   pre_filters=[],
+                                   n_propagate=n_propagate,
+                                   plus_mean=True
+                                   )
 
 
     
