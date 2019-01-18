@@ -722,7 +722,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         return feat
     
-    def compute_output_hidden_aggregators(self,_input,seeds):
+    def compute_output_hidden_aggregators(self,_input,seeds,plusmean=False):
         feat = sparse_conv_collapse(_input)
         feat = zero_out_by_energy(feat)
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
@@ -741,7 +741,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                                                   aggregators[i],
                                                   n_filters=filters[i],
                                                   pre_filters=pre_filters[i],
-                                                  n_propagate=propagate[i]
+                                                  n_propagate=propagate[i],
+                                                  plus_mean=plusmean
                                                   )
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
             feat_list.append(feat)
@@ -758,26 +759,23 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = zero_out_by_energy(feat)
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         
-        filters=16 #48
-        propagate=8 #20
+        filters=42
+        propagate=18
         dimensions=4 
         neighbours=40
         
         feat_list = []
-        feat = high_dim_dense(feat,filters, activation=tf.nn.tanh) 
         for f in range(4):      
             feat = sparse_conv_global_exchange(feat)
-            feat = tf.layers.dense(feat,filters, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
-            #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
+            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
+            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
+            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
             feat = sparse_conv_multi_neighbours(feat,
                                        n_neighbours=neighbours,
                                        n_dimensions=dimensions,
                                        n_filters=filters,
-                                       n_propagate=propagate,)  
+                                       n_propagate=propagate,plus_mean=True)  
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)  
-            feat = tf.layers.dense(feat,filters, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer) 
-            feat = tf.layers.dense(feat,filters, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
-            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)   
             feat_list.append(feat)
             #feat = tf.layers.dropout(feat, rate=0.0001, training=self.is_train)
         feat =  tf.concat(feat_list,axis=-1)
@@ -787,27 +785,31 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         return feat
     
-    def compute_output_single_neighbours(self,_input,seeds):
+    def compute_output_single_neighbours(self,_input,seeds,plusmean=False):
         feat = sparse_conv_collapse(_input)
         feat = zero_out_by_energy(feat)
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         
+        nfilters=48
+        nprop=24
+        if plusmean:
+            nfilters=48
+            nprop=22
         feat_list = []
-        feat = high_dim_dense(feat,32, activation=tf.nn.tanh) 
         for f in range(4):      
-            feat = sparse_conv_global_exchange(feat)
-            feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
+            feat = sparse_conv_global_exchange(feat)  
+            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
+            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
+            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
             #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
             feat = sparse_conv_multi_neighbours(feat,
                                        n_neighbours=40,
                                        n_dimensions=4,
-                                       n_filters=48,
-                                       n_propagate=24,
-                                       total_distance=True)  
+                                       n_filters=nfilters,
+                                       n_propagate=nprop,
+                                       total_distance=True,
+                                       plus_mean=plusmean)  
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)  
-            feat = high_dim_dense(feat,64, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer) 
-            feat = high_dim_dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
-            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)   
             feat_list.append(feat)
             #feat = tf.layers.dropout(feat, rate=0.0001, training=self.is_train)
         feat =  tf.concat(feat_list,axis=-1)
@@ -823,10 +825,11 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         
         feat_list = []
-        feat = tf.layers.dense(feat,32, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
+        feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
+        feat = high_dim_dense(feat,48, activation=tf.nn.tanh)  
         for f in range(4):      
             feat = sparse_conv_global_exchange(feat)
-            feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
+            feat = high_dim_dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
             #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
             feat = sparse_conv_multi_neighbours(feat,
                                        n_neighbours=40,
@@ -837,8 +840,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
                                        total_distance=True,
                                        individual_conv=True)  
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)  
-            feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer) 
-            feat = tf.layers.dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
+            feat = high_dim_dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer) 
+            feat = high_dim_dense(feat,48, activation=tf.nn.tanh)#,kernel_initializer=NoisyEyeInitializer)
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)   
             feat_list.append(feat)
             #feat = tf.layers.dropout(feat, rate=0.0001, training=self.is_train)
@@ -896,174 +899,179 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         #output = self.compute_output_neighbours(net,self._placeholder_seed_indices)
         if self.get_variable_scope() == 'dgcnn':
             output = self.compute_output_dgcnn(net,self._placeholder_seed_indices)
-        elif self.get_variable_scope() == 'moving_seeds':
-            output = self.compute_output_moving_seeds(net,self._placeholder_seed_indices)
-        elif self.get_variable_scope() == 'moving_seeds_dim3':
-            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,3,1)
-        elif self.get_variable_scope() == 'moving_seeds_dim4':
-            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,4,1)
-        elif self.get_variable_scope() == 'moving_seeds_dim4_only_forward':
-            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,4,1,True)
-        elif self.get_variable_scope() == 'moving_seeds_dim3_2':
-            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,5,2)
-        elif self.get_variable_scope() == 'moving_seeds_dim4_2':
-            output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,6,2)
-            
-        elif self.get_variable_scope() == 'moving_seeds3_dim4':
-            output = self.compute_output_moving_seeds3(net,seeds,4,edge_multi=1)
-            
-        elif self.get_variable_scope() == 'moving_seeds4_dim4':
-            output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=1)
-            
-        elif self.get_variable_scope() == 'moving_seeds4_dim4_2':
-            output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=2)
-            
-        elif self.get_variable_scope() == 'moving_seeds4_dim4_v100':
-            output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=1)
-            
-        elif self.get_variable_scope() == 'moving_seeds4_alt_dim4':
-            output = self.compute_output_moving_seeds4_alt(net,seeds,4,edge_multi=1) #compute_output_moving_seeds4_alt2
-            
-        elif self.get_variable_scope() == 'moving_seeds4_alt2':
-            output = self.compute_output_moving_seeds4_alt2(net,seeds,4,edge_multi=1) #
-            
-            
-        elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d6_f32_s12_p8':
-            output = self.compute_output_moving_seeds4_generic(net,seeds,
-                                                               nspacedim=3,
-                                                               edge_multi=1,
-                                                               depth=6,
-                                                               nfilters=32,
-                                                               n_seeds=12,
-                                                               npropagate=8)
-                
-        elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d15_f32_s4_p8':
-            output = self.compute_output_moving_seeds4_generic(net,seeds,
-                                                               nspacedim=3,
-                                                               edge_multi=1,
-                                                               depth=15,
-                                                               nfilters=32,
-                                                               n_seeds=4,
-                                                               npropagate=8)
-            
-            
-        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d6_f32_s12_p8':
-            output = self.compute_output_moving_seeds4_generic(net,seeds,
-                                                               nspacedim=4,
-                                                               edge_multi=1,
-                                                               depth=6,
-                                                               nfilters=32,
-                                                               n_seeds=12,
-                                                               npropagate=8)
-                
-        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8':
-            output = self.compute_output_moving_seeds4_generic(net,seeds,
-                                                               nspacedim=4,
-                                                               edge_multi=1,
-                                                               depth=15,
-                                                               nfilters=32,
-                                                               n_seeds=4,
-                                                               npropagate=8)
-            
-        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8_e':
-            output = self.compute_output_moving_seeds4_generic(net,seeds,
-                                                               nspacedim=4,
-                                                               edge_multi=1,
-                                                               depth=15,
-                                                               nfilters=32,
-                                                               n_seeds=4,
-                                                               npropagate=8,
-                                                               add_edge=True)
-            
-        elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8_e_hi':
-            output = self.compute_output_moving_seeds4_generic(net,seeds,
-                                                               nspacedim=4,
-                                                               edge_multi=1,
-                                                               depth=15,
-                                                               nfilters=32,
-                                                               n_seeds=4,
-                                                               npropagate=8,
-                                                               add_edge=True,
-                                                               weight_filters=[64,64,64],
-                                                               seed_filters=[],
-                                                               out_filters=[64,64,64])
-            
-        
-        elif self.get_variable_scope() == 'moving_seeds5_dim4_m1_d10_f32_s4_p24':
-            output = self.compute_output_moving_seeds5(net,seeds,
-                                                               nspacedim=4,
-                                                               edge_multi=1,
-                                                               depth=10,
-                                                               nfilters=32,
-                                                               n_seeds=4,
-                                                               npropagate=24)
-        
-        elif self.get_variable_scope() == 'aggregator_simple':
-            output = self.compute_output_aggregator_simple(net,seeds) 
-            
-        elif self.get_variable_scope() == 'aggregator_simple_Eloss':
-            self.E_loss=True
-            output = self.compute_output_aggregator_simple(net,seeds) 
-            
-            
-            
-        elif self.get_variable_scope() == 'aggregator_simple2':
-            output = self.compute_output_aggregator_simple(net,seeds,altconfig=True) 
-            
-        elif self.get_variable_scope() == 'aggregator_simple_weighted_agg':
-            output = self.compute_output_aggregator_simple(net,seeds,dropout=-1,weighted_agg_pos=True)   
-            
-        elif self.get_variable_scope() == 'aggregator_simple_weighted_agg_Eloss':
-            self.E_loss=True
-            output = self.compute_output_aggregator_simple(net,seeds,dropout=-1,weighted_agg_pos=True)  
-            
-        elif self.get_variable_scope() == 'aggregator_simple_do_hiPar':
-            output = self.compute_output_aggregator_simple(net,seeds,dropout=0.1,hipar=True)   
-        
-        elif self.get_variable_scope() == 'neighbours':
-            output = self.compute_output_neighbours(net,seeds)   
-            
-        elif self.get_variable_scope() == 'neighbours_sumloss':
+        #elif self.get_variable_scope() == 'moving_seeds':
+        #    output = self.compute_output_moving_seeds(net,self._placeholder_seed_indices)
+        #elif self.get_variable_scope() == 'moving_seeds_dim3':
+        #    output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,3,1)
+        #elif self.get_variable_scope() == 'moving_seeds_dim4':
+        #    output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,4,1)
+        #elif self.get_variable_scope() == 'moving_seeds_dim4_only_forward':
+        #    output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,4,1,True)
+        #elif self.get_variable_scope() == 'moving_seeds_dim3_2':
+        #    output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,5,2)
+        #elif self.get_variable_scope() == 'moving_seeds_dim4_2':
+        #    output = self.compute_output_moving_seeds_all_generic(net,self._placeholder_seed_indices,6,2)
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds3_dim4':
+        #    output = self.compute_output_moving_seeds3(net,seeds,4,edge_multi=1)
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_dim4':
+        #    output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=1)
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_dim4_2':
+        #    output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=2)
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_dim4_v100':
+        #    output = self.compute_output_moving_seeds4(net,seeds,4,edge_multi=1)
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_alt_dim4':
+        #    output = self.compute_output_moving_seeds4_alt(net,seeds,4,edge_multi=1) #compute_output_moving_seeds4_alt2
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_alt2':
+        #    output = self.compute_output_moving_seeds4_alt2(net,seeds,4,edge_multi=1) #
+        #    
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d6_f32_s12_p8':
+        #    output = self.compute_output_moving_seeds4_generic(net,seeds,
+        #                                                       nspacedim=3,
+        #                                                       edge_multi=1,
+        #                                                       depth=6,
+        #                                                       nfilters=32,
+        #                                                       n_seeds=12,
+        #                                                       npropagate=8)
+        #        
+        #elif self.get_variable_scope() == 'moving_seeds4_dim3_m1_d15_f32_s4_p8':
+        #    output = self.compute_output_moving_seeds4_generic(net,seeds,
+        #                                                       nspacedim=3,
+        #                                                       edge_multi=1,
+        #                                                       depth=15,
+        #                                                       nfilters=32,
+        #                                                       n_seeds=4,
+        #                                                       npropagate=8)
+        #    
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d6_f32_s12_p8':
+        #    output = self.compute_output_moving_seeds4_generic(net,seeds,
+        #                                                       nspacedim=4,
+        #                                                       edge_multi=1,
+        #                                                       depth=6,
+        #                                                       nfilters=32,
+        #                                                       n_seeds=12,
+        #                                                       npropagate=8)
+        #        
+        #elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8':
+        #    output = self.compute_output_moving_seeds4_generic(net,seeds,
+        #                                                       nspacedim=4,
+        #                                                       edge_multi=1,
+        #                                                       depth=15,
+        #                                                       nfilters=32,
+        #                                                       n_seeds=4,
+        #                                                       npropagate=8)
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8_e':
+        #    output = self.compute_output_moving_seeds4_generic(net,seeds,
+        #                                                       nspacedim=4,
+        #                                                       edge_multi=1,
+        #                                                       depth=15,
+        #                                                       nfilters=32,
+        #                                                       n_seeds=4,
+        #                                                       npropagate=8,
+        #                                                       add_edge=True)
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds4_dim4_m1_d15_f32_s4_p8_e_hi':
+        #    output = self.compute_output_moving_seeds4_generic(net,seeds,
+        #                                                       nspacedim=4,
+        #                                                       edge_multi=1,
+        #                                                       depth=15,
+        #                                                       nfilters=32,
+        #                                                       n_seeds=4,
+        #                                                       npropagate=8,
+        #                                                       add_edge=True,
+        #                                                       weight_filters=[64,64,64],
+        #                                                       seed_filters=[],
+        #                                                       out_filters=[64,64,64])
+        #    
+        #
+        #elif self.get_variable_scope() == 'moving_seeds5_dim4_m1_d10_f32_s4_p24':
+        #    output = self.compute_output_moving_seeds5(net,seeds,
+        #                                                       nspacedim=4,
+        #                                                       edge_multi=1,
+        #                                                       depth=10,
+        #                                                       nfilters=32,
+        #                                                       n_seeds=4,
+        #                                                       npropagate=24)
+        #
+        #elif self.get_variable_scope() == 'aggregator_simple':
+        #    output = self.compute_output_aggregator_simple(net,seeds) 
+        #    
+        #elif self.get_variable_scope() == 'aggregator_simple_Eloss':
+        #    self.E_loss=True
+        #    output = self.compute_output_aggregator_simple(net,seeds) 
+        #    
+        #    
+        #    
+        #elif self.get_variable_scope() == 'aggregator_simple2':
+        #    output = self.compute_output_aggregator_simple(net,seeds,altconfig=True) 
+        #    
+        #elif self.get_variable_scope() == 'aggregator_simple_weighted_agg':
+        #    output = self.compute_output_aggregator_simple(net,seeds,dropout=-1,weighted_agg_pos=True)   
+        #    
+        #elif self.get_variable_scope() == 'aggregator_simple_weighted_agg_Eloss':
+        #    self.E_loss=True
+        #    output = self.compute_output_aggregator_simple(net,seeds,dropout=-1,weighted_agg_pos=True)  
+        #    
+        #elif self.get_variable_scope() == 'aggregator_simple_do_hiPar':
+        #    output = self.compute_output_aggregator_simple(net,seeds,dropout=0.1,hipar=True)   
+        #
+        ##elif self.get_variable_scope() == 'neighbours':
+        #    output = self.compute_output_neighbours(net,seeds)   
+        #    
+        #elif self.get_variable_scope() == 'neighbours_sumloss':
+        #    self.sum_loss=True
+        #    output = self.compute_output_neighbours(net,seeds)   
+        #    
+        #    
+        #elif self.get_variable_scope() == 'neighbours_multipass':
+        #    output = self.compute_output_make_neighbors_simple_multipass(net,seeds)   
+        #    
+        #elif self.get_variable_scope() == 'neighbours_multipass_Eloss_sumloss':
+        #    self.E_loss=True
+        #    self.sum_loss=True
+        #    output = self.compute_output_make_neighbors_simple_multipass(net,seeds)  
+        #    
+        #elif self.get_variable_scope() == 'neighbours_plus_aggregator_simple':
+        #    output = self.compute_output_seed_driven_neighbours(net,seeds)  
+        #    
+        #elif self.get_variable_scope() == 'moving_seeds_test':
+        #    output = self.compute_output_single_neighbours(net,seeds)    
+        #    
+        #elif self.get_variable_scope() == 'hidden_aggregators'  :
+        #    output = self.compute_output_hidden_aggregators(net,seeds)    
+        elif self.get_variable_scope() == 'hidden_aggregators_plusmean'  :
             self.sum_loss=True
-            output = self.compute_output_neighbours(net,seeds)   
+            output = self.compute_output_hidden_aggregators(net,seeds,plusmean=True) 
             
             
-        elif self.get_variable_scope() == 'neighbours_multipass':
-            output = self.compute_output_make_neighbors_simple_multipass(net,seeds)   
-            
-        elif self.get_variable_scope() == 'neighbours_multipass_Eloss_sumloss':
-            self.E_loss=True
-            self.sum_loss=True
-            output = self.compute_output_make_neighbors_simple_multipass(net,seeds)  
-            
-        elif self.get_variable_scope() == 'neighbours_plus_aggregator_simple':
-            output = self.compute_output_seed_driven_neighbours(net,seeds)  
-            
-        elif self.get_variable_scope() == 'moving_seeds_test':
-            output = self.compute_output_single_neighbours(net,seeds)    
-            
-        elif self.get_variable_scope() == 'hidden_aggregators'  :
-            output = self.compute_output_hidden_aggregators(net,seeds)    
-        elif self.get_variable_scope() == 'hidden_aggregators_sumloss'  :
-            self.sum_loss=True
-            output = self.compute_output_hidden_aggregators(net,seeds) 
-            
-            
-        elif self.get_variable_scope() == 'multi_neighbours':
-            self.E_loss = True
-            output = self.compute_output_multi_neighbours(net,seeds)   
+        #elif self.get_variable_scope() == 'multi_neighbours':
+        #    self.E_loss = True
+        #    output = self.compute_output_multi_neighbours(net,seeds)   
             
         elif self.get_variable_scope() == 'single_neighbours':
-            output = self.compute_output_single_neighbours(net,seeds)   
+            output = self.compute_output_single_neighbours(net,seeds)  
+             
+        elif self.get_variable_scope() == 'single_neighbours_plusmean':
+            output = self.compute_output_single_neighbours(net,seeds,plusmean=True)  
+        elif self.get_variable_scope() == 'single_neighbours_plusmean_v100':
+            output = self.compute_output_single_neighbours(net,seeds,plusmean=True)  
             
-        elif self.get_variable_scope() == 'single_neighbours_conv':
-            output = self.compute_output_single_neighbours_conv(net,seeds)    
+        #elif self.get_variable_scope() == 'single_neighbours_conv':
+        #    output = self.compute_output_single_neighbours_conv(net,seeds)    
             
             
-        elif self.get_variable_scope() == 'only_global_exchange':
-            output = self.compute_output_only_global_exchange(net,self._placeholder_seed_indices)
-        elif self.get_variable_scope() == 'seed_driven':
-            output = self.compute_output_seed_driven(net, self._placeholder_seed_indices)
+        #elif self.get_variable_scope() == 'only_global_exchange':
+        #    output = self.compute_output_only_global_exchange(net,self._placeholder_seed_indices)
+        #elif self.get_variable_scope() == 'seed_driven':
+        #    output = self.compute_output_seed_driven(net, self._placeholder_seed_indices)
         else:
             output = tf.layers.dense(sparse_conv_collapse(net),3)
             

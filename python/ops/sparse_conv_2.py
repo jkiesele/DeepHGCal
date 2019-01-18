@@ -591,9 +591,9 @@ def sparse_conv_edge_conv(vertices_in, num_neighbors=30,
     
 
 
-def max_pool_on_last_dimensions(vertices_in, skip_first_features, n_output_vertices):
+def max_pool_on_last_dimensions(vertices_in, n_output_vertices):
     
-    all_features = vertices_in[:,:,skip_first_features:-1]
+    all_features = vertices_in
     
     _, I = tf.nn.top_k(tf.reduce_max(all_features, axis=2), n_output_vertices)
     I = tf.expand_dims(I, axis=2)
@@ -1284,6 +1284,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
                                    n_filters,
                                    pre_filters=[],
                                    n_propagate=-1,
+                                   plus_mean=False
                                    ):   
     vertices_in_orig = vertices_in
     trans_vertices = vertices_in
@@ -1308,7 +1309,8 @@ def sparse_conv_hidden_aggregators(vertices_in,
     vertices_in_mean_collapsed = apply_edges(vertices_in, edges, reduce_sum=True, flatten=True ,aggregation_function=tf.reduce_mean)# [BxNAxF]
     
     #vertices_in_collapsed = sprint(vertices_in_collapsed,'vertices_in_collapsed')
-    #vertices_in_collapsed= tf.concat([vertices_in_collapsed,vertices_in_mean_collapsed],axis=-1 )
+    if plus_mean:
+        vertices_in_collapsed= tf.concat([vertices_in_collapsed,vertices_in_mean_collapsed],axis=-1 )
     print('vertices_in_collapsed',vertices_in_collapsed.shape)
     
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
@@ -1333,13 +1335,15 @@ def sparse_conv_multi_neighbours(vertices_in,
                                    n_filters,
                                    n_propagate=-1,
                                    individual_conv=False,
-                                   total_distance=False):
+                                   total_distance=False,
+                                   plus_mean=False):
     
     
     trans_vertices = vertices_in
     
     if n_propagate>0:
         vertices_prop = high_dim_dense(trans_vertices,n_propagate,activation=None)
+        
     neighb_dimensions = high_dim_dense(trans_vertices,n_dimensions,activation=None) #BxVxND, 
     #neighb_dimensions=sprint(neighb_dimensions,'neighb_dimensions')
     
@@ -1353,10 +1357,13 @@ def sparse_conv_multi_neighbours(vertices_in,
         #distance = sprint(distance,'distance')
         #don't take the origin vertex - will be mixed later
         edges = gauss_of_lin(distance)[:,:,1:,:]
-        edges = sprint(edges,'edges')
+        #edges = sprint(edges,'edges')
         neighbours = neighbours[:,:,1:,:]
         scaled_feat = edges*neighbours
         collapsed = tf.reduce_max(scaled_feat, axis=2)
+        collapsed_mean = tf.reduce_mean(scaled_feat,axis=2)
+        if plus_mean:
+            collapsed = tf.concat([collapsed,collapsed_mean],axis=-1)
         if indiv_conv:
             collapsed = tf.concat([collapsed, tf.reshape(neighbours,[neighbours.shape[0],neighbours.shape[1],-1])],axis=-1)
         return collapsed
@@ -1385,11 +1392,35 @@ def sparse_conv_multi_neighbours(vertices_in,
     #
     
 
+def sparse_conv_multi_neighbours_reference(vertices_in,
+                                   n_neighbours,
+                                   n_dimensions,
+                                   n_filters,
+                                   n_propagate=-1):
+    
+    return sparse_conv_multi_neighbours(vertices_in,
+                                   n_neighbours,
+                                   n_dimensions,
+                                   n_filters,
+                                   n_propagate=n_propagate,
+                                   individual_conv=False,
+                                   total_distance=True,
+                                   plus_mean=True)
 
 
 
-
-
+def sparse_conv_hidden_aggregators_reference(vertices_in,
+                                   n_aggregators,
+                                   n_filters,
+                                   n_propagate=-1
+                                   ):
+    return sparse_conv_hidden_aggregators(vertices_in,
+                                   n_aggregators,
+                                   n_filters,
+                                   pre_filters=[],
+                                   n_propagate=n_propagate,
+                                   plus_mean=True
+                                   )
 
 
     
