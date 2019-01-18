@@ -74,7 +74,7 @@ class FixNumEntriesReaderSeedsSeparate(FixNumEntriesReader):
         with open(self.files_list) as f:
             content = f.readlines()
         file_paths = [x.strip() for x in content]
-        dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP',buffer_size=int(200e6))
+        dataset = tf.data.TFRecordDataset(file_paths, compression_type='GZIP')
         dataset = dataset.map(self._parse_function)
         if shuffle:
             dataset = dataset.shuffle(buffer_size=self.num_batch * 30 if self.shuffle_size is None else self.shuffle_size)
