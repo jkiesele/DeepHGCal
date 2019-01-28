@@ -753,6 +753,39 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         
         return feat
+    
+    def compute_output_hidden_aggregators_lowpara(self,_input,seeds,plusmean=False):
+        feat = sparse_conv_collapse(_input)
+        feat = zero_out_by_energy(feat)
+        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+        
+        aggregators = 11*[4]  
+        filters =     11*[24] 
+        propagate =   11*[10]
+        pre_filters = 11*[[]]
+        
+        feat = sparse_conv_global_exchange(feat)
+        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+        feat = high_dim_dense(feat,24, activation=tf.nn.tanh)
+        feat_list=[]
+        for i in range(len(filters)):
+            feat = sparse_conv_hidden_aggregators(feat, 
+                                                  aggregators[i],
+                                                  n_filters=filters[i],
+                                                  pre_filters=pre_filters[i],
+                                                  n_propagate=propagate[i],
+                                                  plus_mean=plusmean
+                                                  )
+            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+            feat_list.append(feat)
+            #feat = tf.layers.dropout(feat, rate=0.0005, training=self.is_train)
+            
+        feat =  tf.concat(feat_list,axis=-1)
+        feat = tf.layers.dense(feat,32, activation=tf.nn.relu)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        
+        return feat
+    
         
     def compute_output_multi_neighbours(self,_input,seeds):
         feat = sparse_conv_collapse(_input)
@@ -815,6 +848,40 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat =  tf.concat(feat_list,axis=-1)
         print('all feat',feat.shape) 
         feat = tf.layers.dense(feat,128, activation=tf.nn.relu)
+        feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
+        
+        return feat
+    
+    def compute_output_single_neighbours_lowpara(self,_input,seeds,plusmean=False):
+        feat = sparse_conv_collapse(_input)
+        feat = zero_out_by_energy(feat)
+        feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
+        
+        nfilters=32
+        nprop=16
+        if plusmean:
+            nfilters=32
+            nprop=16
+        feat_list = []
+        for f in range(4):      
+            feat = sparse_conv_global_exchange(feat)  
+            feat = high_dim_dense(feat,42, activation=tf.nn.tanh)
+            feat = high_dim_dense(feat,42, activation=tf.nn.tanh)
+            feat = high_dim_dense(feat,42, activation=tf.nn.tanh)
+            #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
+            feat = sparse_conv_multi_neighbours(feat,
+                                       n_neighbours=40,
+                                       n_dimensions=4,
+                                       n_filters=nfilters,
+                                       n_propagate=nprop,
+                                       total_distance=True,
+                                       plus_mean=plusmean)  
+            feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)  
+            feat_list.append(feat)
+            #feat = tf.layers.dropout(feat, rate=0.0001, training=self.is_train)
+        feat =  tf.concat(feat_list,axis=-1)
+        print('all feat',feat.shape) 
+        feat = tf.layers.dense(feat,96, activation=tf.nn.relu)
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         
         return feat
@@ -1051,6 +1118,11 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             self.sum_loss=True
             output = self.compute_output_hidden_aggregators(net,seeds,plusmean=True) 
             
+        elif self.get_variable_scope() == 'hidden_aggregators_plusmean_lowpara':
+            self.sum_loss=True
+            output = self.compute_output_hidden_aggregators_lowpara(net,seeds,plusmean=True)
+            
+            
             
         #elif self.get_variable_scope() == 'multi_neighbours':
         #    self.E_loss = True
@@ -1063,6 +1135,9 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             output = self.compute_output_single_neighbours(net,seeds,plusmean=True)  
         elif self.get_variable_scope() == 'single_neighbours_plusmean_v100':
             output = self.compute_output_single_neighbours(net,seeds,plusmean=True)  
+            
+        elif self.get_variable_scope() == 'single_neighbours_plusmean_lowpara':
+            output = self.compute_output_single_neighbours_lowpara(net,seeds,plusmean=True)  
             
         #elif self.get_variable_scope() == 'single_neighbours_conv':
         #    output = self.compute_output_single_neighbours_conv(net,seeds)    
