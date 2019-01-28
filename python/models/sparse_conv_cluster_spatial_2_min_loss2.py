@@ -222,17 +222,20 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = high_dim_dense(feat,16) #global transform to 3D
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         
+        self.temp_feat_visualize = []
         feat = sparse_conv_edge_conv(feat,40,  [64,64,64])
+        self.temp_feat_visualize.append(feat)
         feat_g = sparse_conv_global_exchange(feat)
-        
+
         feat = tf.layers.dense(tf.concat([feat,feat_g],axis=-1),
                                64, activation=tf.nn.relu )
-        
+
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         if dropout>0:
             feat = tf.layers.dropout(feat, rate=dropout,training=self.is_train)
         
         feat1 = sparse_conv_edge_conv(feat,40, [64,64,64])
+        self.temp_feat_visualize.append(feat1)
         feat1_g = sparse_conv_global_exchange(feat1)
         feat1 = tf.layers.dense(tf.concat([feat1,feat1_g],axis=-1),
                                 64, activation=tf.nn.relu )
@@ -241,6 +244,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             feat1 = tf.layers.dropout(feat1, rate=dropout,training=self.is_train)
         
         feat2 = sparse_conv_edge_conv(feat1,40,[64,64,64])
+        self.temp_feat_visualize.append(feat2)
         feat2_g = sparse_conv_global_exchange(feat2)
         feat2 = tf.layers.dense(tf.concat([feat2,feat2_g],axis=-1),
                                 64, activation=tf.nn.relu )
@@ -249,6 +253,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             feat2 = tf.layers.dropout(feat2, rate=dropout,training=self.is_train)
         
         feat3 = sparse_conv_edge_conv(feat2,40,[64,64,64])
+        self.temp_feat_visualize.append(feat3)
         feat3 = tf.layers.batch_normalization(feat3,training=self.is_train, momentum=self.momentum)
         if dropout>0:
             feat3 = tf.layers.dropout(feat3, rate=dropout,training=self.is_train)
@@ -736,14 +741,16 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
         feat = high_dim_dense(feat,32, activation=tf.nn.tanh)
         feat_list=[]
+        self.temp_feat_visualize = []
         for i in range(len(filters)):
-            feat = sparse_conv_hidden_aggregators(feat, 
+            feat, xxx = sparse_conv_hidden_aggregators(feat,
                                                   aggregators[i],
                                                   n_filters=filters[i],
                                                   pre_filters=pre_filters[i],
                                                   n_propagate=propagate[i],
                                                   plus_mean=plusmean
                                                   )
+            self.temp_feat_visualize.append(xxx)
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)
             feat_list.append(feat)
             #feat = tf.layers.dropout(feat, rate=0.0005, training=self.is_train)
@@ -796,19 +803,21 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             nfilters=48
             nprop=22
         feat_list = []
+        self.temp_feat_visualize=[]
         for f in range(4):      
             feat = sparse_conv_global_exchange(feat)  
             feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
             feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
             feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
             #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
-            feat = sparse_conv_multi_neighbours(feat,
+            feat, xxx = sparse_conv_multi_neighbours(feat,
                                        n_neighbours=40,
                                        n_dimensions=4,
                                        n_filters=nfilters,
                                        n_propagate=nprop,
                                        total_distance=True,
-                                       plus_mean=plusmean)  
+                                       plus_mean=plusmean)
+            self.temp_feat_visualize.append(xxx)
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)  
             feat_list.append(feat)
             #feat = tf.layers.dropout(feat, rate=0.0001, training=self.is_train)
