@@ -19,6 +19,8 @@ from models.binning_seed_finder_alpha import BinningSeedFinderAlpha
 from models.clustering_dgcnn import DynamicGraphCnnAlpha
 from models.binning_cluster_delta import BinningClusteringDelta
 from models.binning_cluster_epsilon import BinningClusteringEpsilon
+from models.binning_cluster_zeta import BinningClusteringZeta
+from models.binning_cluster_eta import BinningClusteringEta
 
 
 class ModelBuilder:
