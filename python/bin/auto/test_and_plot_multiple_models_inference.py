@@ -10,6 +10,7 @@ parser.add_argument('configs', help="Path to text file containing different conf
 parser.add_argument('combined', help="Path to a directory where to output combined results of everything")
 parser.add_argument('--inference', help="Whether to run inference again", default=True)
 parser.add_argument('--plot', help="whether to run plots again", default=True)
+parser.add_argument('--figures', help="Whether to show 3d plots", default="False")
 
 args = parser.parse_args()
 
@@ -37,14 +38,14 @@ with open(args.configs) as f:
             command = "python bin/train/sparse_conv_clustering.py %s %s --test True" % (args.input, current_config)
             subprocess.call(command, shell=True)
         if str2bool(args.plot):
-            command = "python bin/plot/plot_inference_clustering.py %s %s" % (args.input, current_config)
+            command = "python bin/plot/plot_inference_clustering.py %s %s --figures %s" % (args.input, current_config, args.figures)
             subprocess.call(command, shell=True)
             print(command)
         print()
         print()
 
         for file in os.listdir(config['test_out_path']):
-            if file.endswith('.jpg') or file.endswith('.txt') or file.endswith('.png') or file.endswith('.pdf'):
+            if file.endswith('.jpg') or file.endswith('.txt') or file.endswith('.png') or file.endswith('.pdf') or file.endswith('.pbin'):
                 ext = os.path.splitext(file)[-1]
                 directory_path = os.path.join(args.combined, file.replace('.', '_'))
                 if not os.path.exists(directory_path):
