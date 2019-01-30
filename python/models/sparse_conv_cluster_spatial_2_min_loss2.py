@@ -927,6 +927,61 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         feat = tf.layers.dense(feat,3, activation=tf.nn.relu)
         
         return feat    
+    
+    
+    def compute_output_binning(self,_input,seeds):
+        feat = sparse_conv_collapse(_input)
+        feat = zero_out_by_energy(feat)
+        feat = tf.layers.batch_normalization(feat, training=self.is_train)
+        feat, indices = construct_binning16(feat)
+        print(feat.shape)
+        
+        feat_list=[]
+        
+        feat = sparse_conv_global_exchange_binned(feat)
+        feat = tf.layers.conv3d(feat, 32, [1, 1, 1], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.batch_normalization(feat, training=self.is_train)
+        
+        feat_list.append(feat)
+        
+        feat = tf.layers.conv3d(feat, 28, [6, 6, 1], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.conv3d(feat, 28, [1, 1, 3], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.batch_normalization(feat, training=self.is_train)
+        
+        feat_list.append(feat)
+        
+        feat = sparse_conv_global_exchange_binned(feat)
+        feat = tf.layers.conv3d(feat, 32, [1, 1, 1], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.batch_normalization(feat, training=self.is_train)
+        
+        
+        feat = tf.layers.conv3d(feat, 28, [6, 6, 1], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.conv3d(feat, 28, [1, 1, 3], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.batch_normalization(feat, training=self.is_train)
+        
+        feat_list.append(feat)
+        
+        feat = tf.layers.conv3d(feat, 28, [6, 6, 1], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.conv3d(feat, 28, [1, 1, 3], activation=tf.nn.tanh, padding='same')
+        feat = tf.layers.batch_normalization(feat, training=self.is_train)
+        
+        feat_list.append(feat)
+        
+        #feat = tf.concat(feat_list,axis=-1)
+        vert_list=[]
+        for feat in feat_list:
+            pass
+            assert int(feat.shape[-1])>=4
+            print('feat a',feat.shape)
+            feat = tf.reshape(feat, [int(feat.shape[0]), 16, 16, 20, 4, int(int(feat.shape[-1])/4)])
+            feat = tf.gather_nd(feat, indices)
+            vert_list.append(feat)
+            print('feat b',feat.shape)
+            
+        feat = tf.concat(vert_list, axis=-1)
+        print('feat all',feat.shape)
+        feat = tf.layers.dense(feat,128, activation=tf.nn.relu)
+        return feat
          
 
     def _compute_output(self):
@@ -1148,8 +1203,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         elif self.get_variable_scope() == 'single_neighbours_plusmean_lowpara':
             output = self.compute_output_single_neighbours_lowpara(net,seeds,plusmean=True)  
             
-        #elif self.get_variable_scope() == 'single_neighbours_conv':
-        #    output = self.compute_output_single_neighbours_conv(net,seeds)    
+        elif self.get_variable_scope() == 'output_binning':
+            output = self.compute_output_binning(net,seeds) 
+        
+           
             
             
         #elif self.get_variable_scope() == 'only_global_exchange':
