@@ -843,14 +843,14 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
             feat = high_dim_dense(feat,64, activation=tf.nn.tanh)
             #feat = tf.layers.dense(feat,56, activation=tf.nn.tanh,kernel_initializer=NoisyEyeInitializer) 
-            feat, xxx = sparse_conv_multi_neighbours(feat,
+            feat = sparse_conv_multi_neighbours(feat,
                                        n_neighbours=40,
                                        n_dimensions=4,
                                        n_filters=nfilters,
                                        n_propagate=nprop,
                                        total_distance=True,
                                        plus_mean=plusmean)
-            self.temp_feat_visualize.append(xxx)
+            #self.temp_feat_visualize.append(xxx)
             feat = tf.layers.batch_normalization(feat,training=self.is_train, momentum=self.momentum)  
             feat_list.append(feat)
             #feat = tf.layers.dropout(feat, rate=0.0001, training=self.is_train)
