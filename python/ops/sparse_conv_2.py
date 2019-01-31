@@ -1284,7 +1284,8 @@ def sparse_conv_hidden_aggregators(vertices_in,
                                    n_filters,
                                    pre_filters=[],
                                    n_propagate=-1,
-                                   plus_mean=False
+                                   plus_mean=False,
+                                   return_agg=False
                                    ):   
     vertices_in_orig = vertices_in
     trans_vertices = vertices_in
@@ -1312,6 +1313,9 @@ def sparse_conv_hidden_aggregators(vertices_in,
     if plus_mean:
         vertices_in_collapsed= tf.concat([vertices_in_collapsed,vertices_in_mean_collapsed],axis=-1 )
     print('vertices_in_collapsed',vertices_in_collapsed.shape)
+
+    if return_agg:
+        return vertices_in_collapsed
     
     edges = tf.transpose(edges, perm=[0,2, 1,3]) # [BxVxV'xF]
     
