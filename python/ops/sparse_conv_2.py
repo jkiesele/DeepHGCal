@@ -1458,6 +1458,38 @@ def construct_binning16(vertices_in):
     result = tf.reshape(result, [batch_size, 16, 16, 20, -1])
 
     return result, indexing_array
+
+def construct_binning20(vertices_in):
+    
+    batch_size = int(vertices_in.shape[0])
+    max_entries = int(vertices_in.shape[1])
+    nfeat = int(vertices_in.shape[2])
+    
+    
+    batch_indices = np.arange(batch_size)
+    batch_indices = np.tile(batch_indices[..., np.newaxis], reps=(1, max_entries))[..., np.newaxis]
+
+    indexing_array = \
+        np.concatenate((ic.x_bins_beta_calo_20[:, np.newaxis], ic.y_bins_beta_calo_20[:, np.newaxis], ic.l_bins_beta_calo_20[:, np.newaxis],
+                        ic.d_indices_beta_calo_20[:, np.newaxis]),
+                       axis=1)[np.newaxis, ...]
+
+    indexing_array = np.tile(indexing_array, reps=[batch_size, 1, 1])
+    indexing_array = np.concatenate((batch_indices, indexing_array), axis=2).astype(np.int64)
+
+
+    indexing_array2 = \
+        np.concatenate((ic.x_bins_beta_calo[:, np.newaxis], ic.y_bins_beta_calo[:, np.newaxis], ic.l_bins_beta_calo[:, np.newaxis],
+                        ic.d_indices_beta_calo[:, np.newaxis]),
+                       axis=1)[np.newaxis, ...]
+
+    indexing_array2 = np.tile(indexing_array2, reps=[batch_size, 1, 1])
+    indexing_array2 = np.concatenate((batch_indices, indexing_array2), axis=2).astype(np.int64)
+
+    result = tf.scatter_nd(indexing_array, vertices_in, shape=(batch_size, 20, 20, 20, 1, nfeat ))
+    result = tf.reshape(result, [batch_size, 20, 20, 20, -1])
+
+    return result, indexing_array
     
 def sparse_conv_global_exchange_binned(binned_in):
     in_shape = binned_in.shape.as_list()
