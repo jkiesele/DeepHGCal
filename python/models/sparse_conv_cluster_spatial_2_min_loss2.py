@@ -1036,7 +1036,47 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         print('feat all',feat.shape)
         feat = tf.layers.dense(feat,128, activation=tf.nn.relu)
         return feat
-         
+    
+    def compute_output_binning20_2(self,_input,seeds):
+        feat = sparse_conv_collapse(_input)
+        feat = zero_out_by_energy(feat)
+        feat = tf.layers.batch_normalization(feat, training=self.is_train)
+        feat, indices = construct_binning20(feat)
+        print(feat.shape)
+        
+        feat_list=[]
+        
+        feat = sparse_conv_global_exchange_binned(feat)
+        feat = tf.layers.conv3d(feat, 20, [1, 1, 1], activation=tf.nn.tanh, padding='same')
+        feat_in = tf.layers.batch_normalization(feat, training=self.is_train)
+        
+        feat = feat_in
+        
+        for i in range(8):
+            
+            feat = tf.layers.conv3d(feat, 14, [7, 7, 1], activation=tf.nn.tanh, padding='same')
+            feat = tf.layers.conv3d(feat, 14, [1, 1, 3], activation=tf.nn.tanh, padding='same')
+            feat = tf.layers.batch_normalization(feat, training=self.is_train)
+            
+            feat_list.append(feat)
+        
+        
+        #feat = tf.concat(feat_list,axis=-1)
+        vert_list=[]
+        for feat in feat_list:
+            pass
+            assert int(feat.shape[-1])>=1
+            print('feat a',feat.shape)
+            feat = tf.reshape(feat, [int(feat.shape[0]), 20, 20, 20, 1, int(int(feat.shape[-1])/1)])
+            feat = tf.gather_nd(feat, indices)
+            vert_list.append(feat)
+            print('feat b',feat.shape)
+            
+        feat = tf.concat(vert_list, axis=-1)
+        print('feat all',feat.shape)
+        feat = tf.layers.dense(feat,128, activation=tf.nn.relu)
+        return feat
+              
 
     def _compute_output(self):
         
@@ -1261,6 +1301,8 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             output = self.compute_output_binning(net,seeds) 
         elif self.get_variable_scope() == 'output_binning20':
             output = self.compute_output_binning20(net,seeds) 
+        elif self.get_variable_scope() == 'output_binning20_2':
+            output = self.compute_output_binning20_2(net,seeds) 
         
            
             
