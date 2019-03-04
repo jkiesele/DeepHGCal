@@ -13,7 +13,7 @@ for module_name in modules:
     for model_name in [i for i in dir(module) if 'TrainData' in i]:
         
         #remove base class
-        if 'TrainDataDeepHGCal' == model_name: continue
+        if 'TrainData_miniCalo' == model_name: continue
         
         model = getattr(module, model_name)
         globals()[model_name] = model

@@ -265,10 +265,8 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
 
     int maxhitsperpixel=1;
 
-    std::string xbranch="rechit_phi";
-    std::string ybranch="rechit_eta";
-    std::string xcenter="seed_phi";
-    std::string ycenter="seed_eta";
+    std::string xbranch="rechit_x";
+    std::string ybranch="rechit_y";
     std::string counter_branch="nrechits";
 
     __hidden::indata rh_energybranch;
@@ -281,9 +279,6 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
     __hidden::indata rh_phi_eta;
     rh_phi_eta.createFrom({xbranch, ybranch}, {1., 1.}, {0., 0.}, MAXBRANCHLENGTH);
 
-    __hidden::indata seed_phi_eta;
-    seed_phi_eta.createFrom({xcenter, ycenter}, {1., 1.}, {0., 0.}, 1);
-
     __hidden::indata counter;
     counter.createFrom({counter_branch}, {1.}, {0.}, 1);
 
@@ -292,7 +287,6 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
     layerbranch.setup(tree);
     //
     rh_phi_eta.setup(tree);
-    seed_phi_eta.setup(tree);
     counter.setup(tree);
 
     bool rechitsarevector=rh_energybranch.isVector();
@@ -304,42 +298,27 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
         layerbranch.zeroAndGet(it);
 
         rh_phi_eta.zeroAndGet(it);
-        seed_phi_eta.zeroAndGet(it);
         counter.zeroAndGet(it);
 
         std::vector<std::vector<std::vector<float> > >
         entriesperpixel(xbins,std::vector<std::vector<float> >(ybins,std::vector<float>(maxlayer-minlayer,0)));
 
-        double seedphi=seed_phi_eta.getData(0, 0);
-        double seedeta=seed_phi_eta.getData(1, 0);
+        double seedphi=0;//seed_phi_eta.getData(0, 0);
+        double seedeta=0;//seed_phi_eta.getData(1, 0);
         int nrechits = counter.getData(0, 0);
         if(rechitsarevector){
         	nrechits = rh_energybranch.vectorSize(0);
         }
 
-        double etasum=0;
-        double phisum=0;
-        double energysum=0;
-        //re-calculate center
-        for(size_t hit=0; hit < nrechits; hit++) {
-            double rechitphi=rh_phi_eta.getData(0, hit);
-            double deltaphi=deltaPhi(rechitphi, seedphi);
-            if(fabs(deltaphi)>xwidth) continue;
-            double rechiteta=rh_phi_eta.getData(1, hit);
-            if(fabs(rechiteta - seedeta)>ywidth) continue;
-            float  energy=rh_energybranch.getData(0, hit);
 
-            //all is around phi=0, so no special considerations needed
-            etasum+=energy*rechiteta;
-            phisum+=energy*deltaphi;
-            energysum+=energy;
-        }
-        double newphi=phisum/energysum;
-        double neweta=etasum/energysum;
+        double newphi=0; //phisum/energysum;
+        double neweta=0; //etasum/energysum;
+
         seedphi = seedphi+newphi;
         if(seedphi>3.14159265358979323846)seedphi-=3.14159265358979323846;
         if(seedphi<3.14159265358979323846)seedphi+=3.14159265358979323846;
         seedeta = neweta;
+
 
         for(size_t hit=0; hit < nrechits; hit++) {
             double bincentrephi,bincentreeta;
