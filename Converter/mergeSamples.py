@@ -56,7 +56,7 @@ if len(args.batchdir):
 cd /afs/cern.ch/user/j/jkiesele/work/.cmsenv/CMSSW_8_1_0; \
 eval \`scramv1 runtime -sh\`; \
 cd {batchdir} ; \
-cd /afs/cern.ch/user/j/jkiesele/eos_fcchh/v03 ; \
+cd /eos/experiment/fcc/hh/simulation/samples/v03/singlePart/pim/bFieldOn/eta0.36 ; \
 export PATH=/afs/cern.ch/user/j/jkiesele/work/DeepLearning/FCChh/DeepHGCal/Converter/exe:$PATH ; \
 merge {outdir}/mergeconfig {jobno} ; '''.format(outdir=args.outdir,jobno=j,batchdir=args.batchdir)
         command = "cd "+ args.batchdir +" ; echo \""+ batchscript +"\" | bsub -q 1nh -J merge"+str(j)
