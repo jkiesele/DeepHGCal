@@ -269,27 +269,24 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
     std::string ybranch="rechit_y";
     std::string counter_branch="nrechits";
 
-    __hidden::indata rh_energybranch;
+    __hidden::indata_d rh_energybranch;
     rh_energybranch.createFrom({"rechit_energy"}, {1.}, {0.}, MAXBRANCHLENGTH);
-    __hidden::indata rh_timebranch;
 
-    __hidden::indata layerbranch;
+    __hidden::indata_d layerbranch;
     layerbranch.createFrom({"rechit_layer"}, {1.}, {0.}, MAXBRANCHLENGTH);
 
-    __hidden::indata rh_phi_eta;
+    __hidden::indata_d rh_phi_eta;
     rh_phi_eta.createFrom({xbranch, ybranch}, {1., 1.}, {0., 0.}, MAXBRANCHLENGTH);
 
-    __hidden::indata counter;
-    counter.createFrom({counter_branch}, {1.}, {0.}, 1);
 
 
     rh_energybranch.setup(tree);
     layerbranch.setup(tree);
     //
     rh_phi_eta.setup(tree);
-    counter.setup(tree);
 
     bool rechitsarevector=rh_energybranch.isVector();
+    int nrechits=0;
 
     const int nevents=std::min( (int) tree->GetEntries(), (int) boost::python::len(numpyarray));
     for(int it=0;it<nevents;it++){
@@ -298,14 +295,12 @@ void simple3Dstructure(boost::python::numeric::array numpyarray,std::string file
         layerbranch.zeroAndGet(it);
 
         rh_phi_eta.zeroAndGet(it);
-        counter.zeroAndGet(it);
 
         std::vector<std::vector<std::vector<float> > >
         entriesperpixel(xbins,std::vector<std::vector<float> >(ybins,std::vector<float>(maxlayer-minlayer,0)));
 
         double seedphi=0;//seed_phi_eta.getData(0, 0);
         double seedeta=0;//seed_phi_eta.getData(1, 0);
-        int nrechits = counter.getData(0, 0);
         if(rechitsarevector){
         	nrechits = rh_energybranch.vectorSize(0);
         }

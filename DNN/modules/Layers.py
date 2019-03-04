@@ -13,6 +13,48 @@ from matplotlib.pyplot import axis
 
 
 
+class simple_correction_layer(Layer):
+    def __init__(self, **kwargs):
+        super(simple_correction_layer, self).__init__(**kwargs)
+        
+    
+    def compute_output_shape(self, input_shape):
+        return tuple([input_shape[0],1])
+    
+    def build(self, input_shape):
+        # Create a trainable weight variable for this layer.
+        self.kernel_lin = self.add_weight(name='kernel_lin', 
+                                      shape=(input_shape[1], 1),
+                                      initializer='ones',
+                                      trainable=True)
+        self.kernel_sq = self.add_weight(name='kernel_sq', 
+                                      shape=(input_shape[1], 1),
+                                      initializer='uniform',
+                                      trainable=True)
+        self.kernel_pol3 = self.add_weight(name='kernel_pol3', 
+                                      shape=(input_shape[1], 1),
+                                      initializer='uniform',
+                                      trainable=True)
+        self.kernel_pol4 = self.add_weight(name='kernel_pol4', 
+                                      shape=(input_shape[1], 1),
+                                      initializer='uniform',
+                                      trainable=True)
+        super(simple_correction_layer, self).build(input_shape)  # Be sure to call this at the end
+        
+    def call(self, inputs):
+        print(inputs.shape)
+        lin = K.dot(inputs, self.kernel_lin)
+        lin += 1e-2* K.dot(inputs*inputs, self.kernel_sq)
+        lin += 1e-4* K.dot(inputs*inputs*inputs, self.kernel_pol3)
+        lin += 1e-6 * K.dot(inputs*inputs*inputs*inputs, self.kernel_pol4)
+        print(lin.shape)
+        return lin
+        
+    def get_config(self):
+        base_config = super(simple_correction_layer, self).get_config()
+        return dict(list(base_config.items()))
+
+
 class Print(Layer):
     def __init__(self, message, **kwargs):
         super(Print, self).__init__(**kwargs)
