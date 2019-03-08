@@ -15,6 +15,32 @@ import keras.backend as K
 from Layers import Sum3DFeatureOne,Sum3DFeaturePerLayer, Create_per_layer_energies,SelectEnergyOnly, ReshapeBatch, ScalarMultiply, Log_plus_one, Clip, SelectFeatureOnly, Print, Reduce_sum, Multiply_feature
 from tensorflow.contrib.learn.python.learn import trainable
 
+
+
+def miniCalo_preprocess(x,name):
+    x  = ScalarMultiply(0.01,name=name)(x)
+    return x
+
+def miniCalo_global_correction(x):
+    
+    x = Dense(2048,name="global_correction_a",
+              kernel_initializer=keras.initializers.random_normal(1./2048., 1./2048.))(x)
+    x = LeakyReLU(alpha=0.01)(x)
+    x = Dense(1,name="global_correction_c",use_bias=False,
+              kernel_initializer=keras.initializers.random_normal(1./2048., 1./2048.))(x)
+    x = ScalarMultiply(100.)(x)
+    x = Clip(0.,1000.,name='E')(x)
+    
+    return x
+
+def load_global_correction(filepath,model):
+    model.load_weights(filepath, by_name=True)
+    for l in model.layers:
+        if "global_correction" in l.name:
+            l.trainable=False
+    return model
+
+
 def create_full_calo_image(Inputs, dropoutRate, momentum, trainable=True):
     
     ecalhits=Inputs[0]

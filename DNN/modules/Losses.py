@@ -64,6 +64,13 @@ def huber_loss_relative(y_true, y_pred):
 
 global_loss_list['huber_loss_relative']=huber_loss_relative
 
+def calo_loss_rel(y_true, y_pred):
+    import tensorflow as tf
+    ret= (tf.square((y_true-y_pred))/( tf.abs(y_true)+K.epsilon()) +K.epsilon())
+    ret = tf.reshape(ret, [-1])
+    return tf.sqrt(K.mean(ret  , axis=-1)) * 100
+    
+global_loss_list['calo_loss_rel'] = calo_loss_rel
 
 def acc_calo_relative_rms(y_true, y_pred):
     import tensorflow as tf
@@ -100,9 +107,24 @@ def acc_rel_rms(y_true, y_pred, point):
     return ret
 
 
+def acc_calo_relative_rms_10(y_true, y_pred):
+    return acc_rel_rms(y_true, y_pred,10)
+global_loss_list['acc_calo_relative_rms_10']=acc_calo_relative_rms_10
+
+
+def acc_calo_relative_rms_20(y_true, y_pred):
+    return acc_rel_rms(y_true, y_pred,20)
+global_loss_list['acc_calo_relative_rms_20']=acc_calo_relative_rms_20
+
 def acc_calo_relative_rms_50(y_true, y_pred):
     return acc_rel_rms(y_true, y_pred,50)
 global_loss_list['acc_calo_relative_rms_50']=acc_calo_relative_rms_50
+
+def acc_calo_relative_rms_70(y_true, y_pred):
+    return acc_rel_rms(y_true, y_pred,70)
+global_loss_list['acc_calo_relative_rms_70']=acc_calo_relative_rms_70
+
+
 
 def acc_calo_relative_rms_100(y_true, y_pred):
     return acc_rel_rms(y_true, y_pred,100)

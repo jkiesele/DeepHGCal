@@ -4,4 +4,5 @@
 # But not these files...
 !.gitignore
 !*.py
+!miniCalo
 prepretrained_fcchh_enmodel.h5

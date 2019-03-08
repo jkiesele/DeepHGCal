@@ -29,24 +29,24 @@ class simple_correction_layer(Layer):
                                       trainable=True)
         self.kernel_sq = self.add_weight(name='kernel_sq', 
                                       shape=(input_shape[1], 1),
-                                      initializer='uniform',
+                                      initializer='ones',
                                       trainable=True)
         self.kernel_pol3 = self.add_weight(name='kernel_pol3', 
                                       shape=(input_shape[1], 1),
-                                      initializer='uniform',
+                                      initializer='ones',
                                       trainable=True)
         self.kernel_pol4 = self.add_weight(name='kernel_pol4', 
                                       shape=(input_shape[1], 1),
-                                      initializer='uniform',
+                                      initializer='ones',
                                       trainable=True)
         super(simple_correction_layer, self).build(input_shape)  # Be sure to call this at the end
         
     def call(self, inputs):
         print(inputs.shape)
         lin = K.dot(inputs, self.kernel_lin)
-        lin += 1e-2* K.dot(inputs*inputs, self.kernel_sq)
-        lin += 1e-4* K.dot(inputs*inputs*inputs, self.kernel_pol3)
-        lin += 1e-6 * K.dot(inputs*inputs*inputs*inputs, self.kernel_pol4)
+        lin += 1e-4* K.dot(inputs*inputs, self.kernel_sq)
+        lin += 1e-6* K.dot(inputs*inputs*inputs, self.kernel_pol3)
+        lin += 1e-8 * K.dot(inputs*inputs*inputs*inputs, self.kernel_pol4)
         print(lin.shape)
         return lin
         
@@ -437,6 +437,7 @@ class ReshapeBatch(Layer):
 
 global_layers_list = {}
 global_layers_list['Create_per_layer_energies']=Create_per_layer_energies
+global_layers_list['simple_correction_layer']=simple_correction_layer
 global_layers_list['Sum_difference_squared']=Sum_difference_squared
 global_layers_list['Reduce_sum']=Reduce_sum
 global_layers_list['SelectFeatureOnly']=SelectFeatureOnly
