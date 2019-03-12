@@ -42,22 +42,31 @@ import matplotlib.backends.backend_pdf
 Rs = []
 Es = []
 
+colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+colors_2 = []
+
 models_names = []
+
 
 
 for p in os.listdir(args.input):
     if not p.endswith('.pbin'):
         continue
     if 'single_neighbours_plusmean' in p:
-        models_names.append('LDSFT')
+        models_names.append('GravNet')
+        colors_2.append(colors[1])
     elif 'hidden_aggregators_plusmean' in p:
-        models_names.append('Aggregator')
+        models_names.append('GarNet')
+        colors_2.append(colors[3])
     elif 'dgcnn' in p:
         models_names.append('DGCNN')
-    elif 'binning_clustering_epsilon_1' in p:
+        colors_2.append(colors[0])
+    elif 'output_binning20_2' in p:
         models_names.append('Binning')
+        colors_2.append(colors[2])
     else:
         0/0
+
 
     full_path = os.path.join(args.input, p)
 
@@ -71,9 +80,9 @@ for p in os.listdir(args.input):
     R2 = np.concatenate(V, axis=1)
     R2 = R2.flatten()
     Rs.append(R2)
-    Es.append(E)
+    Es.append(E/1000)
 
-bin_div = ([0, 5000, 10000, 20000, 30000, 40000, 50000, 60000])
+bin_div = ([0, 5, 10, 20, 30, 40, 50, 60])
 bin_indices = []
 
 for model_i in range(len(Rs)):
@@ -90,7 +99,6 @@ for bin_div_i in range(len(bin_div)):
 
         print(np.shape(RRs))
 
-
         if len(RRs)!=0:
             curves_mean[bin_div_i, model_i] = np.mean(RRs)
             curves_variance[bin_div_i, model_i] = np.var(RRs)
@@ -104,12 +112,19 @@ fig=plt.figure()
 fig.set_size_inches(10, 7)
 
 
-for i in range(curves_mean.shape[1]):
-    plt.plot(bin_div[1:], curves_mean[1:, i], marker='o')
-plt.xlabel('Noise shower energy (MeV)')
+# for i in range(curves_mean.shape[1]):
+#     plt.plot(bin_div[1:], curves_mean[1:, i], marker='o', color=colors_2[i])
+
+plt.plot(bin_div[1:], curves_mean[1:, 1], marker='o', color=colors_2[1])
+plt.plot(bin_div[1:], curves_mean[1:, 3], marker='o', color=colors_2[3])
+plt.plot(bin_div[1:], curves_mean[1:, 2], marker='o', color=colors_2[2])
+plt.plot(bin_div[1:], curves_mean[1:, 0], marker='o', color=colors_2[0])
+
+plt.xlabel('Noise shower energy (GeV)')
 plt.ylabel('Response (mean)')
-plt.legend(models_names)
+plt.legend([models_names[1], models_names[3], models_names[2], models_names[0]])
 plt.savefig(os.path.join(args.output, 'mean_response_curve.pdf'))
+
 
 plt.gcf()
 fig=plt.figure()
@@ -117,7 +132,10 @@ fig.set_size_inches(10, 7)
 
 for i in range(curves_variance.shape[1]):
     plt.plot(bin_div[1:], curves_variance[1:, i], marker='o')
-plt.xlabel('Noise shower energy (MeV)')
+plt.xlabel('Noise shower energy (GeV)')
 plt.ylabel('Response (variance)')
 plt.legend(models_names)
 plt.savefig(os.path.join(args.output, 'variance_response_curve.pdf'))
+
+
+print("Plots generated in ", args.output)

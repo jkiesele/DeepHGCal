@@ -15,8 +15,8 @@ from numba import jit
 import experimental_mod.helpers as helpers
 import matplotlib.pyplot as plt
 
-DIM_1 = 16
-DIM_2 = 16
+DIM_1 = 20
+DIM_2 = 20
 DIM_3 = 20
 HALF_X = 150
 HALF_Y = 150
@@ -103,6 +103,14 @@ def blabla(input_file):
     max_size = [2102 for _ in range(7)] + [1, 1, 1, 1, 1]
 
     nparray, sizes = sparse_hgcal.read_np_array(input_file, location, branches, types, max_size)
+
+    # from root_numpy import root2array
+    # nparray = root2array(input_file,
+    #                      treename="B4",
+    #                      branches=branches,
+    #                      # stop=5
+    #                      ).view(np.ndarray)
+
 
     l = nparray[6][0]
     x = nparray[0][0]

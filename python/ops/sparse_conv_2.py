@@ -1330,7 +1330,7 @@ def sparse_conv_hidden_aggregators(vertices_in,
     #merged_out = tf.layers.dense(expanded_collapsed,n_filters,activation=tf.nn.tanh)
     merged_out = high_dim_dense(expanded_collapsed,n_filters,activation=tf.nn.tanh)
     
-    return merged_out
+    return merged_out, agg_nodes
     
     
 def sparse_conv_multi_neighbours(vertices_in,
@@ -1387,7 +1387,7 @@ def sparse_conv_multi_neighbours(vertices_in,
     collapsed = tf.concat(out_per_dim,axis=-1)
     updated_vertices = tf.concat([vertices_in,collapsed],axis=-1)
     print('updated_vertices',updated_vertices.shape)
-    return high_dim_dense(updated_vertices,n_filters,activation=tf.nn.tanh)
+    return high_dim_dense(updated_vertices,n_filters,activation=tf.nn.tanh), neighb_dimensions
     
     #
     # use a similar reduction to one value to determine neighbour relations 

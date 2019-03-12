@@ -420,6 +420,8 @@ def do_plots(swap=True):
          "Efficiency", str(np.alen(histogram_values_resolution_3) / float(np.alen(histogram_values_resolution)))))
     print(output_string_3)
 
+    inlier_response_mean, inlier_response_variance = float(np.mean(histogram_values_resolution_3)), float(np.var(histogram_values_resolution_3))
+
     output_string = 'Response mean: %f\n' \
                     'Response variance: %f\n' \
                     'Loss mean: %f\n' \
@@ -432,8 +434,8 @@ def do_plots(swap=True):
                     'Swapped events : %d\n' \
                     'Efficiency: %f' % (
                         mean, variance, loss_mean, loss_variance, accuracy, variance_from_1,
-                        float(np.mean(histogram_values_resolution_3)),
-                        float(np.var(histogram_values_resolution_3)),
+                        inlier_response_mean,
+                        inlier_response_variance,
                         total_events, swapped_events,
                         float(np.alen(histogram_values_resolution_3) / float(np.alen(histogram_values_resolution))))
 
@@ -456,6 +458,13 @@ def do_plots(swap=True):
     output_file_name = 'values.pbin' if swap else 'values_non_swapped.pbin'
     with gzip.open(os.path.join(config['test_out_path'], output_file_name), 'wb') as f:
         pickle.dump((np.array(histogram_values_resolution), np.array(energy_values)), f)
+
+    if swap:
+        ss = '&%0.3f&%0.3f&%.3f &%0.3f & %.3f&%.3f & %0.3f & %.1f\\\\' % (loss_mean, loss_variance, mean, variance, inlier_response_mean, inlier_response_variance, accuracy, 100*float(swapped_events)/float(total_events))
+    else:
+        ss = '&%0.3f&%0.3f&%.3f &%0.3f & %.3f&%.3f & %0.3f\\\\' % (loss_mean, loss_variance, mean, variance, inlier_response_mean, inlier_response_variance, accuracy)
+
+    print('\n\n%s\n\n' % ss)
 
 
 do_plots()

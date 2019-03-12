@@ -218,6 +218,7 @@ def plot_clustering_layer_wise_visualize(spatial, energy, prediction ,gt, layer_
     plot_clustering_4(spatial, energy, prediction, gt, do_plot=False, elev=56, azmuth=-71)
 
     for i in range(len(layer_feats)):
+        print("What the fuck is this?")
         layer_feat_mine = layer_feats[i][vindex]
         # distances = np.exp(-np.sum((layer_feats[i] - layer_feat_mine[np.newaxis, ...])**2, axis=-1))
         if 'dgcnn' in config_name:
@@ -230,7 +231,7 @@ def plot_clustering_layer_wise_visualize(spatial, energy, prediction ,gt, layer_
         ax = Axes3D(fig)
         ax.view_init(elev=56, azim=-71)
         jet = plt.get_cmap('Oranges')
-        plt.title("Layer: %d" % i)
+        # plt.title("Layer: %d" % i)
         ax.scatter(spatial[:,2],spatial[:,0],spatial[:,1], s=np.sqrt(energy)*2, c=distances, cmap=jet)
         ax.scatter(spatial[vindex,2],spatial[vindex,0],spatial[vindex,1], s=1000, c='green', cmap=jet)
         ax.set_xbound(min_s[2], max_s[2])
@@ -291,7 +292,7 @@ def plot_clustering_layer_wise_visualize_agg(spatial, energy, prediction ,gt, la
             fig = plt.figure()
             # fig.set_size_inches(10, 7)
             ax = Axes3D(fig)
-            plt.title("Layer: %d - Coordinate: %d" % (i+1,j+1))
+            # plt.title("Layer: %d - Coordinate: %d" % (i+1,j+1))
             ax.view_init(elev=56, azim=-71)
             jet = plt.get_cmap('Oranges')
             ax.scatter(spatial[:,2],spatial[:,0],spatial[:,1], s=np.sqrt(energy)*2, c=distances, cmap=jet)
@@ -304,7 +305,7 @@ def plot_clustering_layer_wise_visualize_agg(spatial, energy, prediction ,gt, la
             ax.set_ylabel('x (mm)')
             ax.set_zlabel('y (mm)')
 
-    output_file_name = '/afs/cern.ch/user/s/sqasim/'+config_name+'.pdf'
+    output_file_name = '/eos/home-s/sqasim/work_pdfs_plots/'+config_name+'.pdf'
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(output_file_name)
     for fig in range(1, plt.gcf().number + 1):  ## will open an empty extra figure :(
