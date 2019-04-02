@@ -24,6 +24,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         self.sum_loss=True
         self.log_loss=False
         self.xentr_loss=False
+        self.nosoftmax=False
         
     def normalise_response(self,total_response):
         mean, variance = tf.nn.moments(total_response, axes=0)
@@ -59,6 +60,7 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         num_entries = tf.squeeze(self._placeholder_num_entries, axis=1)
         print('num_entries',num_entries.shape)
         energy = self._placeholder_other_features[:, :, 0]
+        
         
         sqrt_energy = None
         if self.log_loss:
@@ -131,6 +133,30 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         
         self.mean_resolution, self.variance_resolution = self.normalise_response(total_response)
         
+        
+        
+        
+        low_energy_resp = tf.where(energy_a<20000., response_a, tf.zeros_like(response_a))
+        high_energy_resp = tf.where(energy_a>40000., response_a, tf.zeros_like(response_a))
+        n_low_energy = tf.where(energy_a<20000., tf.zeros_like(response_a)+1, tf.zeros_like(response_a))
+        n_high_energy = tf.where(energy_a>40000., tf.zeros_like(response_a)+1, tf.zeros_like(response_a))
+        
+        low_energy_mean = tf.reduce_sum(low_energy_resp,axis=0,keepdims=True) / tf.reduce_sum(n_low_energy,axis=0,keepdims=True)
+        low_energy_mean = tf.tile(low_energy_mean, [low_energy_resp.shape[0]])
+        self.low_energy_mean  = tf.reduce_mean(low_energy_mean)
+        high_energy_mean = tf.reduce_sum(high_energy_resp,axis=0,keepdims=True) / tf.reduce_sum(n_high_energy,axis=0,keepdims=True)
+        high_energy_mean = tf.tile(high_energy_mean, [low_energy_resp.shape[0]])
+        self.high_energy_mean = tf.reduce_mean(high_energy_mean)
+        
+        low_energy_resp = tf.where(n_low_energy>0., low_energy_resp, low_energy_mean)
+        self.low_energy_var  = tf.reduce_mean(tf.reduce_sum((low_energy_resp-low_energy_mean)**2,axis=0) / tf.reduce_sum(n_low_energy,axis=0))
+        
+        high_energy_resp = tf.where(n_high_energy>0., high_energy_resp, high_energy_mean)
+        self.high_energy_var = tf.reduce_mean(tf.reduce_sum((high_energy_resp-high_energy_mean)**2,axis=0) / tf.reduce_sum(n_high_energy,axis=0))
+        
+        
+        
+        
         self.total_loss = tf.reduce_mean(total_loss)
         
         sqrt_response_a = tf.reduce_sum(prediction[:,:,0]*sqrt_energies[:,:,0], axis=1) / sqrt_energy_a
@@ -190,6 +216,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
         print('sqrt_energy_sum',sqrt_energy_sum.shape)
         
         diff_sq = (prediction[:,:,0:2] - targets) ** 2.
+        
+        
+        return self.create_loss_weight_by_energy(diff_sq)
+        
         diff_sq_a = diff_sq[:,:,0]
         diff_sq_b = diff_sq[:,:,1]
         
@@ -1279,6 +1309,10 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             self.xentr_loss=True
             output = self.compute_output_binning20_2(net,seeds) 
             
+        elif self.get_variable_scope() == 'output_binning20_2_noSM':
+            self.nosoftmax=True
+            output = self.compute_output_binning20_2(net,seeds) 
+            
             
         elif self.get_variable_scope() == 'output_binning20_2_linE':
             self.E_loss=True
@@ -1296,8 +1330,15 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             
         #output=self.compute_output_seed_driven(net,self._placeholder_seed_indices)
         #output=self.compute_output_full_adjecency(_input)
-        output = tf.layers.dense(output,2)
-        output = tf.nn.softmax(output)
+        
+        if self.nosoftmax:
+            output = tf.layers.dense(output,1)
+            output = tf.clip_by_value(output,0.,1.)
+            output = tf.concat([output, 1-output],axis=-1)
+            print('output',output.shape)
+        else:
+            output = tf.layers.dense(output,2)
+            output = tf.nn.softmax(output)
         
         self._graph_temp = tf.reduce_sum(output[:,:,:], axis=1)/2679.
 
@@ -1340,9 +1381,13 @@ class SparseConvClusteringSpatialMinLoss2(SparseConvClusteringBase):
             self._graph_summaries = tf.summary.merge([self._graph_summary_loss, 
                                                       tf.summary.scalar('mean-res', self.mean_resolution), 
                                                       tf.summary.scalar('variance-res', self.variance_resolution),
-                                                      tf.summary.scalar('mean-res-sqrt', self.mean_sqrt_resolution), 
-                                                      tf.summary.scalar('variance-res-sqrt', self.variance_sqrt_resolution), 
-                                                      tf.summary.scalar('learning-rate', self.learning_rate)])
+                                                      #tf.summary.scalar('mean-res-sqrt', self.mean_sqrt_resolution), 
+                                                      #tf.summary.scalar('variance-res-sqrt', self.variance_sqrt_resolution), 
+                                                      tf.summary.scalar('learning-rate', self.learning_rate),
+                                                      tf.summary.scalar('low_energy_mean',self.low_energy_mean),
+                                                      tf.summary.scalar('high_energy_mean',self.high_energy_mean),
+                                                      tf.summary.scalar('low_energy_var',self.low_energy_var),
+                                                      tf.summary.scalar('high_energy_var',self.high_energy_var)])
 
             self._graph_summary_loss_validation = tf.summary.scalar('Validation Loss', self._graph_loss)
             self._graph_summaries_validation = tf.summary.merge([self._graph_summary_loss_validation])
