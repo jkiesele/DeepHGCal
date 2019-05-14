@@ -106,7 +106,7 @@ def load_response_values():
                     truth_sum_1 = np.sum(energy * targets[:, 1])
 
                     # Only take less than 70 GeV
-                    if max(truth_sum_0, truth_sum_1) > 70000:
+                    if max(truth_sum_0, truth_sum_1) > 70000 or min(truth_sum_0, truth_sum_1) < 5000:
                         continue
 
                     if loaded > filtered_test_size:
@@ -162,7 +162,7 @@ def compute_var_mean(cuts, response_values, energy_values, noise=False):
         var_values_cut = []
 
         for div in range(len(bin_div)-1):
-            all_corresponding_values = response_values_cut[np.argwhere(bin_indices==div)]
+            all_corresponding_values = response_values_cut[np.argwhere(bin_indices==(div+1))]
             mean_value = np.mean(all_corresponding_values)
             variance_value = np.var(all_corresponding_values)
             mean_values_cut.append(mean_value)
@@ -182,7 +182,7 @@ def make_plot(cuts, values, x_axis_text, y_axis_text):
     fig.set_size_inches(10, 7)
     print("Making %d plots"%len(values))
     for value in values:
-        plt.plot([10, 20, 30, 40, 50, 60], value)
+        plt.plot([10, 20, 30, 40, 50, 60], value, marker='o')
     plt.xlabel(x_axis_text)
     plt.ylabel(y_axis_text)
     plt.legend(["%f-%f" % (x, 1-x) for x in cuts])
