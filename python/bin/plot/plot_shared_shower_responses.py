@@ -77,15 +77,15 @@ def load_response_values():
             with gzip.open(i.strip()) as f:
                 data=pickle.load(f)
                 for j in data:
-                    input, num_entries, output = j
+                    inputx, num_entries, output = j
                     # Output is the fraction output of the network [Ex2]
                     output = np.nan_to_num(output[:,0:2])
                     # Spatial coordinates [E,3] (unused)
-                    spatial = input[:, spatial_features_indices]
+                    spatial = inputx[:, spatial_features_indices]
                     # Target fraction [E,2]
-                    targets = input[:, target_indices]
+                    targets = inputx[:, target_indices]
                     # Energy [E]
-                    energy = input[:,other_features_indices][:,0]
+                    energy = inputx[:,other_features_indices][:,0]
                     # Number of actual entries with deposit (unused)
                     num_entries = float(np.asscalar(num_entries))
 
@@ -105,6 +105,9 @@ def load_response_values():
                     truth_sum_0 = np.sum(energy * targets[:, 0])
                     truth_sum_1 = np.sum(energy * targets[:, 1])
 
+                    # print(truth_sum_0, truth_sum_1)
+                    # input()
+
                     # Only take less than 70 GeV
                     if max(truth_sum_0, truth_sum_1) > 70000 or min(truth_sum_0, truth_sum_1) < 5000:
                         continue
@@ -113,6 +116,9 @@ def load_response_values():
                         continue
                     if loaded%5000 == 0:
                         print("Loaded", loaded)
+
+                    # print(loss_non_swapped, loss_swapped)
+                    # input()
 
                     loaded += 1
 
@@ -127,6 +133,10 @@ def load_response_values():
                         response_0 = np.sum(output_copied[:, 0] * energy_copied) / np.sum(targets[:, 0] * energy_copied)
                         response_1 = np.sum(output_copied[:, 1] * energy_copied) / np.sum(targets[:, 1] * energy_copied)
 
+                        # if icut== 0:
+                        #     print(response_0, response_1)
+                        #     input()
+
                         response_values[icut].append(np.nan_to_num(response_0))
                         response_values[icut].append(np.nan_to_num(response_1))
 
@@ -134,7 +144,7 @@ def load_response_values():
                         energy_values[icut].append(truth_sum_1)
 
                         icut += 1
-    return np.array(cuts, dtype=np.float), np.array(response_values, dtype=np.float), np.array(energy_values, dtype=float)
+    return np.array(cuts, dtype=np.float), np.nan_to_num(np.array(response_values, dtype=np.float)), np.array(energy_values, dtype=float)
 
 
 def compute_var_mean(cuts, response_values, energy_values, noise=False):
@@ -142,8 +152,8 @@ def compute_var_mean(cuts, response_values, energy_values, noise=False):
     bin_div = ([5, 10, 20, 30, 40, 50, 60])
 
     # Mean values against true shower energy
-    mean_values = np.zeros((len(cuts), len(bin_div) - 1), dtype=np.float)
-    variance_values = np.zeros((len(cuts), len(bin_div) - 1), dtype=np.float)
+    mean_values = np.zeros((len(cuts), len(bin_div)), dtype=np.float)
+    variance_values = np.zeros((len(cuts), len(bin_div)), dtype=np.float)
 
     icut = 0
     for cut in cuts:
@@ -161,8 +171,8 @@ def compute_var_mean(cuts, response_values, energy_values, noise=False):
         mean_values_cut = []
         var_values_cut = []
 
-        for div in range(len(bin_div)-1):
-            all_corresponding_values = response_values_cut[np.argwhere(bin_indices==(div+1))]
+        for div in range(len(bin_div)):
+            all_corresponding_values = response_values_cut[np.argwhere(bin_indices==(div))]
             mean_value = np.mean(all_corresponding_values)
             variance_value = np.var(all_corresponding_values)
             mean_values_cut.append(mean_value)
@@ -182,7 +192,7 @@ def make_plot(cuts, values, x_axis_text, y_axis_text):
     fig.set_size_inches(10, 7)
     print("Making %d plots"%len(values))
     for value in values:
-        plt.plot([10, 20, 30, 40, 50, 60], value, marker='o')
+        plt.plot([10, 20, 30, 40, 50, 60], value[1:], marker='o')
     plt.xlabel(x_axis_text)
     plt.ylabel(y_axis_text)
     plt.legend(["%f-%f" % (x, 1-x) for x in cuts])
@@ -191,12 +201,16 @@ def make_plot(cuts, values, x_axis_text, y_axis_text):
 def main():
     # [C], [Cx(T*2)], [Cx(T*2]
     cuts, response_values, energy_values = load_response_values()
+
+    output_file_name = 'values.pbin'
+    with gzip.open(os.path.join(args.output, output_file_name), 'wb') as f:
+        pickle.dump((np.array(response_values[0]), np.array(energy_values[0])), f)
+
     # Convert from MeV to GeV
     energy_values = energy_values / 1000
 
     mean_values_noise, variance_values_noise = compute_var_mean(cuts, response_values, energy_values, noise=True)
     mean_values_true, variance_values_true = compute_var_mean(cuts, response_values, energy_values)
-
 
     make_plot(cuts, mean_values_true, "Test shower energy (GeV)", 'Response (mean)')
     plt.savefig(os.path.join(args.output, "mean_true.pdf"))
@@ -210,4 +224,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
